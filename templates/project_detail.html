@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ project_name }} - SpecFlow{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('index') }}">← プロジェクト一覧</a></p>
+
+<div class="card">
+    <h1>{{ project_name }}</h1>
+    <p class="muted">仕様書を正本として管理します。</p>
+</div>
+
+<div class="card">
+    <h2>1. 仕様書</h2>
+    <form method="post">
+        <textarea name="specification">{{ specification }}</textarea>
+        <p>
+            <button class="button" type="submit">仕様書を保存</button>
+        </p>
+    </form>
+</div>
+
+<div class="card">
+    <h2>2. Implementation Plan</h2>
+    {% if implementation_plan %}
+        <pre>{{ implementation_plan }}</pre>
+    {% else %}
+        <p class="muted">まだPlanは作成されていません。</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>3. 最新ログ</h2>
+    {% if latest_log %}
+        <pre>{{ latest_log }}</pre>
+    {% else %}
+        <p class="muted">まだ実行ログはありません。</p>
+    {% endif %}
+</div>
+{% endblock %}

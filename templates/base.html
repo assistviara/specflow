@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}SpecFlow{% endblock %}</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            margin: 0;
+            background: #f5f6f8;
+            color: #222;
+        }
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 16px 24px;
+        }
+        main {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 16px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+        }
+        textarea {
+            width: 100%;
+            min-height: 360px;
+            box-sizing: border-box;
+            font-family: Consolas, monospace;
+            padding: 12px;
+        }
+        pre {
+            white-space: pre-wrap;
+            background: #111827;
+            color: #e5e7eb;
+            padding: 14px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .button {
+            display: inline-block;
+            background: #2563eb;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 7px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .muted {
+            color: #6b7280;
+        }
+        .flash {
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            padding: 10px 14px;
+            border-radius: 7px;
+            margin-bottom: 16px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <strong>SpecFlow</strong>
+</header>
+<main>
+    {% with messages = get_flashed_messages() %}
+        {% for message in messages %}
+            <div class="flash">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+</body>
+</html>

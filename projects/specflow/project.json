@@ -1,0 +1,8 @@
+{
+    "project_name": "SpecFlow",
+    "description": "仕様駆動開発オーケストレーター",
+    "target_path": "C:/Users/knigh/Documents/AI_Development_Orchestrator/specflow_starter/specflow_starter",
+    "repository_type": "local",
+    "status": "development",
+    "version": "0.1.0"
+}
