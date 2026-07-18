@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Protocol
+
+from core.document_loader import load_text_file
+from core.prompt_builder import PromptBuilder, PromptResult
+
+
+class DocumentLoaderProtocol(Protocol):
+    """Plan Prompt Generatorが必要とする文書読込契約。"""
+
+    def load(self, path: Path) -> str:
+        """指定された文書を読み込み、文字列として返す。"""
+        ...
+
+
+class PromptBuilderProtocol(Protocol):
+    """Plan Prompt Generatorが必要とするPrompt Builder契約。"""
+
+    def build(
+        self,
+        template: str,
+        context: dict[str, object],
+    ) -> PromptResult:
+        """TemplateとContextからPromptResultを生成する。"""
+        ...
+
+
+class DocumentLoaderAdapter:
+    """既存のDocument LoaderをProtocolへ適合させるAdapter。"""
+
+    def load(self, path: Path) -> str:
+        """既存のload_text_fileへ文書読込を委譲する。"""
+        return load_text_file(path)
+
+
+class PlanPromptGenerator:
+    """Implementation Plan生成用Promptを構築する。"""
+
+    def __init__(
+        self,
+        document_loader: DocumentLoaderProtocol | None = None,
+        prompt_builder: PromptBuilderProtocol | None = None,
+    ) -> None:
+        self._document_loader = (
+            document_loader or DocumentLoaderAdapter()
+        )
+        self._prompt_builder = prompt_builder or PromptBuilder()
+
+    def generate(
+        self,
+        *,
+        constitution_path: Path,
+        principles_path: Path,
+        specification_path: Path,
+        decisions_path: Path,
+        project_metadata: dict[str, Any],
+        template_path: Path,
+    ) -> PromptResult:
+        """
+        正式文書とプロジェクト情報から、
+        Implementation Plan生成用Promptを構築する。
+
+        Document Loader、Prompt BuilderおよびJSON変換時の例外は、
+        握りつぶさずそのまま呼び出し元へ伝播させる。
+        """
+        constitution = self._document_loader.load(
+            constitution_path
+        )
+        principles = self._document_loader.load(
+            principles_path
+        )
+        specification = self._document_loader.load(
+            specification_path
+        )
+        decisions = self._document_loader.load(
+            decisions_path
+        )
+        template = self._document_loader.load(
+            template_path
+        )
+
+        project_metadata_json = json.dumps(
+            project_metadata,
+            ensure_ascii=False,
+            indent=2,
+        )
+
+        context: dict[str, object] = {
+            "constitution": constitution,
+            "principles": principles,
+            "specification": specification,
+            "decisions": decisions,
+            "project_metadata": project_metadata_json,
+        }
+
+        return self._prompt_builder.build(
+            template=template,
+            context=context,
+        )
