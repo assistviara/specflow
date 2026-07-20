@@ -62,7 +62,12 @@ def test_generate_returns_prompt_result() -> None:
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
-        project_metadata={"name": "SpecFlow"},
+        project_metadata={
+            "project_name": "SpecFlow",
+            "target_path": "specflow_starter/",
+            "project_description": "仕様書中心のAI開発支援システム",
+            "project_version": "0.2.0",
+        },
         template_path=Path("plan_prompt_template.md"),
     )
 
@@ -83,7 +88,12 @@ def test_generate_loads_all_required_documents() -> None:
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
-        project_metadata={"name": "SpecFlow"},
+        project_metadata={
+            "project_name": "SpecFlow",
+            "target_path": "specflow_starter/",
+            "project_description": "仕様書中心のAI開発支援システム",
+            "project_version": "0.2.0",
+        },
         template_path=Path("plan_prompt_template.md"),
     )
 
@@ -108,34 +118,47 @@ def test_generate_builds_expected_context() -> None:
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
-        project_metadata={"name": "SpecFlow"},
+        project_metadata={
+            "project_name": "SpecFlow",
+            "target_path": "specflow_starter/",
+            "project_description": "仕様書中心のAI開発支援システム",
+            "project_version": "0.2.0",
+        },
         template_path=Path("plan_prompt_template.md"),
     )
 
     assert prompt_builder.template == "CONTENT:plan_prompt_template.md"
-
     assert prompt_builder.context is not None
 
-    assert prompt_builder.context["constitution"] == (
+    assert prompt_builder.context["CONSTITUTION"] == (
         "CONTENT:constitution.md"
     )
 
-    assert prompt_builder.context["principles"] == (
+    assert prompt_builder.context["PRINCIPLES"] == (
         "CONTENT:principles.md"
     )
 
-    assert prompt_builder.context["specification"] == (
+    assert prompt_builder.context["SPECIFICATION"] == (
         "CONTENT:specification.md"
     )
 
-    assert prompt_builder.context["decisions"] == (
+    assert prompt_builder.context["DECISIONS"] == (
         "CONTENT:decisions.md"
     )
 
-    project_metadata = prompt_builder.context["project_metadata"]
+    assert prompt_builder.context["PROJECT_NAME"] == "SpecFlow"
 
-    assert isinstance(project_metadata, str)
-    assert '"name": "SpecFlow"' in project_metadata
+    assert prompt_builder.context["TARGET_PATH"] == (
+        "specflow_starter/"
+    )
+
+    assert prompt_builder.context["PROJECT_DESCRIPTION"] == (
+        "仕様書中心のAI開発支援システム"
+    )
+
+    assert prompt_builder.context["PROJECT_VERSION"] == "0.2.0"
+
+    
 
 def test_generate_propagates_document_loader_error() -> None:
     generator = PlanPromptGenerator(
@@ -149,7 +172,12 @@ def test_generate_propagates_document_loader_error() -> None:
             principles_path=Path("principles.md"),
             specification_path=Path("specification.md"),
             decisions_path=Path("decisions.md"),
-            project_metadata={"name": "SpecFlow"},
+            project_metadata={
+            "project_name": "SpecFlow",
+            "target_path": "specflow_starter/",
+            "project_description": "仕様書中心のAI開発支援システム",
+            "project_version": "0.2.0",
+        },
             template_path=Path("plan_prompt_template.md"),
         )
 
@@ -171,6 +199,11 @@ def test_generate_propagates_prompt_builder_error() -> None:
             principles_path=Path("principles.md"),
             specification_path=Path("specification.md"),
             decisions_path=Path("decisions.md"),
-            project_metadata={"name": "SpecFlow"},
+            project_metadata={
+            "project_name": "SpecFlow",
+            "target_path": "specflow_starter/",
+            "project_description": "仕様書中心のAI開発支援システム",
+            "project_version": "0.2.0",
+        },
             template_path=Path("plan_prompt_template.md"),
         )
