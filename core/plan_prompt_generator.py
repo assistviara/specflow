@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -82,20 +81,16 @@ class PlanPromptGenerator:
             template_path
         )
 
-        project_metadata_json = json.dumps(
-            project_metadata,
-            ensure_ascii=False,
-            indent=2,
-        )
-
         context: dict[str, object] = {
-            "constitution": constitution,
-            "principles": principles,
-            "specification": specification,
-            "decisions": decisions,
-            "project_metadata": project_metadata_json,
+            "CONSTITUTION": constitution,
+            "PRINCIPLES": principles,
+            "SPECIFICATION": specification,
+            "DECISIONS": decisions,
+            "PROJECT_NAME": project_metadata["project_name"],
+            "TARGET_PATH": project_metadata["target_path"],
+            "PROJECT_DESCRIPTION": project_metadata["project_description"],
+            "PROJECT_VERSION": project_metadata["project_version"],
         }
-
         return self._prompt_builder.build(
             template=template,
             context=context,
