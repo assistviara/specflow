@@ -55,16 +55,10 @@ class PlanPromptGenerator:
         principles_path: Path,
         specification_path: Path,
         decisions_path: Path,
+        implementation_plan_template_path: Path,
         project_metadata: dict[str, Any],
         template_path: Path,
     ) -> PromptResult:
-        """
-        正式文書とプロジェクト情報から、
-        Implementation Plan生成用Promptを構築する。
-
-        Document Loader、Prompt BuilderおよびJSON変換時の例外は、
-        握りつぶさずそのまま呼び出し元へ伝播させる。
-        """
         constitution = self._document_loader.load(
             constitution_path
         )
@@ -77,6 +71,9 @@ class PlanPromptGenerator:
         decisions = self._document_loader.load(
             decisions_path
         )
+        implementation_plan_template = self._document_loader.load(
+            implementation_plan_template_path
+        )
         template = self._document_loader.load(
             template_path
         )
@@ -88,9 +85,15 @@ class PlanPromptGenerator:
             "DECISIONS": decisions,
             "PROJECT_NAME": project_metadata["project_name"],
             "TARGET_PATH": project_metadata["target_path"],
-            "PROJECT_DESCRIPTION": project_metadata["project_description"],
+            "PROJECT_DESCRIPTION": project_metadata[
+                "project_description"
+            ],
             "PROJECT_VERSION": project_metadata["project_version"],
+            "IMPLEMENTATION_PLAN_TEMPLATE": (
+                implementation_plan_template
+            ),
         }
+
         return self._prompt_builder.build(
             template=template,
             context=context,
