@@ -69,11 +69,23 @@ def test_plan_prompt_can_be_executed_by_dummy_ai(
     generator = PlanPromptGenerator()
     runner = DummyAIRunner()
 
+    implementation_plan_template_path = write_text_file(
+    tmp_path,
+    "implementation_plan_template.md",
+    (
+        "# Implementation Plan\n\n"
+        "## 1. Plan概要\n\n"
+        "## 2. Specificationの理解\n\n"
+        "## 3. 現状調査\n"
+    ),
+)
+
     prompt_result = generator.generate(
         constitution_path=constitution_path,
         principles_path=principles_path,
         specification_path=specification_path,
         decisions_path=decisions_path,
+        implementation_plan_template_path=implementation_plan_template_path,
         project_metadata={
             "project_name": "SpecFlow",
             "target_path": "specflow_starter/",

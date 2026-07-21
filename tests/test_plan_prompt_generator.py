@@ -62,6 +62,9 @@ def test_generate_returns_prompt_result() -> None:
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
+        implementation_plan_template_path=Path(
+            "implementation_plan_template.md"
+        ),
         project_metadata={
             "project_name": "SpecFlow",
             "target_path": "specflow_starter/",
@@ -88,6 +91,9 @@ def test_generate_loads_all_required_documents() -> None:
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
+        implementation_plan_template_path=Path(
+            "implementation_plan_template.md"
+        ),
         project_metadata={
             "project_name": "SpecFlow",
             "target_path": "specflow_starter/",
@@ -102,6 +108,7 @@ def test_generate_loads_all_required_documents() -> None:
         Path("principles.md"),
         Path("specification.md"),
         Path("decisions.md"),
+        Path("implementation_plan_template.md"),
         Path("plan_prompt_template.md"),
     ]
 
@@ -118,6 +125,9 @@ def test_generate_builds_expected_context() -> None:
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
+        implementation_plan_template_path=Path(
+            "implementation_plan_template.md"
+        ),
         project_metadata={
             "project_name": "SpecFlow",
             "target_path": "specflow_starter/",
@@ -158,6 +168,10 @@ def test_generate_builds_expected_context() -> None:
 
     assert prompt_builder.context["PROJECT_VERSION"] == "0.2.0"
 
+    assert prompt_builder.context[
+        "IMPLEMENTATION_PLAN_TEMPLATE"
+    ] == "CONTENT:implementation_plan_template.md"
+
     
 
 def test_generate_propagates_document_loader_error() -> None:
@@ -173,11 +187,38 @@ def test_generate_propagates_document_loader_error() -> None:
             specification_path=Path("specification.md"),
             decisions_path=Path("decisions.md"),
             project_metadata={
-            "project_name": "SpecFlow",
-            "target_path": "specflow_starter/",
-            "project_description": "仕様書中心のAI開発支援システム",
-            "project_version": "0.2.0",
-        },
+                "project_name": "SpecFlow",
+                "target_path": "specflow_starter/",
+                "project_description": "仕様書中心のAI開発支援システム",
+                "project_version": "0.2.0",
+            },
+            template_path=Path("plan_prompt_template.md"),
+        )
+
+    assert exc_info.value.error_type == "TEST_ERROR"
+    assert exc_info.value.path == Path("constitution.md")
+
+def test_generate_propagates_document_loader_error() -> None:
+    generator = PlanPromptGenerator(
+        document_loader=FailingDocumentLoader(),
+        prompt_builder=FakePromptBuilder(),
+    )
+
+    with pytest.raises(DocumentLoadError) as exc_info:
+        generator.generate(
+            constitution_path=Path("constitution.md"),
+            principles_path=Path("principles.md"),
+            specification_path=Path("specification.md"),
+            decisions_path=Path("decisions.md"),
+            implementation_plan_template_path=Path(
+                "implementation_plan_template.md"
+            ),
+            project_metadata={
+                "project_name": "SpecFlow",
+                "target_path": "specflow_starter/",
+                "project_description": "仕様書中心のAI開発支援システム",
+                "project_version": "0.2.0",
+            },
             template_path=Path("plan_prompt_template.md"),
         )
 
@@ -199,11 +240,14 @@ def test_generate_propagates_prompt_builder_error() -> None:
             principles_path=Path("principles.md"),
             specification_path=Path("specification.md"),
             decisions_path=Path("decisions.md"),
+            implementation_plan_template_path=Path(
+                "implementation_plan_template.md"
+            ),
             project_metadata={
-            "project_name": "SpecFlow",
-            "target_path": "specflow_starter/",
-            "project_description": "仕様書中心のAI開発支援システム",
-            "project_version": "0.2.0",
-        },
+                "project_name": "SpecFlow",
+                "target_path": "specflow_starter/",
+                "project_description": "仕様書中心のAI開発支援システム",
+                "project_version": "0.2.0",
+            },
             template_path=Path("plan_prompt_template.md"),
         )
