@@ -128,28 +128,34 @@ AIは一つの巨大なAIとして動作するのではない。
                      Requirement
                            │
                            ▼
-                     Specification
+                  Specification AI
                            │
+                           ▼
+                Specification (Draft)
+                           │
+                  Decision / Approval
+                           │
+                           ▼
+              Approved Specification
 ────────────────────────────────────────────
-
-                 Specification AI
-                         │
-                         ▼
-                  Architecture AI
-                         │
-                         ▼
+                           │
+                           ▼
+                   Architecture AI
+                           │
+                           ▼
                 Implementation AI
-                         │
-                         ▼
-                     Review AI
-                         │
-                         ▼
-                      Test AI
-
+                           │
+                           ▼
+                      Review AI
+                           │
+                           ▼
+                       Test AI
 ────────────────────────────────────────────
-                         │
-                         ▼
-                  Approved Result
+                           │
+                  Decision / Approval
+                           │
+                           ▼
+                   Approved Result
 ```
 
 ---
@@ -202,12 +208,13 @@ AI同士は、
 
 独断で変更してはならない。
 
-改善提案を発見した場合は、
+改善提案または不整合を発見した場合は、
 
-Implementationへ反映せず、
+担当外成果物へ直接反映してはならない。
 
-Specification策定工程へ返却する。
+問題の発生源となる工程、
 
+またはHumanへ返却する。
 ---
 
 ## 3.6 Human-Centered Development
@@ -281,7 +288,7 @@ Engineは、
 # 4.1 Overall Flow
 
 ```text
-                         Human
+                        Human
                            │
                            ▼
                      Requirement
@@ -291,27 +298,33 @@ Engineは、
                            │
                            ▼
                Plan Prompt Generator
-                  │               │
-                  ▼               ▼
-          Document Loader   Prompt Builder
-                                   │
-                                   ▼
-                            Template Engine
-                                   │
-                                   ▼
-                             Plan Prompt
-                                   │
-                                   ▼
-                              AI Runner
-                                   │
-                                   ▼
-                  Implementation Plan (Draft)
-                                   │
-                                   ▼
-                            Human Review
-                                   │
-                                   ▼
-                 Approved Implementation Plan
+                        │
+                        ├── Document Loader
+                        │       │
+                        │       ▼
+                        │   Document Objects
+                        │
+                        └── Prompt Builder
+                                │
+                                └── uses Template Engine
+                                        │
+                                        ▼
+                                  Rendered Prompt
+                                │
+                                ▼
+                          PromptResult
+                                │
+                                ▼
+                           AI Runner
+                                │
+                                ▼
+              Implementation Plan (Draft)
+                                │
+                                ▼
+                         Human Review
+                                │
+                                ▼
+             Approved Implementation Plan
 ```
 
 SpecFlowでは、
@@ -551,6 +564,8 @@ State Managerは、
 ---
 
 # 5.4 Engine Relationship
+以下は、Engine間の概念的な関係を示す。
+実際の内部呼び出し順序を表すものではない。
 
 ```text
 Document Loader
@@ -588,7 +603,7 @@ Engine間で循環依存を作ってはならない。
 
 SpecFlowでは、
 
-各Engineが入力データを段階的に変換しながら処理を進める。
+各Engineが前工程の成果物を受け取り、次工程で利用可能な成果物へ変換しながら処理を進める。
 
 ```text
 Markdown Documents
@@ -639,6 +654,8 @@ Approved Document
 各Engineは、
 
 入力を受け取り、
+
+必要に応じて内部コンポーネントを利用しながら、
 
 次工程で利用できる成果物へ変換する責務のみを持つ。
 
