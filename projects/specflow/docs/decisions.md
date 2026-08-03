@@ -23,3 +23,28 @@ Decision文書の索引である。
 - 対象：Template Engine
 - 判定：APPROVED
 - 正本文書：`decision_template_engine.md`
+
+---
+
+
+## DEC-003 Prompt Builder
+
+- 対象：Prompt Builder
+- 判定：APPROVED
+- 正本文書：`decision_prompt_builder.md`
+
+---
+
+## DEC-004 Plan Prompt Generator
+
+- 対象：Plan Prompt Generator
+- 判定：APPROVED
+- 正本文書：`decision_plan_prompt_generator.md`
+
+---
+
+## DEC-005 AI Runner Foundation
+
+- 対象：AI Runner Foundation
+- 判定：APPROVED
+- 正本文書：`decision_ai_runner_foundation.md`
