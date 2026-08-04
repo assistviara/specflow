@@ -1,5 +1,6 @@
 import pytest
 
+from dataclasses import FrozenInstanceError
 from core.ai.ai_request import AIRequest
 
 
@@ -22,3 +23,9 @@ def test_ai_request_rejects_whitespace_only_prompt() -> None:
 def test_ai_request_rejects_non_string_prompt() -> None:
     with pytest.raises(TypeError, match="prompt must be a string"):
         AIRequest(prompt=123)  # type: ignore[arg-type]
+
+def test_ai_request_cannot_be_modified() -> None:
+    request = AIRequest(prompt="Create an implementation plan.")
+
+    with pytest.raises(FrozenInstanceError):
+        request.prompt = "Modified prompt"  # type: ignore[misc]

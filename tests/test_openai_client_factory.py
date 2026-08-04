@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 from core.ai.openai_client_factory import OpenAIClientFactory
 
 
-def test_create_returns_openai_client():
+def test_create_returns_openai_client() -> None:
     expected_client = Mock()
 
     with patch(

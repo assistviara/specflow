@@ -83,3 +83,28 @@ def test_openai_api_runner_returns_failure_when_output_text_is_invalid() -> None
     assert response.content == ""
     assert response.success is False
     assert response.error_message == "OpenAI API response has no output text"
+
+def test_openai_api_runner_returns_failure_when_output_text_is_empty() -> None:
+    client = Mock()
+
+    api_response = Mock()
+    api_response.output_text = "   "
+
+    client.responses.create.return_value = api_response
+
+    runner = OpenAIAPIRunner(
+        client=client,
+        model="gpt-5.5",
+    )
+
+    request = AIRequest(
+        prompt="Implementation Planを生成してください。"
+    )
+
+    response = runner.run(request)
+
+    assert response.content == ""
+    assert response.success is False
+    assert response.error_message == (
+        "OpenAI API response has no output text"
+    )

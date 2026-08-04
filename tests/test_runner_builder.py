@@ -3,7 +3,8 @@ from unittest.mock import Mock, patch
 from core.ai.runner_builder import create_openai_runner
 
 
-def test_create_openai_runner():
+
+def test_create_openai_runner() -> None:
     mock_client = Mock()
     mock_runner = Mock()
 
