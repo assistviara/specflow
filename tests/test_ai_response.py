@@ -1,5 +1,7 @@
 import pytest
 
+from dataclasses import FrozenInstanceError
+
 from core.ai.ai_response import AIResponse
 
 
@@ -63,3 +65,36 @@ def test_response_rejects_non_bool_success() -> None:
             content="Generated content",
             success="yes",  # type: ignore[arg-type]
         )
+
+def test_response_rejects_invalid_error_message_type() -> None:
+    with pytest.raises(
+        TypeError,
+        match="error_message must be a string or None",
+    ):
+        AIResponse(
+            content="",
+            success=False,
+            error_message=123,  # type: ignore[arg-type]
+        )
+
+
+def test_failed_response_rejects_empty_error_message() -> None:
+    with pytest.raises(
+        ValueError,
+        match="failed response must contain an error message",
+    ):
+        AIResponse(
+            content="",
+            success=False,
+            error_message="",
+        )
+
+
+def test_ai_response_cannot_be_modified() -> None:
+    response = AIResponse(
+        content="Generated content",
+        success=True,
+    )
+
+    with pytest.raises(FrozenInstanceError):
+        response.content = "Modified content"  # type: ignore[misc]

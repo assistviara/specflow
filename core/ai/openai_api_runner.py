@@ -26,7 +26,7 @@ class OpenAIAPIRunner(AIRunner):
 
             output_text = response.output_text
 
-            if not isinstance(output_text, str):
+            if not isinstance(output_text, str) or not output_text.strip():
                 return AIResponse(
                     content="",
                     success=False,

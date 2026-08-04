@@ -2,6 +2,8 @@ from openai import OpenAI
 
 
 class OpenAIClientFactory:
+    """OpenAIクライアントを生成する。"""
+
     @staticmethod
-    def create():
+    def create() -> OpenAI:
         return OpenAI()

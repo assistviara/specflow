@@ -3,7 +3,7 @@ from pathlib import Path
 from core.ai.dummy_runner import DummyAIRunner
 from core.ai.prompt_adapter import PromptAdapter
 from core.plan_prompt_generator import PlanPromptGenerator
-
+from core.ai.ai_service import AIService
 
 def write_text_file(
     directory: Path,
@@ -68,17 +68,18 @@ def test_plan_prompt_can_be_executed_by_dummy_ai(
 
     generator = PlanPromptGenerator()
     runner = DummyAIRunner()
+    service = AIService(runner=runner)
 
     implementation_plan_template_path = write_text_file(
-    tmp_path,
-    "implementation_plan_template.md",
-    (
-        "# Implementation Plan\n\n"
-        "## 1. Plan概要\n\n"
-        "## 2. Specificationの理解\n\n"
-        "## 3. 現状調査\n"
-    ),
-)
+        tmp_path,
+        "implementation_plan_template.md",
+        (
+            "# Implementation Plan\n\n"
+            "## 1. Plan概要\n\n"
+            "## 2. Specificationの理解\n\n"
+            "## 3. 現状調査\n"
+        ),
+    )
 
     prompt_result = generator.generate(
         constitution_path=constitution_path,
@@ -98,7 +99,7 @@ def test_plan_prompt_can_be_executed_by_dummy_ai(
     )
 
     request = PromptAdapter.to_ai_request(prompt_result)
-    response = runner.run(request)
+    response = service.run(request)
 
     assert prompt_result.is_ready is True
     assert prompt_result.undefined_variables == []
