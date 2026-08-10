@@ -915,24 +915,315 @@ SpecFlow Version 1 MVPは、以下を満たした場合に完成とする。
 
 ---
 
-# 15. Open Issues Before Formal Specification
+# 15. Decisions and Open Issues Before Formal Specification
 
-正式Specification策定前に、以下を決定する必要がある。
+正式Specification策定前に、Application Layerの基本設計に関する事項をHumanが決定する。
 
-1. Application Layerを配置するPythonパッケージ
-2. UseCaseの命名規則
-3. UseCase入力・出力DTOの形式
-4. 承認記録の保存形式
-5. 状態管理の保存形式
-6. Implementation Evidenceの正式なフォーマット
-7. Codexの停止・再開方式
-8. Source CodeおよびGit Diffの取得方法
-9. Review用Promptの入力上限と分割方法
-10. TDDを必須とする範囲
-11. 修正ループの最大回数
-12. HumanがSpecificationを承認済みと判断する方法
-13. ChatGPT RunnerとCodex Runnerの具体的な割り当て方法
+決定済み事項については、決定内容だけでなく、その判断理由を本章に記録する。
 
-これらは、Humanの判断なしに実装段階で補完してはならない。
+未決事項については、Humanの判断なしに実装段階で補完してはならない。
+
+---
+
+## 15.1 Application Layerを配置するPythonパッケージ
+
+**Status: Decided**
+
+Application Layerは、`core`の外側に独立したトップレベルPython Packageとして配置する。
+
+概念的な構成は、以下とする。
+
+```text
+specflow/
+├── application/
+├── core/
+├── projects/
+└── tests/
+```
+
+依存方向は、以下を原則とする。
+
+```text
+UI / Interface
+      ↓
+Application
+      ↓
+Core
+```
+
+Application LayerはCoreを利用できる。
+
+CoreはApplication Layerへ依存してはならない。
+
+### Decision Reason
+
+Application Layerは、以下の責務を持つ。
+
+- UseCase制御
+- Human承認
+- 状態遷移
+- 修正ループ
+- Engine間の成果物受け渡し
+
+これらは、再利用可能なCore Engineとは責務が異なる。
+
+`core/application/`としてCore内部へ配置する案は、Version 1 MVPにおいて構成を単純にできる利点がある。
+
+一方で、Application LayerをCore内部へ配置すると、再利用可能なCore Engineと、SpecFlow固有のUseCase制御との責務境界が不明確になる可能性がある。
+
+そのため、Version 1 MVPでは実装対象機能を限定するが、MVPであることのみを理由として責務分離を弱めない。
+
+SpecFlowでは、機能についてはMVPとして必要最小限に限定しつつ、構造については将来の拡張を妨げない最小限の責務分離を採用する。
+
+Application LayerをCoreから分離することで、将来的に以下のInterfaceから共通してApplication Layerを利用できる構造を維持する。
+
+```text
+Web UI ─┐
+CLI    ├──> Application ───> Core
+API    ┘
+```
+
+これにより、将来Web UI、CLI、API等を追加する場合にも、Core Engineの構造を大きく変更せずに拡張できる。
+
+また、Core EngineはApplication LayerやUIの存在を知る必要がなく、独立した再利用可能な部品として維持する。
+
+以上の理由から、Application Layerは`core`の外側に独立したトップレベルPython Packageとして配置する。
+
+---
+
+## 15.2 UseCaseの命名規則
+
+**Status: Decided**
+
+Application Layerに配置するUseCaseクラスは、原則として以下の命名規則を使用する。
+
+```text
+動詞 + 目的語 + UseCase
+```
+
+Pythonのクラス名はPascalCaseとする。
+
+例：
+
+```python
+GenerateImplementationPlanUseCase
+ApproveImplementationPlanUseCase
+ReviseImplementationPlanUseCase
+GenerateCodexPromptUseCase
+ExecuteImplementationUseCase
+CollectImplementationEvidenceUseCase
+ReviewImplementationUseCase
+ApproveFinalResultUseCase
+ResumeCorrectionUseCase
+```
+
+対応するPythonファイル名はsnake_caseとし、クラス名と対応関係が分かる名称とする。
+
+例：
+
+```text
+generate_implementation_plan_use_case.py
+approve_implementation_plan_use_case.py
+revise_implementation_plan_use_case.py
+generate_codex_prompt_use_case.py
+execute_implementation_use_case.py
+collect_implementation_evidence_use_case.py
+review_implementation_use_case.py
+approve_final_result_use_case.py
+resume_correction_use_case.py
+```
+
+### Decision Reason
+
+Application LayerのUseCaseは、Core EngineやService、Runner等とは異なり、複数の部品を利用してSpecFlowの開発工程を進行する責務を持つ。
+
+そのため、クラス名に`UseCase`を明示することで、そのクラスがApplication Layerの進行処理を担当することを、名前だけから判断できるようにする。
+
+例えば、
+
+```python
+GenerateImplementationPlan
+```
+
+という名称だけでは、それがUseCase、Service、Engine、Runner等のどの責務を持つものかが明確でない。
+
+一方、
+
+```python
+GenerateImplementationPlanUseCase
+```
+
+とすることで、Application Layerに属するUseCaseであることを明示できる。
+
+SpecFlowでは今後、以下のような異なる責務を持つコンポーネントが共存する。
+
+```text
+UseCase
+Engine
+Service
+Runner
+Adapter
+Loader
+```
+
+そのため、多少名称が長くなっても、責務を名前から判別できることを優先する。
+
+また、SpecFlowの開発ではAIによるコード生成やコピー・編集を利用するため、名称が長くなることによる入力負担は限定的である。
+
+以上の理由から、Application LayerのUseCaseクラスは、
+
+```text
+動詞 + 目的語 + UseCase
+```
+
+を基本命名規則とする。
+
+---
+
+## 15.3 UseCase入力・出力DTOの形式
+
+**Status: Decided**
+
+Application LayerのUseCaseにおける入力・出力DTOは、原則としてPython標準ライブラリの`dataclass`を使用する。
+
+DTOは、原則として以下の形式で定義する。
+
+```python
+from dataclasses import dataclass
 
 
+@dataclass(frozen=True)
+class ExampleInput:
+    ...
+
+
+@dataclass(frozen=True)
+class ExampleOutput:
+    ...
+```
+
+UseCaseごとに、必要に応じてInput DTOおよびOutput DTOを定義する。
+
+命名は、対象となるUseCaseとの対応関係が明確になる名称を使用する。
+
+例：
+
+```python
+@dataclass(frozen=True)
+class GenerateImplementationPlanInput:
+    ...
+
+
+@dataclass(frozen=True)
+class GenerateImplementationPlanOutput:
+    ...
+```
+
+Application LayerのUseCaseは、これらのDTOを通じて入力を受け取り、処理結果を返すことを基本とする。
+
+概念的なデータの流れは、以下とする。
+
+```text
+UI / Interface
+      ↓
+Input DTO
+      ↓
+Application UseCase
+      ↓
+Core
+      ↓
+Application UseCase
+      ↓
+Output DTO
+      ↓
+UI / Interface
+```
+
+### DTOの責務
+
+DTOは、LayerやUseCase間でデータを受け渡すためのデータ構造である。
+
+DTO自身は、開発工程の進行判断やAI実行等の業務処理を担当しない。
+
+Application Layerにおいて、
+
+- どのデータを入力として必要とするか
+- どのデータを処理結果として返すか
+
+を明示するための契約として使用する。
+
+### Decision Reason
+
+Pythonの`dict`を使用すれば、柔軟かつ簡潔にデータを受け渡すことができる。
+
+一方で、Application Layerの正式な入出力契約として`dict`を使用すると、
+
+- 必要なキーがコードから判別しにくい
+- キー名の誤りを検出しにくい
+- 値の型が不明確になりやすい
+- UseCaseの規模拡大に伴いデータ構造を把握しにくくなる
+
+という問題が生じる可能性がある。
+
+`dataclass`を使用することで、UseCaseが必要とするデータ構造と型をコード上で明示できる。
+
+また、IDE、静的解析、テスト、およびAIによるコード生成・レビューにおいても、InputとOutputの契約を把握しやすくなる。
+
+SpecFlowでは既に`AIRequest`および`AIResponse`で`@dataclass(frozen=True)`を使用しており、既存コードとの設計上の一貫性も保つことができる。
+
+`frozen=True`を基本とすることで、生成されたDTOが受け渡し途中で意図せず変更されることを防ぎ、データの流れを追跡しやすくする。
+
+以上の理由から、Version 1ではApplication Layer内部のUseCase Input / Output DTOに`dataclass(frozen=True)`を基本形式として採用する。
+
+### `dict`の扱い
+
+`dict`の使用自体は禁止しない。
+
+Core内部のContextや、一時的・内部的なデータ構造など、柔軟なデータ表現が適切な箇所では使用できる。
+
+ただし、Application LayerのUseCaseにおける正式なInput / Output契約については、原則としてDTOを使用する。
+
+### Pydanticの扱い
+
+Version 1のApplication Layer内部DTOでは、Pydanticを必須としない。
+
+将来Web UIやAPI等を実装し、外部から不確かな入力データを受け取る場合には、入力ValidationのためにPydantic等を利用できる。
+
+その場合も、外部InterfaceにおけるValidationモデルと、Application Layer内部のDTOは責務を分離することを原則とする。
+
+概念的には、以下の構造を想定する。
+
+```text
+External Input
+      ↓
+Validation
+(Pydantic等)
+      ↓
+Application DTO
+(dataclass)
+      ↓
+Application UseCase
+      ↓
+Core
+```
+
+これにより、外部入力の検証責務と、Application Layer内部のデータ受け渡し責務を分離する。
+
+---
+
+## 15.4 Open Issues
+
+正式Specification策定前に、以下の事項を引き続き決定する必要がある。
+
+1. 承認記録の保存形式
+2. 状態管理の保存形式
+3. Implementation Evidenceの正式なフォーマット
+4. Codexの停止・再開方式
+5. Source CodeおよびGit Diffの取得方法
+6. Review用Promptの入力上限と分割方法
+7. TDDを必須とする範囲
+8. 修正ループの最大回数
+9. HumanがSpecificationを承認済みと判断する方法
+10. ChatGPT RunnerとCodex Runnerの具体的な割り当て方法
+
+これらの未決事項は、Humanの判断なしに実装段階で補完してはならない。
