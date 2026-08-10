@@ -1211,19 +1211,435 @@ Core
 
 ---
 
-## 15.4 Open Issues
+## 15.4 承認記録の保存形式
+
+**Status: Decided**
+
+Version 1では、現在の進行状態とHumanによる承認記録を分離して管理する。
+
+現在の進行状態は`state.json`で管理する。
+
+Humanによる承認記録は、独立したJSONファイルとして`approvals/`配下に保存する。
+
+概念的な構成は、以下とする。
+
+```text
+projects/specflow/
+├── state.json
+└── approvals/
+    ├── plan_approval_001.json
+    ├── critical_change_approval_001.json
+    └── final_approval_001.json
+```
+
+`state.json`は、現在の開発工程や状態を管理する。
+
+例：
+
+```json
+{
+  "state": "plan_approved"
+}
+```
+
+承認記録JSONは、Humanが何をどのように判断したかを記録する。
+
+承認記録には、少なくとも以下の情報を保持する。
+
+```text
+approval_id
+artifact_type
+artifact_path
+artifact_hash
+decision
+approved_at
+comment
+```
+
+`artifact_hash`は、Humanが承認した成果物と現在の成果物が同一であることを確認するために使用する。
+
+承認後に対象成果物が変更され、現在のhashと承認時の`artifact_hash`が一致しない場合、その承認記録を現在の成果物に対する有効な承認として扱ってはならない。
+
+### Decision Reason
+
+`state.json`のみで承認状態を管理する方法は実装が簡潔である一方、どの成果物をHumanが承認したのかを十分に追跡できない。
+
+例えば、
+
+```text
+plan_approved = true
+```
+
+という情報だけでは、承認後にImplementation Planが変更された場合でも、承認済み状態が残る可能性がある。
+
+そのため、
+
+```text
+state.json
+= 現在の状態
+
+approvals/*.json
+= Humanによる判断の証拠
+```
+
+として責務を分離する。
+
+これにより、Application Layerは現在の工程を管理しながら、Human承認の対象、判断内容、時点、および承認対象の同一性を追跡できる。
+
+Version 1では、承認記録の保存のためにDBを必須としない。
+
+JSON形式を採用することで、実装を比較的単純に保ちつつ、Gitによる変更履歴の追跡やHumanによる内容確認を容易にする。
+
+将来、複数ユーザー管理、高度な検索、監査機能等が必要になった場合には、DBへの移行または併用を検討できる。
+
+以上の理由から、Version 1では、
+
+```text
+state.json + approvals/*.json
+```
+
+による分離管理を採用する。
+
+## 15.5 状態管理の保存形式
+
+**Status: Decided**
+
+Version 1では、現在の開発状態と状態遷移の履歴を分離して管理する。
+
+現在の開発状態は、`state.json`に保存する。
+
+状態遷移の履歴は、独立したJSONファイルとして`state_history/`配下に保存する。
+
+概念的な構成は、以下とする。
+
+```text
+projects/specflow/
+├── state.json
+├── state_history/
+│   ├── state_transition_001.json
+│   ├── state_transition_002.json
+│   └── state_transition_003.json
+└── approvals/
+```
+
+`state.json`は、SpecFlowが現在どの開発工程にあるかを示すCurrent Stateとして扱う。
+
+例：
+
+```json
+{
+  "state": "plan_approval_pending",
+  "updated_at": "2026-08-10T22:00:00+09:00"
+}
+```
+
+状態が変更された場合、`state.json`を新しい状態へ更新するとともに、その状態遷移を`state_history/`へ記録する。
+
+状態遷移履歴には、少なくとも以下の情報を保持する。
+
+```text
+transition_id
+from_state
+to_state
+occurred_at
+reason
+```
+
+例：
+
+```json
+{
+  "transition_id": "state_transition_003",
+  "from_state": "plan_generating",
+  "to_state": "plan_approval_pending",
+  "occurred_at": "2026-08-10T22:00:00+09:00",
+  "reason": "Implementation Plan Draft generated"
+}
+```
+
+### Current StateとHistoryの責務
+
+`state.json`は、現在の状態を確認するために使用する。
+
+`state_history/*.json`は、現在の状態へ至るまでに、どのような状態遷移が発生したかを追跡するために使用する。
+
+役割は、以下のように分離する。
+
+```text
+state.json
+= 現在の状態
+
+state_history/*.json
+= 状態遷移の履歴
+```
+
+Application Layerは、次のUseCaseを実行できるか判断する際に、`state.json`のCurrent Stateを参照する。
+
+状態遷移が発生した場合は、Current Stateの更新だけでなく、その遷移を履歴として記録する。
+
+### Decision Reason
+
+`state.json`のみを更新する方式は、現在の状態を把握する方法としては簡潔である。
+
+一方で、`state.json`を上書きするだけでは、過去にどの状態を経由し、なぜ現在の状態へ到達したのかを追跡できない。
+
+SpecFlowでは、Humanによる差し戻し、Review不適合、再実装、再Review等によって、以前の工程へ戻る状態遷移が発生する。
+
+例えば、以下のような状態遷移が想定される。
+
+```text
+plan_approval_pending
+        ↓
+Human Rejected
+        ↓
+plan_revision_requested
+        ↓
+plan_generating
+        ↓
+plan_approval_pending
+```
+
+Current Stateのみを保存した場合、最終的には、
+
+```text
+plan_approval_pending
+```
+
+という現在状態しか確認できず、
+
+- 一度Humanから差し戻されたこと
+- Plan修正工程へ戻ったこと
+- 再度Planが生成されたこと
+
+などの経過が失われる。
+
+そのため、
+
+```text
+state.json
+= 現在地
+
+state_history/*.json
+= そこへ至った経路
+```
+
+として責務を分離する。
+
+これにより、Application Layerは`state.json`を参照することで現在の工程を単純に判断できる一方、必要に応じて`state_history/`から過去の状態遷移とその理由を追跡できる。
+
+また、15.4で決定したHuman承認記録についても、
+
+```text
+approvals/*.json
+= Humanによる判断の証拠
+```
+
+として独立して管理する。
+
+したがって、Version 1では、
+
+```text
+state.json
+= 現在の状態
+
+state_history/*.json
+= 状態遷移の履歴
+
+approvals/*.json
+= Humanによる承認・判断の証拠
+```
+
+という責務分離を採用する。
+
+Version 1では、状態管理および状態履歴の保存のためにDBを必須としない。
+
+JSON形式を採用することで、実装を比較的単純に保ちながら、Humanによる確認、Gitによる変更履歴の追跡、および将来のReview・Traceability処理との連携を可能にする。
+
+将来、複数プロジェクト、複数ユーザー、高度な履歴検索等が必要になった場合には、DBへの移行または併用を検討できる。
+
+以上の理由から、Version 1では、
+
+```text
+state.json + state_history/*.json
+```
+
+による状態管理を採用する。
+
+---
+## 15.6 Implementation Evidenceの正式なフォーマット
+
+**Status: Decided**
+
+Version 1では、Implementation Evidenceの正式フォーマットとしてJSONを使用する。
+
+Implementation Evidenceは、Codexによる実装結果を単に記録するためのログではない。
+
+ChatGPTが、承認済みSpecification、Implementation Plan、Codex Promptと、実際のSource Code変更、Test Result、およびGit Diffを比較し、以下を検証するための構造化された証拠として扱う。
+
+- 必要な実装が不足していないか
+- SpecificationまたはPlanにない実装を追加していないか
+- 不要なファイル変更を行っていないか
+- 修正対象以外を変更していないか
+- Testが必要十分に追加または更新されているか
+- 対象Testおよび既存Testが成功しているか
+- Error、Warning、未完了事項が残っていないか
+- Human承認が必要な変更を含んでいないか
+
+Implementation Evidenceは、以下の主要ブロックを持つ。
+
+```text
+identity
+basis
+scope
+changes
+verification
+deviations
+codex_summary
+```
+
+### identity
+
+実装作業を識別する情報を保持する。
+
+最低限、以下を含む。
+
+```text
+implementation_id
+created_at
+status
+```
+
+### basis
+
+Codexが何を根拠に実装したかを記録する。
+
+最低限、以下を含む。
+
+```text
+Specification path / hash
+Implementation Plan path / hash
+Codex Prompt path / hash
+```
+
+### scope
+
+承認された実装範囲を記録する。
+
+最低限、以下を含む。
+
+```text
+target_paths
+allowed_changes
+forbidden_changes
+```
+
+### changes
+
+Codexが実際に行った変更を記録する。
+
+最低限、以下を含む。
+
+```text
+created_files
+modified_files
+deleted_files
+git_diff_path
+change_summary
+```
+
+### verification
+
+実装後に行った検証を記録する。
+
+最低限、以下を含む。
+
+```text
+commands
+tests_created_or_modified
+target_test_result
+full_test_result
+errors
+warnings
+```
+
+### deviations
+
+承認済み範囲との不一致や未解決事項を記録する。
+
+最低限、以下を含む。
+
+```text
+out_of_scope_changes
+unplanned_changes
+unfinished_items
+human_approval_required
+```
+
+### Review Rule
+
+ChatGPT Reviewは、CodexがEvidence内に記述した自己評価のみを根拠としてはならない。
+
+以下を相互に比較する。
+
+```text
+Specification
+Approved Implementation Plan
+Codex Prompt
+Implementation Evidence
+Source Code
+Git Diff
+Test Result
+```
+
+例えば、Codexが`out_of_scope_changes`を空として報告していても、Git Diffに承認範囲外の変更が存在する場合は、Review側で逸脱として検出する。
+
+同様に、Implementation Planで要求された実装項目が、変更ファイル、Git Diff、Testのいずれにも確認できない場合は、実装不足として扱う。
+
+### Storage
+
+Version 1では、Implementation Evidenceを`evidence/`配下へ保存する。
+
+例：
+
+```text
+projects/specflow/
+└── evidence/
+    ├── implementation_001.json
+    ├── implementation_001.diff
+    ├── implementation_002.json
+    └── implementation_002.diff
+```
+
+JSONをImplementation Evidenceの正本とする。
+
+Git Diffは、実際のコード変更を検証するための補助証拠として保存する。
+
+Human向けのMarkdown版を正式記録として二重保存しない。
+
+HumanがEvidenceを確認する必要がある場合は、UI等がJSONをHuman-readableな形式へ変換して表示する。
+
+### Decision Reason
+
+Implementation Evidenceは、主としてCodex、Application Layer、ChatGPT Review間で受け渡される内部データである。
+
+そのため、Human向け可読性よりも、機械が安定して解析・比較できる構造化形式を優先する。
+
+JSONを採用することで、Application Layerによる自動処理、ChatGPT Reviewによる比較、および将来のUI表示やDB移行を容易にする。
+
+MarkdownはHumanにとって読みやすいが、Version 1では保存形式として二重管理せず、必要に応じてJSONから表示用データを生成する。
+
+以上の理由から、Version 1ではImplementation Evidenceの正式フォーマットとしてJSONを採用する。
+
+## 15.7 Open Issues
 
 正式Specification策定前に、以下の事項を引き続き決定する必要がある。
 
-1. 承認記録の保存形式
-2. 状態管理の保存形式
-3. Implementation Evidenceの正式なフォーマット
-4. Codexの停止・再開方式
-5. Source CodeおよびGit Diffの取得方法
-6. Review用Promptの入力上限と分割方法
-7. TDDを必須とする範囲
-8. 修正ループの最大回数
-9. HumanがSpecificationを承認済みと判断する方法
-10. ChatGPT RunnerとCodex Runnerの具体的な割り当て方法
+1. Codexの停止・再開方式
+2. Source CodeおよびGit Diffの取得方法
+3. Review用Promptの入力上限と分割方法
+4. TDDを必須とする範囲
+5. 修正ループの最大回数
+6. HumanがSpecificationを承認済みと判断する方法
+7. ChatGPT RunnerとCodex Runnerの具体的な割り当て方法
 
 これらの未決事項は、Humanの判断なしに実装段階で補完してはならない。
