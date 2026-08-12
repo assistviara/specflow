@@ -629,30 +629,139 @@ Application LayerはCodex Runnerから返された実装結果に加え、実際
 
 ### Purpose
 
-Codex実行中に重要な変更が必要になった場合、処理を停止してHuman承認を求める。
+Codex RunnerによるImplementation中に、承認済みのSpecification、Approved Implementation Plan、Codex Prompt、または既存のHuman Approval Scopeを超える重要変更が必要になった場合、Implementationを停止し、Humanへ判断を求める。
+
+Critical Changeは、Codex RunnerまたはApplication Layerが独自判断で実行してはならない。
+
+### Input
+
+- 対象Implementation
+- Implementation Branch
+- Specification
+- Approved Implementation Plan
+- Codex Prompt
+- Critical Changeの内容
+- Critical Changeが必要となった理由
+- 変更対象および影響範囲
+- 現在のState
+- 必要に応じて関連するImplementation Evidence
 
 ### Critical Changes
 
-* DB変更
-* 認証変更
-* 権限変更
-* 外部API変更
-* 依存ライブラリ変更
-* PKL互換性を損なう変更
-* データ消失の可能性がある変更
-* その他の破壊的変更
-* SpecificationまたはPlanに記載されていない変更
+少なくとも以下の変更をCritical Changeとして扱う。
+
+- DB変更
+- 認証変更
+- 権限変更
+- 外部API変更
+- 依存ライブラリ変更
+- PKL互換性を損なう変更
+- データ消失の可能性がある変更
+- その他の破壊的変更
+- SpecificationまたはApproved Implementation Planに記載されていない変更
+- 既存のHuman Approval Scopeを超える変更
 
 ### Human Actions
 
-* 承認して続行
-* 修正を依頼
-* 実装を中止
-* SpecificationまたはPlanの再検討へ戻す
+- 承認してImplementationを続行
+- 修正を依頼
+- Specificationの再検討へ戻す
+- Implementation Planの再検討へ戻す
+- Implementationを中止
+
+### Approval Record
+
+HumanによるCritical Changeへの判断は、15.4で定義したApproval Recordとして記録する。
+
+Critical Change Approvalでは、Humanへ提示したCritical Change Requestを承認対象Artifactとして扱う。
+
+Approval Recordには、少なくとも以下を保持する。
+
+```text
+approval_id
+artifact_type
+artifact_path
+artifact_hash
+decision
+approved_at
+comment
+```
+
+Critical Change Approval Recordの`artifact_path`および`artifact_hash`は、承認対象となったCritical Change Requestを参照する。
+
+Critical Changeを承認する場合、その承認はHumanへ提示された特定のCritical Change Requestおよび対象Implementationに対してのみ有効とする。
+
+Application Layerは、Critical Change承認後にImplementationを再開する前に、現在のCritical Change RequestからHashを計算し、Approval Recordに保存された`artifact_hash`と比較する。
+
+```text
+Approval Record
+artifact_hash
+        │
+        │ compare
+        │
+Current Critical Change Request
+current_hash
+```
+
+Hashが一致し、かつ`decision`が承認を示している場合にのみ、そのCritical Change Approvalを有効として扱う。
+
+Critical Change Requestの内容がHuman承認後に変更されHashが一致しなくなった場合、以前のApproval Recordを変更後のCritical Changeに対する有効な承認として扱ってはならない。
+
+対象Implementationが承認時点から変更され、Critical Change Requestに記録された対象Implementationとの同一性を確認できない場合も、以前のApproval Recordを有効な承認として扱ってはならない。
+
+### Transition
+
+Critical Changeが検出された場合は、`critical_approval_pending`へ遷移する。
+
+HumanがCritical Changeを有効に承認した場合は、承認された範囲内で`implementing`へ戻り、Implementationを再開できる。
+
+修正依頼の場合は、`correction_requested`へ遷移し、指定された修正工程へ戻る。
+
+SpecificationまたはImplementation Planの再検討が必要な場合は、それぞれ対応する策定・修正工程へ戻る。
+
+中止の場合は、`cancelled`へ遷移する。
+
+```text
+implementing
+        ↓
+critical_approval_pending
+        │
+        ├── 承認
+        │      ↓
+        │  implementing
+        │
+        ├── 修正
+        │      ↓
+        │  correction_requested
+        │
+        ├── Specification / Plan再検討
+        │      ↓
+        │  指定された工程
+        │
+        └── 中止
+               ↓
+           cancelled
+```
+
+### Output
+
+- Human Decision
+- Critical Change Approval Record
+- 承認有効性に関する情報
+- 承認された変更範囲
+- 修正要求
+- 再検討対象
+- 中止情報
 
 ### Rule
 
-Human承認前に重要変更を実行してはならない。
+Humanによる有効な承認が確認される前に、Critical Changeを実行してはならない。
+
+Critical Change Approvalは、提示された特定の変更内容に対する承認であり、Specification、Approved Implementation Plan、またはImplementation全体を包括的に変更する権限をCodex Runnerへ与えるものではない。
+
+Codex Runner、Application Layer、またはAI RunnerがHumanの代わりにCritical Changeを承認してはならない。
+
+有効なCritical Change Approvalを確認した場合でも、Implementationは承認された変更範囲内でのみ再開できる。
 
 ---
 
@@ -1662,10 +1771,15 @@ plan_approval_pending
 
 ## 10.4 Critical Change Transition
 
+Implementation中にCritical Changeが必要となった場合は、Implementationを継続せず、`critical_approval_pending`へ遷移してHuman判断を求める。
+
+Humanの判断に応じて、以下のように遷移する。
+
 ```text
 implementing
         ↓
 critical_approval_pending
+        │
         ├── 承認
         │      ↓
         │  implementing
@@ -1674,10 +1788,60 @@ critical_approval_pending
         │      ↓
         │  correction_requested
         │
+        ├── Specification再検討
+        │      ↓
+        │  Specification策定・修正工程
+        │
+        ├── Implementation Plan再検討
+        │      ↓
+        │  Plan策定・修正工程
+        │
         └── 中止
                ↓
            cancelled
 ```
+
+Critical ChangeがHumanによって有効に承認された場合にのみ、承認された変更範囲内で`implementing`へ戻ることができる。
+
+SpecificationまたはImplementation Planの再検討へ戻った場合は、修正後の成果物について必要なHuman Approvalを改めて取得しなければならない。
+
+以前のApproval Recordを、変更後のSpecificationまたはImplementation Planに対する有効な承認として自動的に引き継いではならない。
+
+Critical Change Approvalの有効性は、UC-07および15.4で定義したApproval RecordとCritical Change Requestの同一性確認に従う。
+
+---
+
+## 10.4.1 Implementation Failure Transition
+
+Implementation中に、Codex Runnerの実行失敗、Test失敗、またはその他の理由によりImplementationを正常に完了できず、定められた範囲で処理を継続できない場合は、`implementation_failed`へ遷移する。
+
+```text
+implementing
+        ↓
+Implementation Failure
+        ↓
+implementation_failed
+        ↓
+停止条件確認
+        │
+        ├── 再試行可能
+        │      ↓
+        │  定められた範囲で再試行
+        │
+        └── 継続不能
+               ↓
+           Human判断へ返す
+```
+
+`implementation_failed`は、TDDにおける期待されたTest失敗を示すStateではない。
+
+TDD対象のImplementationにおいて、Implementation前に期待される振る舞いを表現したTestが意図どおり失敗することは正常な工程として扱い、それ自体を`implementation_failed`への遷移理由としてはならない。
+
+`implementation_failed`への遷移は、Codex Runnerの実行失敗、Implementation後のTest失敗、実行環境上の問題、またはその他の理由により、現在のImplementationを正常に継続または完了できない場合に使用する。
+
+再試行可能な場合は、第13章および15.13で定義した範囲内で再試行できる。
+
+再試行によって解消できない場合は、自動的に別のAI Runnerへ切り替えず、停止理由、現在の状態、影響範囲、および再開に必要なHuman操作を記録してHumanへ判断を返す。
 
 ---
 
@@ -2296,6 +2460,35 @@ state.json + approvals/*.json
 ```
 
 による分離管理を採用する。
+
+### Critical Change Approval
+
+Critical Changeに対するHuman Approvalでは、Humanへ提示した変更要求そのものを承認対象Artifactとして扱う。
+
+Version 1では、Critical Changeの内容、理由、対象Implementation、変更対象、および影響範囲等を識別可能なCritical Change Requestとして保存する。
+
+Critical Change Approval Recordの`artifact_path`および`artifact_hash`は、このCritical Change Requestを参照する。
+
+概念的には、以下とする。
+
+```text
+Critical Change Request
+        ↓
+Human Review
+        ↓
+Approval Record
+        ↓
+artifact_path
+artifact_hash
+        ↓
+Critical Change Requestとの同一性確認
+```
+
+Critical Change Requestの内容がHuman承認後に変更され、現在のHashとApproval Recordに保存された`artifact_hash`が一致しなくなった場合、以前のApproval Recordを変更後のCritical Changeに対する有効な承認として扱ってはならない。
+
+この方式により、Critical Change Approvalについても、Humanが具体的にどの変更要求を承認したかをArtifact単位で追跡可能にする。
+
+---
 
 ## 15.5 状態管理の保存形式
 
