@@ -32,6 +32,12 @@ Implementation Evidence
 ChatGPT Review
     ↓
 Human Final Approval
+    ↓
+Application-controlled Merge
+    ↓
+developer
+    ↓
+completed
 ```
 
 Application Layerは、AIが自律的に開発を完結させるための層ではない。
@@ -44,22 +50,42 @@ Humanの判断と承認を各工程の境界として維持しながら、現在
 
 ## 2.1 AI Role
 
-SpecFlow Version 1では、AIの役割を次に限定する。
+SpecFlow Version 1では、Application LayerがAI製品を直接処理の責務として扱わず、必要な処理をRoleとして定義する。
 
-| 役割                    | 担当      |
-| --------------------- | ------- |
-| Implementation Plan生成 | ChatGPT |
-| Codex用Prompt生成        | ChatGPT |
-| 実装                    | Codex   |
-| テスト作成・実行              | Codex   |
-| 実装レビュー                | ChatGPT |
-| 最終判断・承認               | Human   |
+各Roleには、Version 1で使用するRunnerを固定して割り当てる。
 
-汎用的なAIRunnerの構造は維持する。
+Version 1では、少なくとも以下のRoleとRunner Assignmentを使用する。
 
-ただし、Version 1の実行構成では、Claude、Gemini、Local LLM等を使用しない。
+| Role | Assigned Runner | 主な責務 |
+| --- | --- | --- |
+| Plan Generation Role | ChatGPT Runner | Implementation Plan Draftの生成 |
+| Codex Prompt Generation Role | ChatGPT Runner | Codex用Implementation Promptの生成 |
+| Implementation Role | Codex Runner | Test作成・変更、Source Code作成・変更、Test実行、実装結果の報告 |
+| Implementation Review Role | ChatGPT Runner | Implementationの適合性および逸脱のReview |
+| Correction Instruction Role | ChatGPT Runner | Review結果に基づく修正指示の生成 |
 
-これらは将来の拡張対象とする。
+Humanによる最終判断および承認はAI Roleには含めない。
+
+```text
+AI Role
+= AIが担当する処理上の役割
+
+Assigned Runner
+= Version 1でそのRoleを実行するRunner
+
+Human
+= 承認および最終判断
+```
+
+Version 1では、RoleとRunnerの割り当てを固定する。
+
+汎用的な`AIRunner`の構造は維持し、Application LayerのUseCaseが特定のAI製品そのものへ依存する構造とはしない。
+
+Version 1の実行構成では、Claude、Gemini、Local LLM等への動的なRunner切り替えは行わない。
+
+Runnerの動的割り当て、Fallback、および他のAI Runnerの利用は将来の拡張対象とする。
+
+具体的なRoleとRunnerの割り当て方式は、15.13で定義する。
 
 ---
 
@@ -209,8 +235,8 @@ Review用入力を構築
         ↓
 [ChatGPT Runner]
 Specification・Approved Implementation Plan・
-Implementation Evidence・Source Code・Git Diff・
-Test Code・Test ResultをReview
+Codex Prompt・Implementation Evidence・
+Source Code・Git Diff・Test Code・Test ResultをReview
         ↓
 [Application Layer]
 Review結果を評価
@@ -221,6 +247,21 @@ Review結果を評価
         ↓
 [Human]
 最終承認 または 差し戻し
+        ↓
+最終承認
+        ↓
+[Application Layer]
+有効なFinal Approvalおよび対象Implementationを確認
+        ↓
+MergeApprovedImplementationUseCaseを実行
+        ↓
+[Git操作Component / Service]
+Implementation Branchをdeveloperへmerge
+        ↓
+[Application Layer]
+merge成功を確認
+        ↓
+completedへ遷移
 ```
 
 ---
@@ -333,21 +374,97 @@ AIResponse
 
 ### Purpose
 
-Implementation Plan DraftをHumanへ提示し、判断を受け取る。
+Implementation Plan DraftをHumanへ提示し、承認、修正依頼、または中止の判断を受け取る。
+
+### Input
+
+- Implementation Plan Draft
+- 対象Implementation PlanのPath
+- 現在のImplementation PlanのHash
+- 必要に応じて関連するSpecificationおよびPlan生成情報
 
 ### Human Actions
 
-* 承認
-* 修正依頼
-* 中止
+- 承認
+- 修正依頼
+- 中止
 
 ### Approval Record
 
-* 対象Plan
-* 判断
-* 判断日時
-* コメント
-* 修正依頼内容
+Humanの判断は、15.4で定義したApproval Recordとして`approvals/`配下へ保存する。
+
+Approval Recordには、少なくとも以下を保持する。
+
+```text
+approval_id
+artifact_type
+artifact_path
+artifact_hash
+decision
+approved_at
+comment
+```
+Implementation Planを承認する場合、概念的には以下のようなApproval Recordを生成する。
+
+```json
+{
+  "approval_id": "plan_approval_001",
+  "artifact_type": "implementation_plan",
+  "artifact_path": "<Implementation Plan path>",
+  "artifact_hash": "<SHA-256 hash>",
+  "decision": "approved",
+  "approved_at": "<timestamp>",
+  "comment": ""
+}
+```
+
+修正依頼の場合は、`decision`に修正要求を示す値を記録し、Humanによる修正理由または要求内容を`comment`へ記録する。
+
+中止の場合は、`decision`に中止を示す値を記録する。
+
+### Approval Validation
+
+HumanがImplementation Planを承認した場合、その承認は承認時点の特定内容のImplementation Planに対してのみ有効とする。
+
+後続工程へ進む前に、Application Layerは現在のImplementation PlanからHashを計算し、Approval Recordに保存された`artifact_hash`と比較する。
+
+```text
+Approval Record
+artifact_hash
+        │
+        │ compare
+        │
+Current Implementation Plan
+current_hash
+```
+
+Hashが一致し、かつ`decision`が承認を示している場合にのみ、現在のImplementation Planを有効に承認済みとして扱う。
+
+承認後にImplementation Planが変更されHashが一致しなくなった場合、以前のApproval Recordを現在のImplementation Planに対する有効な承認として扱ってはならない。
+
+### Output
+
+- Human Decision
+- Approval Record
+- 承認有効性に関する情報
+- 修正依頼内容
+- 中止情報
+
+### Transition
+
+Humanが有効に承認した場合は、`plan_approved`へ遷移し、Codex Prompt生成工程へ進むことができる。
+
+修正依頼の場合は、`plan_revision_requested`へ遷移し、Implementation Plan修正工程へ戻る。
+
+中止の場合は、`cancelled`へ遷移する。
+
+### Rule
+
+Application LayerまたはAI RunnerがHumanの代わりにImplementation Planを承認してはならない。
+
+単に`state.json`が`plan_approved`であることや、Implementation Plan本文に承認済み表記が存在することだけを根拠として、有効なHuman Approvalと判断してはならない。
+
+有効な承認の判断には、HumanによるApproval Recordと現在のImplementation PlanのArtifact Hashの一致を必要とする。
 
 ---
 
@@ -380,60 +497,131 @@ Humanからの修正依頼を基にImplementation Plan Draftを再生成する�
 
 ### Purpose
 
-承認済みImplementation Planを基にCodex用Promptを生成する。
+Approved Implementation Planを基に、Implementation Roleを実行するCodex Runnerへ渡すImplementation Promptを生成する。
+
+Codex Promptは、Codex RunnerがHumanによって承認された範囲内でImplementationを実行できるよう、実装対象、許可された変更範囲、TDDルール、完了条件、および停止条件を明示する。
 
 ### Input
 
-* 承認済みSpecification
-* 承認済みImplementation Plan
-* 実装対象Path
-* TDD実行ルール
-* 完了条件
-* 停止条件
-* Log出力要件
-
-### Output
-
-* Codex用Implementation Prompt
-
-### Rule
-
-未承認のImplementation PlanからPromptを生成してはならない。
-
----
-
-## UC-06 Execute Codex Implementation
-
-### Purpose
-
-Codexを使用して、承認済みPlanに沿った実装とテストを行う。
+- 承認済みSpecification
+- 承認済みImplementation Plan
+- 実装対象Path
+- TDD実行ルール
+- 完了条件
+- 停止条件
+- Implementation Evidence生成に必要な実行結果の報告要件
 
 ### Processing
 
+Codex Prompt Generation Roleを実行し、Version 1で割り当てられたChatGPT RunnerによってCodex用Implementation Promptを生成する。
+
+Promptには、必要に応じて以下を明示する。
+
 ```text
-Codex用Prompt
-    ↓
-テスト作成
-    ↓
-失敗確認
-    ↓
-実装
-    ↓
-対象テスト実行
-    ↓
-既存テスト実行
+Implementation Scope
+Allowed Changes
+Forbidden Changes
+TDD Requirements
+Completion Conditions
+Stop Conditions
+Required Execution Result Reporting
+Human Approval Required Conditions
 ```
+
+Codex RunnerがSpecificationまたはApproved Implementation Planに存在しない事項を独自に補完することを前提としてはならない。
 
 ### Output
 
-* Codex実行結果
-* Implementation Evidence
-* Human確認要求
-* 成功または失敗
+- Codex用Implementation Prompt
 
 ### Rule
 
-CodexはSpecificationまたはPlanにない変更を行ってはならない。
+有効に承認されていないSpecificationまたはImplementation Planを基にCodex Promptを生成してはならない。
+
+承認の有効性は、単に承認済み状態が記録されていることだけで判断せず、対応するApproval Recordおよび現在のArtifact Hashとの整合性を確認する。
+
+Codex Promptは、SpecificationおよびApproved Implementation Planで承認されたImplementation Scopeを拡張してはならない。
+
+承認範囲を超える変更が必要となる可能性がある場合は、Codex Runnerが独自に判断して実行するのではなく、Human Approvalを要求する条件としてPromptに明示する。
+
+Codex Promptは、Codex Runner自身にImplementation Evidenceの正当性を自己確定させてはならない。
+
+Codex Runnerには、Implementation Evidenceを構築するために必要な実行結果を報告させる。
+
+最終的なImplementation Evidenceは、Application LayerがCodex Runnerの実行結果と実際のSource Code、Git Status、Git Diff、およびTest Result等を収集して構築する。
+
+---
+
+## UC-06 Execute Implementation
+
+### Purpose
+
+Implementation Roleに割り当てられたCodex Runnerを使用し、Approved Implementation PlanおよびCodex Promptで承認された範囲内のImplementationとTestを実行する。
+
+### Input
+
+- Specification
+- Approved Implementation Plan
+- Codex Prompt
+- Implementation Branch
+- Base Commit
+
+### Processing
+
+Implementationの内容に応じて、15.10で定義したTDD適用ルールに従う。
+
+```text
+Codex Prompt
+        ↓
+Implementation Scopeを確認
+        ↓
+TDD適用要否を確認
+        ↓
+┌─ TDD対象
+│      ↓
+│  必要なTestを作成・変更
+│      ↓
+│  期待されるTest失敗を確認
+│      ↓
+│  必要最小限のImplementation
+│
+└─ TDD対象外
+       ↓
+   承認された範囲内で必要なImplementation
+        ↓
+対象Testを実行
+        ↓
+必要な既存Testを実行
+        ↓
+実装結果をApplication Layerへ返す
+```
+
+TDDの適用要否は、単純なファイル拡張子ではなく、変更がSystemの振る舞いを変更するかどうかを本質的な基準として判断する。
+
+`.py`ファイルの変更は原則としてTest対象とする。
+
+文書修正、コメント修正、その他Systemの振る舞いを変更しない変更については、TDDを必須としない。
+
+### Output
+
+- Codex Runner実行結果
+- 作成・変更・削除したファイルに関する情報
+- 実行したCommandに関する情報
+- Test実行結果
+- ErrorおよびWarning
+- 未完了事項
+- Human Approvalが必要な事項
+- 成功または失敗
+
+### Rule
+
+Codex Runnerは、Specification、Approved Implementation Plan、およびCodex Promptによって承認された範囲を超える変更を行ってはならない。
+
+承認範囲を超える変更が必要であると判断した場合、Codex Runnerは独自に変更を実行せず、Human Approvalが必要な事項としてApplication Layerへ返す。
+
+Codex RunnerはImplementation Evidenceの正当性を自己確定してはならない。
+
+Application LayerはCodex Runnerから返された実装結果に加え、実際のSource Code、Git Status、Git Diff、およびTest Result等を収集し、Implementation Evidenceを構築する。
 
 ---
 
@@ -472,13 +660,96 @@ Human承認前に重要変更を実行してはならない。
 
 ### Purpose
 
-Codexによる実装の証拠を収集し、Review工程へ渡せる形にする。
+Codex RunnerによるImplementationの実行結果と、実際のRepositoryおよびTestの状態を収集し、Review工程で検証可能なImplementation Evidenceを構築する。
+
+Implementation Evidenceは、Codex Runnerの自己申告のみを根拠として生成してはならない。
+
+Application Layerは、Codex Runnerから返された実行結果と実際の成果物を照合し、第9章で定義した形式に従ってImplementation Evidenceを構築する。
+
+### Input
+
+- Codex Prompt
+- Codex Runner実行結果
+- Specification
+- Approved Implementation Plan
+- Implementation Branch
+- Base Commit
+- Source Code
+- Git Status
+- Git Diff
+- Test Code
+- Test Result
+- 実行したCommandに関する情報
+- ErrorおよびWarning
+- 未完了事項
+- Human Approvalが必要な事項
+
+### Processing
+
+Application Layerは、Codex Runnerから返された情報に加え、可能な範囲で実際のRepositoryおよびTestの状態を取得し、Implementation Evidenceを構築する。
+
+概念的な処理は、以下とする。
+
+```text
+Codex Runner実行結果
+        │
+        ├──────────────┐
+        │              │
+        ↓              ↓
+Repository情報      Test情報
+        │              │
+        ├──────┬───────┤
+        │      │       │
+        ↓      ↓       ↓
+Git Status  Git Diff  Test Result
+        │      │       │
+        └──────┴───────┘
+               ↓
+      Application Layer
+               ↓
+      情報の収集・関連付け
+               ↓
+   Implementation Evidence JSON
+```
+
+Application Layerは、少なくとも以下を確認する。
+
+- 対象Implementationを識別できる
+- 使用したSpecificationを識別できる
+- 使用したApproved Implementation Planを識別できる
+- 使用したCodex Promptを識別できる
+- Implementation BranchおよびBase Commitを識別できる
+- 作成・変更・削除されたファイルを確認できる
+- Git Diffを取得または参照できる
+- 実行したTestおよびその結果を確認できる
+- Error、Warningおよび未完了事項を記録できる
+- Human Approvalが必要な事項を記録できる
+
+Codex Runnerから返された情報と実際のRepositoryまたはTestの状態に不一致がある場合、その不一致を無視してEvidenceを正常として扱ってはならない。
+
+不一致は、Error、Warning、Deviation、またはHuman Approvalが必要な事項として、内容に応じて記録する。
 
 ### Output
 
-Implementation Evidenceを生成する。
+- Implementation Evidence JSON
+- 関連するGit Diff
+- Evidence構築結果
+- Evidence不足または不整合に関する情報
+- Human Approvalが必要な事項
 
-詳細は第9章に定義する。
+### Rule
+
+Implementation Evidenceの正式フォーマット、Required Information、保存方法、およびImmutabilityは第9章の定義に従う。
+
+Codex Runner自身がImplementation Evidenceの正当性を自己確定してはならない。
+
+Application LayerはImplementation Evidenceを構築する責務を持つが、Implementationの適合性を最終判断してはならない。
+
+Implementationの適合性は、UC-09 `Review Implementation`においてReviewする。
+
+Review開始後は、対象となるImplementation Evidenceを上書きしてはならない。
+
+Correctionまたは再Implementationを行った場合は、第9章のImmutability Ruleに従って新しいImplementation Evidenceを生成する。
 
 ---
 
@@ -726,15 +997,111 @@ Review結果が`REVISION_REQUIRED`の場合は、15.11で定義した修正ル�
 
 ### Purpose
 
-Review ReportをHumanへ提示し、最終判断を受け取る。
+Review ReportをHumanへ提示し、対象Implementationを`developer`へ取り込んでよいかについて最終判断を受け取る。
+
+### Input
+
+- Review Report
+- Review Result
+- 対象Implementation Branch
+- Base Commit
+- Implementation Evidence
+- Git Diff
+- 対象Implementationを識別する情報
+- 必要に応じて関連するApproval Record
 
 ### Human Actions
 
-* 最終承認
-* 実装修正へ戻す
-* Plan修正へ戻す
-* Specification再検討へ戻す
-* 中止
+- 最終承認
+- 実装修正へ戻す
+- Plan修正へ戻す
+- Specification再検討へ戻す
+- 中止
+
+### Approval Record
+
+Humanによる最終判断は、15.4で定義したApproval Recordとして`approvals/`配下へ保存する。
+
+最終承認の場合、Approval Recordには少なくとも以下を保持する。
+
+```text
+approval_id
+artifact_type
+artifact_path
+artifact_hash
+decision
+approved_at
+comment
+```
+
+最終承認時には、Humanが承認した対象Implementationを識別できる情報およびHashをApproval Recordへ記録する。
+
+概念的には、以下のようなApproval Recordを生成する。
+
+```json
+{
+  "approval_id": "final_approval_001",
+  "artifact_type": "implementation",
+  "artifact_path": "<approved implementation reference>",
+  "artifact_hash": "<SHA-256 hash>",
+  "decision": "approved",
+  "approved_at": "<timestamp>",
+  "comment": ""
+}
+```
+
+### Approval Validation
+
+Humanによる最終承認は、承認時点の特定のImplementationに対してのみ有効とする。
+
+merge工程へ進む前に、Application Layerは現在の対象ImplementationとApproval Recordに記録された承認対象が一致していることを確認する。
+
+少なくとも以下を確認する。
+
+```text
+Final Approval Recordが存在する
+
+decisionが承認を示している
+
+対象Implementation Branchが一致する
+
+対象Implementationが承認された内容と一致する
+
+Approval Recordのartifact_hashと
+現在の対象Implementationから計算したHashが一致する
+```
+
+いずれかの条件を満たさない場合、そのFinal Approvalを現在のImplementationに対する有効な承認として扱ってはならない。
+
+### Output
+
+- Human Decision
+- Final Approval Record
+- 承認有効性に関する情報
+- 修正要求
+- 中止情報
+
+### Transition
+
+Humanが最終承認し、そのApproval Recordが現在の対象Implementationに対して有効であることを確認できた場合、Application Layerは`MergeApprovedImplementationUseCase`へ進むことができる。
+
+実装修正が選択された場合は、対応するImplementation修正工程へ戻る。
+
+Plan修正が選択された場合は、Implementation Plan修正工程へ戻る。
+
+Specification再検討が選択された場合は、Specification策定工程へ戻る。
+
+中止の場合は、`cancelled`へ遷移する。
+
+### Rule
+
+Application LayerまたはAI RunnerがHumanの代わりにFinal Approvalを行ってはならない。
+
+Humanによる最終承認のみをもって`completed`へ遷移してはならない。
+
+有効なFinal Approvalを確認した後、15.14で定義したmerge工程を実行し、対象Implementation Branchの`developer`へのmergeが正常に完了した場合にのみ`completed`へ遷移できる。
+
+merge開始前に、Approval Recordと現在の対象Implementationの整合性を確認しなければならない。
 
 ---
 
@@ -742,18 +1109,83 @@ Review ReportをHumanへ提示し、最終判断を受け取る。
 
 ### Purpose
 
-Review不適合またはHuman差し戻しを受け、適切な修正工程へ戻す。
+Review結果またはHumanによる差し戻しを受け、問題の種類および承認範囲に応じて、適切な修正工程へ処理を戻す。
+
+UC-11は修正内容そのものを決定または実装するUseCaseではなく、Review Report、Review Result、Human Decision、および現在の状態を基に、再開すべき工程を決定する。
+
+### Input
+
+- Review Report
+- Review Result
+- Human Decision
+- 現在のState
+- 対象Implementation
+- 必要に応じて関連するApproval Record
+- 修正対象および修正理由
+- 修正回数およびEarly Stop情報
 
 ### Return Destination
 
-| 問題                    | 戻り先             |
-| --------------------- | --------------- |
-| Specification不足・矛盾    | Specification策定 |
-| Implementation Plan不備 | Plan修正          |
-| Codex用Prompt不備        | Prompt再生成       |
-| 実装不備                  | Codex再実装        |
-| テスト不足・誤り              | Test修正          |
-| 判断不能                  | Human判断         |
+| 問題 | 戻り先 |
+| --- | --- |
+| Specification不足・矛盾・不明確さ | Specification策定工程 |
+| Implementation Plan不備 | Plan修正工程 |
+| Codex用Prompt不備 | Prompt再生成工程 |
+| Implementation不備 | Codex再実装工程 |
+| Test不足・誤り | Test修正工程 |
+| Humanによる設計判断が必要 | Human判断 |
+| 承認範囲を超える変更が必要 | Human判断 |
+| Critical Changeが必要 | Critical Change Approval工程 |
+| 自動修正を安全に継続できない | Human判断 |
+
+### Processing
+
+Review Resultが`REVISION_REQUIRED`の場合は、15.11で定義したCorrection Loopおよび停止条件を確認する。
+
+自動修正可能であり、修正回数が上限未満で、Early Stop Conditionに該当しない場合は、Review Reportで指定された修正対象に応じた工程へ戻す。
+
+```text
+REVISION_REQUIRED
+        ↓
+Correction条件確認
+        ↓
+修正可能
+        ↓
+Return Destinationを決定
+        ↓
+指定された修正工程
+```
+
+Review Resultが`HUMAN_REVIEW_REQUIRED`の場合は、自動的に修正工程を選択して進行してはならない。
+
+```text
+HUMAN_REVIEW_REQUIRED
+        ↓
+Human判断
+        ↓
+Humanが指定した工程へ再開
+```
+
+HumanによるFinal Approval Rejectionまたはその他の差し戻しの場合は、Humanが指定した修正理由および戻り先に従う。
+
+### Output
+
+- Return Destination
+- 次に実行可能なUseCase
+- 修正理由
+- Human判断が必要かどうか
+- 再開可能なState
+- 停止情報
+
+### Rule
+
+UC-11は、Specification、Approved Implementation Plan、またはHuman Approval Scopeを独自に変更してはならない。
+
+`HUMAN_REVIEW_REQUIRED`の場合、Application LayerがHumanの代わりに修正方針を確定してはならない。
+
+自動修正を再開する場合は、15.11で定義した最大修正回数、Early Stop Condition、Convergence Detection、およびHuman Escalationの規則に従う。
+
+修正後に再Reviewを行う場合は、第9章で定義した新しいImplementation Evidenceを生成し、以前のEvidenceを上書きしてはならない。
 
 ---
 
@@ -787,9 +1219,17 @@ Codex実行中に重要変更が必要になった場合、Human承認を求め�
 
 ## Approval Point 4: Final Review
 
-ChatGPTによるReview ReportをHumanが確認する。
+ChatGPTによるReview ReportをHumanが確認し、Implementationを`developer`へ取り込んでよいかを最終判断する。
 
-Human承認前に開発工程をCompletedとしてはならない。
+Humanによる最終承認がない限り、承認済みImplementationを`developer`へmergeしてはならない。
+
+Humanによる最終承認後、Application Layerは15.14で定義したmerge工程を開始する。
+
+対象Implementation Branchの`developer`へのmergeが正常に完了した場合にのみ、開発状態を`completed`へ遷移できる。
+
+Humanによる最終承認のみをもって`completed`としてはならない。
+
+mergeに失敗した場合は`completed`へ遷移してはならない。
 
 ---
 
@@ -817,21 +1257,56 @@ Plan Draft
 
 ## 8.2 Implementation Correction Loop
 
+ImplementationまたはReviewにおいて修正が必要となった場合は、
+Review Resultおよび停止条件に基づき、自動修正を継続できるかを判断する。
+
 ```text
 Codex Implementation
     ↓
-Test Failure または Review不適合
+Test実行
     ↓
-修正指示生成
+Implementation Evidence構築
     ↓
-Codex再実装
+ChatGPT Review
     ↓
-再テスト
-    ↓
-再レビュー
+Review Result
+    │
+    ├── APPROVED
+    │       ↓
+    │   Human Final Approvalへ
+    │
+    ├── REVISION_REQUIRED
+    │       ↓
+    │   異常・停止条件確認
+    │       │
+    │       ├── 自動修正可能
+    │       │       ↓
+    │       │   修正回数確認
+    │       │       │
+    │       │       ├── 上限未満
+    │       │       │       ↓
+    │       │       │   修正指示生成
+    │       │       │       ↓
+    │       │       │   Codex再実装
+    │       │       │       ↓
+    │       │       │   再テスト
+    │       │       │       ↓
+    │       │       │   新しいImplementation Evidence構築
+    │       │       │       ↓
+    │       │       │   Re-Review
+    │       │       │
+    │       │       └── 上限到達
+    │       │               ↓
+    │       │           Human判断へ返す
+    │       │
+    │       └── Early Stop Condition
+    │               ↓
+    │           Human判断へ返す
+    │
+    └── HUMAN_REVIEW_REQUIRED
+            ↓
+        Human判断へ返す
 ```
-
-修正時は、元のSpecificationと承認済みPlanを引き続き基準とする。
 
 ---
 
@@ -891,36 +1366,48 @@ Humanによる新たな判断なしに、自動修正回数の上限を解除し
 
 ---
 
-# 9. Implementation Evidence / Log
+# 9. Implementation Evidence
 
 ## 9.1 Purpose
 
-Implementation Evidenceは、Codexが何を行ったかをReview可能にするための証拠である。
+Implementation Evidenceは、Implementationにおいて何が行われたかをReview可能にするための構造化された証拠である。
 
-単なるデバッグログではなく、Specification、Plan、Code、Testを結びつける追跡情報として扱う。
+単なるデバッグログやCodex Runnerによる自己申告ではなく、Specification、Approved Implementation Plan、Codex Prompt、Source Code、Git Diff、およびTest Resultを結びつける追跡情報として扱う。
+
+Implementation Evidenceは、Application LayerおよびChatGPT Reviewが、Implementationの適合性、完全性、および承認範囲からの逸脱を検証するために使用する。
 
 ---
 
 ## 9.2 Required Information
 
-Version 1では、少なくとも以下を記録する。
+Version 1では、Implementation Evidenceに少なくとも以下の情報を保持する。
 
-* Codexへ渡したPrompt
-* Codexの実行結果
-* 変更したファイル
-* ファイルごとの変更概要
-* 実行したコマンド
-* 作成または変更したテスト
-* 対象テスト結果
-* 既存テスト結果
-* エラー内容
-* 警告内容
-* 未完了事項
-* Humanへ確認した事項
-* Humanの回答
-* 実行開始・終了情報
-* 使用したSpecification
-* 使用したImplementation Plan
+- Implementationを識別する情報
+- 使用したSpecification
+- 使用したApproved Implementation Plan
+- Codex Runnerへ渡したCodex Prompt
+- 承認されたImplementation Scope
+- Codex Runnerの実行結果
+- 作成したファイル
+- 変更したファイル
+- 削除したファイル
+- ファイル変更の概要
+- Git Diffへの参照
+- 実行したCommand
+- 作成または変更したTest
+- 対象Test Result
+- 全体Test Result
+- Error
+- Warning
+- 承認範囲外として検出または報告された変更
+- 未完了事項
+- Human Approvalが必要な事項
+- 関連するApproval Recordの識別情報
+- 実行開始・終了に関する情報
+
+Humanによる承認・判断そのものの正式な証拠は、Implementation Evidenceへ重複して保持せず、`approvals/*.json`に保存されたApproval Recordを正本として扱う。
+
+Implementation EvidenceからHumanによる判断を参照する必要がある場合は、対応するApproval Recordを識別可能な情報によって関連付ける。
 
 ---
 
@@ -928,9 +1415,9 @@ Version 1では、少なくとも以下を記録する。
 
 Version 1では、Implementation Evidenceの正式フォーマットとしてJSONを使用する。
 
-Implementation Evidenceは、Codexによる実装結果を単に記録するためのテキストログではなく、Application LayerおよびChatGPT Reviewが機械的に解析・比較できる構造化データとして扱う。
+Implementation Evidenceは、Codex Runnerによる実装結果を単に記録するためのテキストログではなく、Application LayerおよびChatGPT Reviewが機械的に解析・比較できる構造化データとして扱う。
 
-JSONには、少なくとも以下の情報を保持する。
+JSONには、少なくとも以下の主要ブロックを保持する。
 
 ```text
 identity
@@ -982,6 +1469,10 @@ deviations
 - human_approval_required
 ```
 
+Human ApprovalがImplementationに関連する場合は、必要に応じて対応するApproval Recordを識別する情報を保持できる。
+
+ただし、Humanによる承認内容そのものの正本は`approvals/*.json`とし、Implementation Evidenceとの二重管理は行わない。
+
 Version 1では、Implementation Evidence JSONを正式な記録の正本とする。
 
 Git Diffは、実際のSource Code変更を確認するための補助証拠として、Implementation Evidenceと関連付けて保存する。
@@ -1012,15 +1503,34 @@ Review工程には、少なくとも以下を渡す。
 ```text
 Specification
 Approved Implementation Plan
-Source CodeまたはGit Diff
+Codex Prompt
+Implementation Evidence
+Source Code
+Git Diff
 Test Code
 Test Result
-Implementation Evidence / Log
 ```
 
-Logのみを根拠にレビューしてはならない。
+Implementation Evidenceのみを根拠にReviewしてはならない。
 
-可能な範囲で、実際のCode、Diff、Test Resultと照合する。
+Reviewでは、
+
+```text
+Specification
+Approved Implementation Plan
+Codex Prompt
+Implementation Evidence
+Source Code
+Git Diff
+Test Code
+Test Result
+```
+
+を相互に比較し、Implementationの適合性、完全性、および承認範囲からの逸脱を判断する。
+
+例えば、Implementation Evidenceに承認範囲外の変更が存在しないと記録されていても、Git DiffまたはSource Codeに承認範囲外の変更が確認された場合は、Review側で逸脱として検出する。
+
+同様に、SpecificationまたはApproved Implementation Planで要求されたImplementationが、Source Code、Git Diff、Test Code、またはTest Resultから確認できない場合は、Implementation不足として扱う。
 
 ---
 
@@ -1050,6 +1560,9 @@ implementation_002.json
 implementation_002.diff
         ↓
 Re-Review
+```
+
+この方式により、Correctionによって過去のImplementation Evidenceが失われることを防ぎ、Initial Implementationから各CorrectionおよびRe-Reviewまでの経過を追跡可能にする。
 
 ---
 
@@ -1080,8 +1593,9 @@ cancelled
 ```
 
 ---
-
 ## 10.2 Main Transition
+
+Version 1における正常系のMain Transitionは、以下とする。
 
 ```text
 specification_ready
@@ -1102,6 +1616,8 @@ implementation_completed
         ↓
 reviewing
         ↓
+[Review Result: APPROVED]
+        ↓
 final_approval_pending
         ↓
 Human Final Approval
@@ -1113,12 +1629,21 @@ merge成功
 completed
 ```
 
-`completed`は、Humanによる最終承認のみをもって成立する状態ではない。
+`APPROVED`はStateではなく、UC-09で定義したReview Resultである。
 
-Humanによる最終承認後、承認されたImplementation Branchが`developer`へ正常にmergeされたことを確認した時点で、`completed`へ遷移する。
+Review Resultが`APPROVED`の場合にのみ、`reviewing`から`final_approval_pending`へ遷移できる。
+
+Review Resultが`REVISION_REQUIRED`または`HUMAN_REVIEW_REQUIRED`の場合は、Main Transitionを継続せず、10.5で定義するReview結果に応じた遷移を行う。
+
+Humanによる最終承認は、対象Implementationを`developer`へ取り込むことを許可する判断であり、最終承認のみをもって`completed`へ遷移してはならない。
+
+Humanによる最終承認後、Application Layerは15.14で定義したmerge工程を実行する。
+
+承認されたImplementation Branchが`developer`へ正常にmergeされたことを確認した場合にのみ、`completed`へ遷移する。
+
+mergeに失敗した場合は`completed`へ遷移してはならない。
 
 Version 1では、merge処理のための独立したStateは設けない。
-
 ---
 
 ## 10.3 Plan Rejection Transition
@@ -1158,21 +1683,75 @@ critical_approval_pending
 
 ## 10.5 Review Failure Transition
 
+Review Resultが`REVISION_REQUIRED`または`HUMAN_REVIEW_REQUIRED`の場合、Main Transitionを継続して`final_approval_pending`へ進んではならない。
+
+### REVISION_REQUIRED
+
+Review Resultが`REVISION_REQUIRED`の場合は、以下の遷移を基本とする。
+
 ```text
 reviewing
+        ↓
+[Review Result: REVISION_REQUIRED]
         ↓
 review_failed
         ↓
 correction_requested
-        ├── Specification修正
-        ├── Plan修正
-        ├── Prompt修正
-        ├── Implementation修正
-        └── Test修正
+        ↓
+異常・停止条件確認
+        │
+        ├── 自動修正可能
+        │       ↓
+        │  修正回数確認
+        │       │
+        │       ├── 上限未満
+        │       │       ↓
+        │       │  指定された修正工程
+        │       │       ↓
+        │       │    Re-Review
+        │       │
+        │       └── 上限到達
+        │               ↓
+        │          Human判断へ返す
+        │
+        └── Early Stop Condition
+                ↓
+           Human判断へ返す
 ```
+
+修正対象は、Review Reportに基づき、以下のいずれかとする。
+
+```text
+Specification修正
+Plan修正
+Prompt修正
+Implementation修正
+Test修正
+```
+
+Specification、Approved Implementation Planおよび既存のHuman Approvalの範囲内で自動修正可能な場合は、15.11で定義したCorrection Loopに従って修正およびRe-Reviewを行う。
 
 修正完了後は、問題の種類に応じた工程へ戻る。
 
+### HUMAN_REVIEW_REQUIRED
+
+Review Resultが`HUMAN_REVIEW_REQUIRED`の場合は、自動修正ループへ進んではならない。
+
+```text
+reviewing
+        ↓
+[Review Result: HUMAN_REVIEW_REQUIRED]
+        ↓
+correction_requested
+        ↓
+Human判断へ返す
+```
+
+Humanは、Review Reportおよび停止理由を確認し、必要な修正工程、承認、再検討、または中止等の次の操作を判断する。
+
+`REVISION_REQUIRED`であっても、Early Stop Conditionを検出した場合、または自動修正の最大回数に到達した場合は、自動修正を継続せずHumanへ判断を返す。
+
+`REVISION_REQUIRED`および`HUMAN_REVIEW_REQUIRED`はStateではなく、UC-09で定義したReview Resultである。
 ---
 
 ## 10.6 Final Rejection Transition
@@ -1268,7 +1847,38 @@ state.json
 
 state_history/*.json
 = 状態遷移の履歴
+```
+
 ---
+
+# 13. Error and Stop Conditions
+
+以下の場合、Application Layerは処理を停止する。
+
+- 必要な正式文書が存在しない
+- Specificationが有効に承認されていない
+- Implementation Planが有効に承認されていない
+- Prompt生成に失敗した
+- PromptResultがAI実行可能でない
+- ChatGPT RunnerまたはCodex Runnerの実行に失敗し、定められた範囲で処理を継続できない
+- CodexがHuman承認を必要とする重要変更の必要性を報告した
+- Implementation後の対象Testまたは全体Testが期待に反して失敗し、自動修正可能な範囲で解消できない
+- Implementation Evidenceが不足している
+- Reviewに必要な成果物が不足している
+- Specificationに不足・矛盾・不明確さがあり、現在の承認範囲内で処理を継続できない
+- 修正ループにおいてEarly Stop Conditionを検出した
+- 自動修正の最大回数に到達した
+- Human判断が必要である
+
+TDDにおいて、Implementation前に期待される振る舞いを表現したTestが意図どおり失敗することは、正常な工程として扱い、それ自体を停止条件とはしない。
+
+停止時は、少なくとも以下を返す。
+
+- 停止理由
+- 現在の状態
+- 影響範囲
+- 次に必要なHuman操作
+- 再開可能な工程
 
 ---
 
@@ -1285,7 +1895,7 @@ SpecFlow Version 1 MVPは、以下を満たした場合に完成とする。
 - 振る舞いを変更する実装について、原則としてTDDを適用できる
 - Implementation EvidenceをJSON形式で構築・保存できる
 - Source CodeおよびGit Diffを取得できる
-- Specification、Approved Implementation Plan、Implementation Evidence、Source Code、Git Diff、Test CodeおよびTest ResultをReviewへ提供できる
+- Specification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、Source Code、Git Diff、Test CodeおよびTest ResultをReviewへ提供できる
 - ChatGPT RunnerがReview Reportを生成できる
 - Review不適合時に、定められた範囲で自動修正および再Reviewを行える
 - Early Stop Conditionまたは修正回数上限に到達した場合、処理を停止してHumanへ判断を返せる
@@ -1387,15 +1997,18 @@ Pythonのクラス名はPascalCaseとする。
 例：
 
 ```python
+LoadDevelopmentInputUseCase
 GenerateImplementationPlanUseCase
 ApproveImplementationPlanUseCase
 ReviseImplementationPlanUseCase
 GenerateCodexPromptUseCase
 ExecuteImplementationUseCase
+ApproveCriticalChangeUseCase
 CollectImplementationEvidenceUseCase
 ReviewImplementationUseCase
 ApproveFinalResultUseCase
 ResumeCorrectionUseCase
+MergeApprovedImplementationUseCase
 ```
 
 対応するPythonファイル名はsnake_caseとし、クラス名と対応関係が分かる名称とする。
@@ -1403,15 +2016,18 @@ ResumeCorrectionUseCase
 例：
 
 ```text
+load_development_input_use_case.py
 generate_implementation_plan_use_case.py
 approve_implementation_plan_use_case.py
 revise_implementation_plan_use_case.py
 generate_codex_prompt_use_case.py
 execute_implementation_use_case.py
+approve_critical_change_use_case.py
 collect_implementation_evidence_use_case.py
 review_implementation_use_case.py
 approve_final_result_use_case.py
 resume_correction_use_case.py
+merge_approved_implementation_use_case.py
 ```
 
 ### Decision Reason
@@ -3140,29 +3756,37 @@ Version 1では、ChatGPT Reviewによって修正が必要と判断された場
 Codex Implementation
         ↓
 ChatGPT Review
-        ↓
-PASS ───────────────→ Human Final Approval Candidate
         │
-        └─ REVISION_REQUIRED
-                    ↓
-              異常・停止条件確認
-                    │
-             ┌──────┴──────┐
-             │             │
-          問題なし       問題あり
-             │             │
-             ↓             ↓
-        修正回数確認    Early Stop
-             │             ↓
-      ┌──────┴──────┐  Human Review Required
-      │             │
-   上限未満       上限到達
-      │             │
-      ↓             ↓
-Codex Correction   Stop
-      │             ↓
-      ↓        Human Review Required
-   Re-Review
+        ├─ APPROVED
+        │       ↓
+        │  Human Final Approval Candidate
+        │
+        ├─ REVISION_REQUIRED
+        │       ↓
+        │  異常・停止条件確認
+        │       │
+        │  ┌────┴────┐
+        │  │         │
+        │ 問題なし   問題あり
+        │  │         │
+        │  ↓         ↓
+        │ 修正回数確認  Early Stop
+        │  │         ↓
+        │  │    Human Review Required
+        │  │
+        │ ┌┴────────┐
+        │ │         │
+        │ 上限未満   上限到達
+        │ │         │
+        │ ↓         ↓
+        │ Codex     Stop
+        │ Correction │
+        │ ↓         ↓
+        │ Re-Review Human Review Required
+        │
+        └─ HUMAN_REVIEW_REQUIRED
+                ↓
+           Human Review Required
 ```
 
 Humanは、通常の修正ループへ毎回介入する必要はない。
