@@ -152,34 +152,37 @@ Version 1では、以下のような高度なGit運用は必須としない。
 
 Application Layerは、以下を担当する。
 
-* HumanまたはUIからUseCase実行要求を受け取る
-* 現在の開発状態を確認する
-* 次に実行可能なUseCaseを制御する
-* 必要なEngineおよびAI Runnerを呼び出す
-* 各工程の成果物を次工程へ受け渡す
-* Human承認を記録する
-* Human未承認時に次工程への進行を停止する
-* 実装証拠をReview工程へ渡す
-* Review不適合時に修正工程へ戻す
-* 実行結果と状態遷移を呼び出し元へ返す
+- HumanまたはUIからUseCase実行要求を受け取る
+- 現在の開発状態を確認する
+- 次に実行可能なUseCaseを制御する
+- 必要なEngineおよびAI Runnerを呼び出す
+- 各工程の成果物を次工程へ受け渡す
+- Humanによる判断をApproval Recordとして記録する
+- Approval Recordと現在のArtifactの整合性を確認し、Human Approvalの有効性を検証する
+- 有効なHuman Approvalを確認できない場合、承認を必要とする次工程への進行を停止する
+- Implementation EvidenceおよびReviewに必要な成果物をReview工程へ渡す
+- Review Resultに応じて、次工程、修正工程、またはHuman判断への返却を制御する
+- 実行結果と状態遷移を呼び出し元へ返す
 
 ---
 
 # 4. Non-Responsibility
 
-Application Layerは、以下を直接実装しない。
+Application Layerは、以下を直接実装または独自判断しない。
 
-* Markdown文書の解析
-* Prompt Templateの展開
-* AI Provider固有の通信
-* Codexの内部実装処理
-* テストコードの具体的な生成
-* Specificationの内容変更
-* Implementation Planの内容決定
-* Review結果の最終判断
-* Humanに代わる承認
+- Markdown文書の解析
+- Prompt Templateの展開
+- AI Provider固有の通信
+- Codexの内部実装処理
+- テストコードの具体的な生成
+- Specificationの内容変更
+- Implementation Plan Draftの内容生成
+- Implementationの適合性に関するReview Resultの生成
+- Humanに代わる承認判断
 
-これらは、それぞれ既存Engine、AI Runner、またはHumanの責務とする。
+これらは、それぞれ既存Engine、AI Runner、Codex Runner、またはHumanの責務とする。
+
+Application Layerは、これらの処理結果を受け取り、必要な検証、工程制御、状態遷移、および次工程への受け渡しを担当する。
 
 ---
 
@@ -241,7 +244,7 @@ Source Code・Git Diff・Test Code・Test ResultをReview
 [Application Layer]
 Review結果を評価
         ↓
-適合
+[Review Result: APPROVED]
         ↓
 最終承認待ちへ遷移
         ↓
@@ -317,7 +320,7 @@ TDDの具体的な適用範囲および例外条件は、15.10で定義する。
 
 ### Output
 
-* 読み込み対象情報
+* 読み込まれたDevelopment Input
 * 入力検証結果
 * 開発対象識別情報
 
@@ -366,7 +369,11 @@ AIResponse
 
 ### Completion
 
-生成物はDraftであり、Human承認前に実装工程へ渡してはならない。
+生成されたImplementation PlanはDraftとして扱う。
+
+Implementation Planに対する有効なHuman Approvalが確認されるまで、Codex Prompt生成工程へ進んではならない。
+
+単にImplementation Plan Draftが生成されたことをもって、承認済みImplementation Planとして扱ってはならない。
 
 ---
 
@@ -380,7 +387,6 @@ Implementation Plan DraftをHumanへ提示し、承認、修正依頼、また�
 
 - Implementation Plan Draft
 - 対象Implementation PlanのPath
-- 現在のImplementation PlanのHash
 - 必要に応じて関連するSpecificationおよびPlan生成情報
 
 ### Human Actions
@@ -393,7 +399,7 @@ Implementation Plan DraftをHumanへ提示し、承認、修正依頼、また�
 
 Humanの判断は、15.4で定義したApproval Recordとして`approvals/`配下へ保存する。
 
-Approval Recordには、少なくとも以下を保持する。
+Approval Recordを生成する際、Application Layerは承認対象となる現在のImplementation PlanからArtifact Hashを計算し、その値を`artifact_hash`として記録する。
 
 ```text
 approval_id
@@ -1306,23 +1312,31 @@ Version 1では、少なくとも以下のHuman承認ポイントを設ける。
 
 SpecificationはHumanが作成または承認する。
 
-Application Layerは、未承認Specificationを実装工程へ渡してはならない。
+Application Layerは、Specificationに対する有効なHuman Approvalを確認できない限り、Plan生成工程へ進んではならない。
+
+Specification Approvalの有効性は、対応するApproval Recordと現在のSpecificationのArtifact Hashが一致することによって確認する。
 
 ---
 
 ## Approval Point 2: Implementation Plan
 
-ChatGPTが生成したImplementation Plan DraftをHumanが確認する。
+ChatGPT Runnerが生成したImplementation Plan DraftをHumanが確認する。
 
-Humanが承認するまでCodex用Prompt生成へ進んではならない。
+Application Layerは、Implementation Planに対する有効なHuman Approvalを確認できない限り、Codex Prompt生成工程へ進んではならない。
+
+Implementation Plan Approvalの有効性は、UC-03および15.4で定義したApproval Recordと現在のImplementation PlanのArtifact Hashが一致することによって確認する。
 
 ---
 
 ## Approval Point 3: Critical Change
 
-Codex実行中に重要変更が必要になった場合、Human承認を求める。
+Codex RunnerによるImplementation中にCritical Changeが必要となった場合、Implementationを停止してHumanへ判断を求める。
 
-承認されない場合、変更を実行してはならない。
+HumanによるCritical Changeへの判断は、UC-07および15.4で定義したCritical Change Requestを承認対象Artifactとして記録する。
+
+Critical Change Requestに対する有効なApproval Recordが確認されない限り、Critical Changeを実行してはならない。
+
+HumanがCritical Changeを承認した場合でも、Implementationは承認された変更範囲内でのみ再開できる。
 
 ---
 
@@ -1952,14 +1966,14 @@ Application Layerに配置するUseCaseクラスは、15.2で定義した命名�
 Application Layer
 ├── LoadDevelopmentInputUseCase
 ├── GenerateImplementationPlanUseCase
-├── ApproveImplementationPlanUseCase
+├── RequestPlanApprovalUseCase
 ├── ReviseImplementationPlanUseCase
 ├── GenerateCodexPromptUseCase
 ├── ExecuteImplementationUseCase
-├── ApproveCriticalChangeUseCase
+├── RequestCriticalChangeApprovalUseCase
 ├── CollectImplementationEvidenceUseCase
 ├── ReviewImplementationUseCase
-├── ApproveFinalResultUseCase
+├── RequestFinalApprovalUseCase
 ├── MergeApprovedImplementationUseCase
 └── ResumeCorrectionUseCase
 ```
@@ -2163,14 +2177,14 @@ Pythonのクラス名はPascalCaseとする。
 ```python
 LoadDevelopmentInputUseCase
 GenerateImplementationPlanUseCase
-ApproveImplementationPlanUseCase
+RequestPlanApprovalUseCase
 ReviseImplementationPlanUseCase
 GenerateCodexPromptUseCase
 ExecuteImplementationUseCase
-ApproveCriticalChangeUseCase
+RequestCriticalChangeApprovalUseCase
 CollectImplementationEvidenceUseCase
 ReviewImplementationUseCase
-ApproveFinalResultUseCase
+RequestFinalApprovalUseCase
 ResumeCorrectionUseCase
 MergeApprovedImplementationUseCase
 ```
@@ -2182,14 +2196,14 @@ MergeApprovedImplementationUseCase
 ```text
 load_development_input_use_case.py
 generate_implementation_plan_use_case.py
-approve_implementation_plan_use_case.py
+request_plan_approval_use_case.py
 revise_implementation_plan_use_case.py
 generate_codex_prompt_use_case.py
 execute_implementation_use_case.py
-approve_critical_change_use_case.py
+request_critical_change_approval_use_case.py
 collect_implementation_evidence_use_case.py
 review_implementation_use_case.py
-approve_final_result_use_case.py
+request_final_approval_use_case.py
 resume_correction_use_case.py
 merge_approved_implementation_use_case.py
 ```
@@ -2215,6 +2229,42 @@ GenerateImplementationPlanUseCase
 ```
 
 とすることで、Application Layerに属するUseCaseであることを明示できる。
+
+また、Human Approvalを扱うUseCaseについては、Application Layer自身が承認を行うのではなく、Humanへ判断を求め、その結果を記録・検証・状態遷移へ反映する責務を持つ。
+
+そのため、Human Approvalを扱うUseCaseでは、
+
+```text
+Approve...
+```
+
+ではなく、
+
+```text
+Request...Approval...
+```
+
+を使用する。
+
+例えば、
+
+```python
+RequestPlanApprovalUseCase
+RequestCriticalChangeApprovalUseCase
+RequestFinalApprovalUseCase
+```
+
+とすることで、
+
+```text
+Human
+= Approval Decision
+
+Application Layer
+= Approval Request / Record / Validation / State Transition
+```
+
+という責務分離を名称上も明確にする。
 
 SpecFlowでは今後、以下のような異なる責務を持つコンポーネントが共存する。
 
