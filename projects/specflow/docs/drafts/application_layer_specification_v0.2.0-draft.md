@@ -5603,3 +5603,276 @@ Version 1の正式Specification策定前にHumanによる決定を必要とし�
 また、本章で`Future Extension`として記録した事項は、Version 1の実装対象ではない。
 
 Future Extensionは、将来の検討候補を保持するための記録であり、Humanによる新たな判断なしにVersion 1へ追加実装してはならない。
+
+---
+
+## 15.16 Approval Recordの生成・保存責務
+
+**Status: Decided**
+
+Version 1では、Human Approvalに関する判断、工程制御、Approval Recordの構築、および保存の責務を分離する。
+
+責務分担は、以下を基本とする。
+
+```text
+Human
+    ↓
+Approval Decision
+    ↓
+Application Layer
+    ↓
+ApprovalRecordService
+    ↓
+ApprovalRecordRepository
+    ↓
+approvals/*.json
+```
+
+### Human
+
+Humanは、承認対象Artifactの内容を確認し、承認、修正依頼、中止、その他必要な判断を行う。
+
+Human Approvalの判断をApplication Layer、AI Runner、Service、Repository等が代替してはならない。
+
+### Application Layer
+
+Application Layerは、開発工程においてHuman Approvalが必要となる時点を制御し、Humanによる判断結果を受け取る。
+
+Application Layerは、Humanの判断結果に基づいてApproval Recordの構築を依頼し、その後のState Transitionおよび後続工程への進行可否を制御する。
+
+Application Layer自身がHumanに代わってApproval Decisionを生成してはならない。
+
+### ApprovalRecordService
+
+`ApprovalRecordService`は、HumanによるApproval Decisionと承認対象Artifactに関する情報を受け取り、15.4で定義した形式に従ってApproval Recordを構築する責務を持つ。
+
+少なくとも以下の情報を扱う。
+
+```text
+approval_id
+artifact_type
+artifact_path
+artifact_hash
+decision
+approved_at
+comment
+```
+
+`artifact_hash`は、承認対象Artifactに対して定義された算出規則に従って生成する。
+
+`ApprovalRecordService`は、HumanによるApproval Decisionの内容を独自に変更、補完、または代替してはならない。
+
+また、承認対象Artifactの内容が適切であるかどうかを判断する責務を持たない。
+
+### ApprovalRecordRepository
+
+`ApprovalRecordRepository`は、`ApprovalRecordService`によって構築されたApproval Recordの保存および読み出しを担当する。
+
+Version 1では、Approval Recordを`approvals/`配下のJSONファイルとして保存する。
+
+`ApprovalRecordRepository`は、Human Approvalの判断、Approval Recordの内容に関する業務的判断、または後続工程への進行可否を決定してはならない。
+
+### Common Use
+
+`ApprovalRecordService`および`ApprovalRecordRepository`は、特定のApproval UseCase専用とはせず、以下のHuman Approvalで共通して利用可能な仕組みとする。
+
+```text
+Specification Approval
+Implementation Plan Approval
+Critical Change Approval
+Final Approval
+```
+
+各Approvalで承認対象となるArtifactは異なるが、Humanによる判断を特定のArtifactおよびArtifact Hashと関連付けて記録する基本的な責務は共通とする。
+
+### Responsibility Boundary
+
+概念的な責務境界は、以下とする。
+
+```text
+Human
+= 判断する
+
+Application Layer
+= いつ判断を求めるか、および判断後の工程を制御する
+
+ApprovalRecordService
+= Humanの判断をApproval Recordとして構築する
+
+ApprovalRecordRepository
+= Approval Recordを保存・読み出しする
+```
+
+この責務分離により、Human Approvalの判断主体と、承認記録の構築・保存処理を分離し、Application LayerまたはAIがHuman Approvalを暗黙的に代替することを防止する。
+
+---
+
+## 15.17 Approval Recordの検証責務
+
+**Status: Decided**
+
+Version 1では、保存されたApproval Recordが現在の承認対象Artifactに対して有効であるかを検証する共通責務を、`ApprovalValidationService`として定義する。
+
+`ApprovalValidationService`はHumanによるApproval Decisionを行うものではなく、既に記録されたHuman Approvalと現在の承認対象Artifactとの整合性を検証する。
+
+概念的な処理は、以下とする。
+
+```text
+Approval Record
+        │
+        ├── decision
+        ├── artifact_type
+        ├── artifact_path
+        └── artifact_hash
+                │
+                │ compare
+                │
+Current Artifact
+        │
+        ├── artifact_type
+        ├── artifact_path
+        └── current_hash
+                │
+                ↓
+    ApprovalValidationService
+                ↓
+        Validation Result
+```
+
+### Responsibility
+
+`ApprovalValidationService`は、少なくとも以下を確認する。
+
+```text
+Approval Recordが存在する
+
+decisionが要求された承認状態を示している
+
+Approval Recordが現在の承認対象Artifactに対応している
+
+現在のArtifactからHashを計算できる
+
+Approval Recordのartifact_hashと
+現在のArtifact Hashが一致する
+```
+
+対象となるApprovalの種類に応じて追加の同一性確認が必要な場合は、その確認も行う。
+
+例えばFinal Approvalでは、15.4で定義したFinal Approval Target Artifactに基づき、Implementation Branch、HEAD Commit、Base Commit、および関連Artifact等の対応関係を確認する。
+
+Critical Change Approvalでは、Approval Recordが現在のCritical Change Requestおよび対象Implementationに対応していることを確認する。
+
+### Validation Result
+
+`ApprovalValidationService`は、少なくとも以下の情報を返す。
+
+```text
+is_valid
+approval_id
+artifact_type
+validation_errors
+validation_warnings
+```
+
+`is_valid`は、Humanによる承認判断そのものを表すものではない。
+
+`is_valid = true`は、
+
+```text
+Humanによって記録されたApprovalが、
+現在の対象Artifactに対して有効である
+```
+
+ことを意味する。
+
+`is_valid = false`は、
+
+```text
+現在の対象Artifactについて、
+そのApproval Recordを有効なHuman Approvalとして使用できない
+```
+
+ことを意味する。
+
+### Common Use
+
+`ApprovalValidationService`は、特定のApproval UseCase専用とはせず、少なくとも以下のHuman Approvalの検証で共通して利用可能な仕組みとする。
+
+```text
+Specification Approval
+Implementation Plan Approval
+Critical Change Approval
+Final Approval
+```
+
+各Approvalで必要となる追加の検証条件は異なるが、保存されたApproval Recordと現在の承認対象Artifactとの同一性および整合性を確認する基本責務は共通とする。
+
+### Responsibility Boundary
+
+責務境界は、以下とする。
+
+```text
+Human
+= Artifactの内容を確認し、Approval Decisionを行う
+
+Application Layer
+= Approval Validationが必要な時点を制御し、
+  Validation Resultに基づいて後続工程への進行可否を制御する
+
+ApprovalRecordService
+= Humanの判断をApproval Recordとして構築する
+
+ApprovalRecordRepository
+= Approval Recordを保存・読み出しする
+
+ApprovalValidationService
+= 保存されたApproval Recordが
+  現在のArtifactに対して有効かを検証する
+```
+
+`ApprovalValidationService`は、承認対象Artifactの内容が要求として適切であるか、設計として妥当であるか、またはHumanが承認すべきかを判断してはならない。
+
+また、無効なApproval Recordを自動的に有効化したり、Human Approvalを推定または補完したりしてはならない。
+
+### Invalid Approval
+
+以下の場合、現在のArtifactに対する有効なApprovalとして扱ってはならない。
+
+```text
+Approval Recordが存在しない
+
+decisionが承認を示していない
+
+Approval Recordと対象Artifactの対応関係を確認できない
+
+現在のArtifact Hashを計算できない
+
+artifact_hashとcurrent_hashが一致しない
+
+Approval固有の追加検証条件を満たさない
+```
+
+Approval Validationに失敗した場合、Application Layerは、そのApprovalを前提とする後続工程へ進行させてはならない。
+
+必要な場合は、Humanへ再承認を求める工程または適切な修正工程へ処理を返す。
+
+### Separation of Decision and Validation
+
+Human Approvalの判断とApproval Validationは、明確に区別する。
+
+```text
+Human
+「このArtifactを承認する」
+        ↓
+Approval Record
+        ↓
+時間経過・工程進行
+        ↓
+ApprovalValidationService
+「この承認記録は、
+ 今のArtifactにも有効か？」
+```
+
+`ApprovalValidationService`が行うのはHuman Decisionの再評価ではなく、Humanが承認した対象と現在の対象が同一であることの検証である。
+
+この責務分離により、Humanによる意思決定を維持しながら、承認後にArtifactが変更された場合や、異なるArtifactに過去のApproval Recordが誤って使用されることを防止する。
