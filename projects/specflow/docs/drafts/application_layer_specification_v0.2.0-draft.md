@@ -317,6 +317,9 @@ TDDの具体的な適用範囲および例外条件は、15.10で定義する。
 * Implementation Plan Template
 * Plan Prompt Template
 * Project Metadata
+* Specification Approval Record
+
+
 
 ### Output
 
@@ -335,6 +338,31 @@ Project全体の自動探索・自動読み込みは必須としない。
 必要に応じて、対応するApproval Recordおよび現在のArtifact Hashとの整合性を確認し、有効な承認状態であることを検証する。
 
 Development Inputの読み込みと、Human Approvalの有効性判定は責務を区別する。
+
+Specificationに対するHuman Approvalは、Application Layerが生成または代替するものではない。
+
+Version 1では、HumanがApplication Layerの外部でSpecificationを作成または選択し、その内容を承認する。
+
+Specification Approval Recordは、そのHumanによる承認判断の証拠としてDevelopment InputとともにApplication Layerへ渡される。
+
+Application Layerは、後続工程へ進む前に、現在のSpecificationからArtifact Hashを計算し、Specification Approval Recordに記録された`artifact_hash`との一致を確認する。
+
+Specification Approval Recordが存在しない場合、`decision`が承認を示していない場合、または現在のSpecificationのArtifact Hashと一致しない場合、そのSpecificationを有効に承認済みとして扱ってはならない。
+
+Specification Approvalの判断主体と、その承認の有効性を検証する責務は区別する。
+
+```text
+Human
+    ↓
+Specificationを作成・選択・承認
+    ↓
+Specification Approval Record
+    ↓
+Application Layer
+    ↓
+現在のSpecificationとの同一性を検証
+    ↓
+有効な場合のみ後続工程へ進行
 
 ---
 
@@ -482,20 +510,28 @@ Humanからの修正依頼を基にImplementation Plan Draftを再生成する�
 
 ### Input
 
-* 現在のImplementation Plan Draft
-* Humanの修正理由
-* 元のSpecification
-* 関連文書
+- 現在のImplementation Plan Draft
+- Humanの修正理由または修正要求
+- 元のSpecification
+- 関連文書
 
 ### Output
 
-* 修正版Implementation Plan Draft
-* 変更点
-* 前版との対応情報
+- 修正版Implementation Plan Draft
+- 変更点
+- 前版との対応情報
 
 ### Transition
 
-修正版生成後は、再びPlan承認待ちへ戻る。
+修正版Implementation Plan Draftを生成した後は、`plan_approval_pending`へ遷移し、再びHuman Approvalを求める。
+
+### Rule
+
+修正版Implementation Plan Draftは、新しい承認対象Artifactとして扱う。
+
+以前のImplementation Planに対するApproval Recordを、修正版Implementation Planに対する有効な承認として引き継いではならない。
+
+修正版Implementation Planを後続工程で使用するためには、UC-03で定義したApproval Validationに従い、新たなHuman Approvalを取得しなければならない。
 
 ---
 
@@ -539,6 +575,9 @@ Codex RunnerがSpecificationまたはApproved Implementation Planに存在しな
 ### Output
 
 - Codex用Implementation Prompt
+- 使用したSpecificationの参照
+- 使用したApproved Implementation Planの参照
+- Prompt生成結果
 
 ### Rule
 
@@ -555,6 +594,8 @@ Codex Promptは、Codex Runner自身にImplementation Evidenceの正当性を自
 Codex Runnerには、Implementation Evidenceを構築するために必要な実行結果を報告させる。
 
 最終的なImplementation Evidenceは、Application LayerがCodex Runnerの実行結果と実際のSource Code、Git Status、Git Diff、およびTest Result等を収集して構築する。
+
+生成されたCodex Promptは、どのSpecificationおよびApproved Implementation Planを基に生成されたかを後続工程で識別可能でなければならない。
 
 ---
 
@@ -629,6 +670,10 @@ Codex RunnerはImplementation Evidenceの正当性を自己確定してはなら
 
 Application LayerはCodex Runnerから返された実装結果に加え、実際のSource Code、Git Status、Git Diff、およびTest Result等を収集し、Implementation Evidenceを構築する。
 
+承認範囲を超える変更がUC-07で定義したCritical Changeに該当する場合、Application LayerはImplementationを継続させず、`critical_approval_pending`へ遷移してUC-07 `Request Critical Change Approval`へ処理を渡す。
+
+Critical Changeに対する有効なHuman Approvalが確認されるまで、Codex Runnerは当該変更を含むImplementationを再開してはならない。
+
 ---
 
 ## UC-07 Request Critical Change Approval
@@ -679,7 +724,9 @@ Critical Changeは、Codex RunnerまたはApplication Layerが独自判断で実
 
 HumanによるCritical Changeへの判断は、15.4で定義したApproval Recordとして記録する。
 
-Critical Change Approvalでは、Humanへ提示したCritical Change Requestを承認対象Artifactとして扱う。
+Critical Change Approvalでは、Humanへ提示する変更内容、変更理由、対象Implementation、変更対象、および影響範囲をCritical Change Requestとして構築・保存し、承認対象Artifactとして扱う。
+
+Application Layerは、Humanへ判断を求める前にCritical Change Requestを識別可能なArtifactとして確定し、そのArtifactからHashを計算する。
 
 Approval Recordには、少なくとも以下を保持する。
 
@@ -839,6 +886,7 @@ Application Layerは、少なくとも以下を確認する。
 - 実行したTestおよびその結果を確認できる
 - Error、Warningおよび未完了事項を記録できる
 - Human Approvalが必要な事項を記録できる
+- 使用したCodex Promptが、対象SpecificationおよびApproved Implementation Planに対応するPromptであることを確認できる
 
 Codex Runnerから返された情報と実際のRepositoryまたはTestの状態に不一致がある場合、その不一致を無視してEvidenceを正常として扱ってはならない。
 
@@ -913,6 +961,10 @@ Implementation EvidenceのみをReviewの根拠としてはならない。
 
 Implementation Evidenceに記録された内容と、実際のSource Code、Git Diff、Test Code、およびTest Resultを相互に比較する。
 
+Review開始前に、Specification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、Implementation Branch、および関連するGit Diff等が、同一の対象Implementationに対する一連のArtifactとして対応していることを確認する。
+
+Review対象Artifact間の対応関係を確認できない場合、その不整合を無視してReviewを継続し、`APPROVED`としてはならない。
+
 ---
 
 ### Review Scope
@@ -955,6 +1007,7 @@ Reviewでは、少なくとも以下を確認する。
 - Implementation Evidenceに記録された変更ファイルと実際の変更ファイルが一致しているか
 - Test ResultがImplementation Evidenceの記録と一致しているか
 - Error、Warning、未完了事項が適切に記録されているか
+- Specification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、およびGit Diff等の対応関係が確認できるか
 
 ---
 
@@ -1120,6 +1173,7 @@ Review ReportをHumanへ提示し、対象Implementationを`developer`へ取り�
 - Review Result
 - 対象Implementation Branch
 - Base Commit
+- 現在のHEAD Commit
 - Implementation Evidence
 - Git Diff
 - 対象Implementationを識別する情報
@@ -1149,7 +1203,9 @@ approved_at
 comment
 ```
 
-最終承認時には、Humanが承認した対象Implementationを識別できる情報およびHashをApproval Recordへ記録する。
+最終承認時には、Humanが承認した対象Implementationを一意に識別できる情報およびArtifact HashをApproval Recordへ記録する。
+
+Final Approvalにおける承認対象ArtifactおよびArtifact Hashの算出対象は、15.4で定義した方式に従い、承認時とmerge開始前で同一の規則を使用する。
 
 概念的には、以下のようなApproval Recordを生成する。
 
@@ -1180,10 +1236,13 @@ decisionが承認を示している
 
 対象Implementation Branchが一致する
 
+対象ImplementationのHEAD Commitが承認時点と一致する
+
 対象Implementationが承認された内容と一致する
 
 Approval Recordのartifact_hashと
-現在の対象Implementationから計算したHashが一致する
+現在の対象Implementationについて
+同一の算出規則で計算したArtifact Hashが一致する
 ```
 
 いずれかの条件を満たさない場合、そのFinal Approvalを現在のImplementationに対する有効な承認として扱ってはならない。
@@ -1302,7 +1361,126 @@ UC-11は、Specification、Approved Implementation Plan、またはHuman Approva
 
 修正後に再Reviewを行う場合は、第9章で定義した新しいImplementation Evidenceを生成し、以前のEvidenceを上書きしてはならない。
 
+修正によってHuman Approvalの対象Artifactが変更された場合、変更前のApproval Recordを変更後のArtifactに対する有効な承認として引き継いではならない。
+
+UC-11は修正工程へ処理を戻す際、修正によって再取得が必要となるHuman Approvalを識別し、対応するApproval工程を経ずに後続工程へ進行させてはならない。
 ---
+
+## UC-12 Merge Approved Implementation
+
+### Purpose
+
+Humanによって最終承認されたImplementationについて、Final Approvalの有効性および対象Implementationの同一性を確認した上で、Implementation Branchを`developer`へmergeする。
+
+UC-12はHumanによるFinal Approvalを代替するUseCaseではなく、有効なFinal Approvalを前提として承認済みImplementationを`developer`へ取り込む工程を実行する。
+
+### Input
+
+- 対象Implementation Branch
+- Base Commit
+- 現在のHEAD Commit
+- Final Approval Record
+- Final Approval Target Artifact
+- Implementation Evidence
+- Review Report
+- Review Result
+- 現在のState
+- 必要に応じてGit StatusおよびGit Diff
+
+### Precondition
+
+merge開始前に、少なくとも以下を確認する。
+
+```text
+Review ResultがAPPROVEDである
+
+有効なFinal Approval Recordが存在する
+
+Final Approval Recordのdecisionが承認を示している
+
+Final Approval Target Artifactが存在する
+
+対象Implementation Branchが承認時点と一致する
+
+HEAD Commitが承認時点と一致する
+
+Final Approval Recordのartifact_hashと
+現在のFinal Approval Target Artifactから
+同一の算出規則で計算したArtifact Hashが一致する
+```
+
+いずれかの条件を満たさない場合、mergeを開始してはならない。
+
+### Processing
+
+概念的な処理は、以下とする。
+
+```text
+Final Approval Record
+        +
+Final Approval Target Artifact
+        +
+Current Implementation
+        ↓
+Approval Validation
+        ↓
+対象Implementationの同一性確認
+        ↓
+merge実行可能性確認
+        ↓
+Implementation Branch
+        ↓
+developerへmerge
+        ↓
+merge結果確認
+        │
+        ├── 成功
+        │      ↓
+        │  completed
+        │
+        └── 失敗
+               ↓
+           completedへ遷移しない
+               ↓
+           Human判断へ返す
+```
+
+Git操作そのものは、Application Layerが直接実装するのではなく、Git操作を担当するComponentまたはServiceを利用する。
+
+### Output
+
+- Merge Result
+- merge対象Implementation
+- merge元Branch
+- merge先Branch
+- merge後Commitに関する情報
+- ErrorおよびWarning
+- Human判断が必要な事項
+- 遷移可能なState
+
+### Transition
+
+mergeが正常に完了し、対象Implementationが`developer`へ正しく取り込まれたことを確認できた場合にのみ、`completed`へ遷移する。
+
+mergeに失敗した場合は、`completed`へ遷移してはならない。
+
+merge conflict、Repository状態の不整合、承認対象との不一致、その他安全に自動継続できない問題が確認された場合は、自動的に問題を解消したものとして処理せず、必要な情報を記録してHumanへ判断を返す。
+
+### Rule
+
+Humanによる有効なFinal Approvalが確認される前にmergeを実行してはならない。
+
+Final Approval後に対象Implementation Branch、HEAD Commit、Final Approval Target Artifact、または承認対象の内容が変更された場合、以前のFinal Approvalを現在のImplementationに対する有効な承認として使用してはならない。
+
+UC-12は、Final Approvalの対象となったImplementationを変更してはならない。
+
+mergeのためにImplementation自体の修正が必要となった場合は、承認済みImplementationを直接修正してmergeを継続せず、適切な修正工程へ処理を戻す。
+
+merge成功の確認前に`completed`へ遷移してはならない。
+
+---
+
+
 
 # 7. Human Approval Points
 
@@ -1974,8 +2152,8 @@ Application Layer
 ├── CollectImplementationEvidenceUseCase
 ├── ReviewImplementationUseCase
 ├── RequestFinalApprovalUseCase
-├── MergeApprovedImplementationUseCase
-└── ResumeCorrectionUseCase
+├── ResumeCorrectionUseCase
+└── MergeApprovedImplementationUseCase
 ```
 
 各UseCaseは、必要な既存EngineまたはServiceを利用する。
@@ -2438,6 +2616,7 @@ Humanによる承認記録は、独立したJSONファイルとして`approvals/
 projects/specflow/
 ├── state.json
 └── approvals/
+    ├── specification_approval_001.json
     ├── plan_approval_001.json
     ├── critical_change_approval_001.json
     └── final_approval_001.json
@@ -2511,6 +2690,35 @@ state.json + approvals/*.json
 
 による分離管理を採用する。
 
+### Specification Approval
+
+Specificationに対するHuman Approvalは、Application Layerが生成または代替するものではない。
+
+Version 1では、HumanがApplication Layerの外部でSpecificationを作成または選択し、その内容を承認する。
+
+HumanによるSpecificationへの承認判断は、Specification Approval Recordとして`approvals/`配下に保存し、Development InputとともにApplication Layerへ渡す。
+
+Specification Approval Recordでは、承認対象となったSpecificationそのものをArtifactとして扱う。
+
+Approval Recordの`artifact_path`は承認対象Specificationを参照し、`artifact_hash`にはHumanが承認した時点のSpecificationから算出したHashを記録する。
+
+概念的には、以下とする。
+
+```text
+Specification
+        ↓
+Human Review / Approval
+        ↓
+Specification Approval Record
+        ├── artifact_path
+        └── artifact_hash
+        ↓
+Development Input
+        ↓
+Application Layer
+        ↓
+Current Specification Hashとの同一性確認
+
 ### Critical Change Approval
 
 Critical Changeに対するHuman Approvalでは、Humanへ提示した変更要求そのものを承認対象Artifactとして扱う。
@@ -2533,10 +2741,58 @@ artifact_hash
         ↓
 Critical Change Requestとの同一性確認
 ```
-
 Critical Change Requestの内容がHuman承認後に変更され、現在のHashとApproval Recordに保存された`artifact_hash`が一致しなくなった場合、以前のApproval Recordを変更後のCritical Changeに対する有効な承認として扱ってはならない。
 
 この方式により、Critical Change Approvalについても、Humanが具体的にどの変更要求を承認したかをArtifact単位で追跡可能にする。
+
+### Final Approval
+
+Final Approvalでは、Humanが最終Reviewを経て`developer`へ取り込むことを承認した特定時点のImplementationを承認対象とする。
+
+Version 1では、承認対象Implementationを少なくともImplementation Branchおよび承認時点のHEAD Commitによって識別する。
+
+Final Approvalの対象となるImplementationについて、承認対象を識別可能なFinal Approval Target Artifactを構築・保存し、そのArtifactをApproval Recordの承認対象として扱う。
+
+Final Approval Target Artifactには、少なくとも以下を含める。
+
+```text
+implementation_branch
+head_commit
+base_commit
+implementation_evidence_reference
+git_diff_reference
+review_report_reference
+```
+
+Approval Recordの`artifact_path`はFinal Approval Target Artifactを参照し、`artifact_hash`には当該Artifactから算出したHashを記録する。
+
+概念的には、以下とする。
+
+```text
+Reviewed Implementation
+        ↓
+Final Approval Target Artifact
+        ├── Implementation Branch
+        ├── HEAD Commit
+        ├── Base Commit
+        ├── Implementation Evidence
+        ├── Git Diff
+        └── Review Report
+        ↓
+Human Final Approval
+        ↓
+Approval Record
+        ├── artifact_path
+        └── artifact_hash
+        ↓
+merge開始前に同一性確認
+```
+
+merge開始前に、Application Layerは現在の対象ImplementationからFinal Approval Target Artifactに対応する情報を確認し、承認時点の対象Implementationと一致していることを検証する。
+
+Final Approval Target Artifactの内容が承認後に変更された場合、または対象Implementation BranchのHEAD Commitが承認時点から変更された場合、以前のFinal Approval Recordを現在のImplementationに対する有効な承認として扱ってはならない。
+
+Final ApprovalにおけるArtifact Hashは、承認時とmerge開始前で同一の算出規則を使用する。
 
 ---
 
