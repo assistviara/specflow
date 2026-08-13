@@ -2718,6 +2718,17 @@ Development Input
 Application Layer
         ↓
 Current Specification Hashとの同一性確認
+```
+
+Application Layerは、Specificationを後続工程で使用する前に、現在のSpecificationからArtifact Hashを計算し、Specification Approval Recordに保存された`artifact_hash`と比較する。
+
+Hashが一致し、かつ`decision`が承認を示している場合にのみ、現在のSpecificationを有効に承認済みとして扱う。
+
+Specification Approval Recordが存在しない場合、`decision`が承認を示していない場合、または現在のSpecificationのHashと`artifact_hash`が一致しない場合、そのSpecificationを有効に承認済みとして扱ってはならない。
+
+Humanによる承認後にSpecificationが変更された場合、以前のSpecification Approval Recordを変更後のSpecificationに対する有効な承認として使用してはならない。
+
+Specificationの承認判断はHumanの責務とし、Application Layerはその判断を代替せず、承認記録と現在のSpecificationとの同一性を検証する。
 
 ### Critical Change Approval
 
