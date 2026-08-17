@@ -5687,20 +5687,34 @@ Final Approval
 
 ### Responsibility Boundary
 
-概念的な責務境界は、以下とする。
+Version 1における責務境界は、以下を基本とする。
 
 ```text
 Human
-= 判断する
+= Approval Decisionを行う
 
 Application Layer
-= いつ判断を求めるか、および判断後の工程を制御する
+= Approvalが必要となる工程を制御し、
+  ServiceおよびRepositoryを利用して
+  後続工程とState Transitionを制御する
 
-ApprovalRecordService
-= Humanの判断をApproval Recordとして構築する
+Core
+├── ApprovalRecordService
+│   = Humanの判断をApproval Recordとして構築する
+│
+├── ApprovalValidationService
+│   = Approval Recordが現在のArtifactに対して
+│     有効であるかを検証する
+│
+└── ApprovalRecordRepository
+    = Approval Recordの保存・取得に必要な
+      抽象的な契約を定義する
 
-ApprovalRecordRepository
-= Approval Recordを保存・読み出しする
+Infrastructure / Adapter
+└── JsonApprovalRecordRepository
+    = ApprovalRecordRepositoryの契約に従い、
+      JSONファイルを用いて
+      Approval Recordを永続化・読み出しする
 ```
 
 この責務分離により、Human Approvalの判断主体と、承認記録の構築・保存処理を分離し、Application LayerまたはAIがHuman Approvalを暗黙的に代替することを防止する。
@@ -5876,3 +5890,478 @@ ApprovalValidationService
 `ApprovalValidationService`が行うのはHuman Decisionの再評価ではなく、Humanが承認した対象と現在の対象が同一であることの検証である。
 
 この責務分離により、Humanによる意思決定を維持しながら、承認後にArtifactが変更された場合や、異なるArtifactに過去のApproval Recordが誤って使用されることを防止する。
+
+---
+
+## 15.18 Approval関連Service / Repositoryの配置
+
+**Status: Decided**
+
+Version 1では、Human Approvalに関する共通責務を、その性質に応じてCore、Application Layer、およびInfrastructure / Adapterへ分離して配置する。
+
+15.16および15.17で定義したApproval関連の共通責務について、基本的な配置は以下とする。
+
+```text
+Human
+    │
+    │ Approval Decision
+    ↓
+Application Layer
+    │
+    ├── ApprovalRecordService
+    │       → Core
+    │
+    ├── ApprovalValidationService
+    │       → Core
+    │
+    └── ApprovalRecordRepository
+            → Core
+                    ↑
+                    │ implements
+                    │
+        JsonApprovalRecordRepository
+            → Infrastructure / Adapter
+```
+
+### ApprovalRecordService
+
+`ApprovalRecordService`はCoreに配置する。
+
+`ApprovalRecordService`は、HumanによるApproval Decisionと承認対象Artifactに関する情報を受け取り、15.4および15.16で定義した規則に従ってApproval Recordを構築する。
+
+この責務は、特定のUseCaseやUI、JSONファイル等の保存方式に依存しない、Human Approvalに関する共通の業務規則として扱う。
+
+したがって、`ApprovalRecordService`はApplication LayerまたはInfrastructure / Adapterではなく、Coreに属するServiceとする。
+
+概念的には、以下とする。
+
+```text
+Human Approval Decision
+        +
+Approval Target Artifact
+        ↓
+ApprovalRecordService
+        ↓
+Approval Record
+```
+
+`ApprovalRecordService`は、HumanによるApproval Decisionを代替してはならない。
+
+また、Approval Recordをどのファイルまたは保存媒体へ保存するかを決定する責務を持たない。
+
+### ApprovalValidationService
+
+`ApprovalValidationService`はCoreに配置する。
+
+`ApprovalValidationService`は、15.17で定義した規則に従い、保存されたApproval Recordが現在の承認対象Artifactに対して有効であるかを検証する。
+
+この検証は、単なるファイル読み出しではなく、少なくとも以下の情報を基に、現在のArtifactに対して既存のHuman Approvalを使用できるかを判定する共通の業務規則である。
+
+```text
+decision
+artifact_type
+artifact_path
+artifact_hash
+current_hash
+Approval固有の追加検証条件
+```
+
+そのため、`ApprovalValidationService`はCoreに属するServiceとする。
+
+概念的には、以下とする。
+
+```text
+Approval Record
+        +
+Current Artifact
+        ↓
+ApprovalValidationService
+        ↓
+Validation Result
+```
+
+`ApprovalValidationService`は、HumanによるApproval Decisionそのものを再評価、変更、補完、または代替してはならない。
+
+また、Validation Resultに基づいて後続工程へ進むかどうかを最終的に制御する責務を持たない。
+
+### ApprovalRecordRepository
+
+`ApprovalRecordRepository`は、Approval Recordの永続化および読み出しに必要な抽象的な契約を定義する。
+
+実際の保存方式には依存せず、Application LayerまたはCoreから利用可能な内側のLayerに配置する。
+
+Version 1では、`ApprovalRecordRepository`の具体実装として`JsonApprovalRecordRepository`を使用する。
+
+`JsonApprovalRecordRepository`は、Approval Recordを`approvals/`配下のJSONファイルとして保存・読み出しするため、Infrastructure / Adapterに配置する。
+
+概念的には、以下とする。
+
+```text
+Approval Record
+        ↓
+ApprovalRecordRepository
+        ↓
+JsonApprovalRecordRepository
+        ↓
+approvals/*.json
+```
+
+読み出しについては、以下とする。
+
+```text
+approvals/*.json
+        ↓
+JsonApprovalRecordRepository
+        ↓
+ApprovalRecordRepository
+        ↓
+Approval Record
+```
+
+`ApprovalRecordRepository`は、Human Approvalの判断、Approval Recordの有効性判定、または後続工程への進行可否を判断してはならない。
+
+Approval Recordの保存および取得に必要な抽象的な契約の定義に責務を限定する。
+
+実際のJSONファイルへの永続化および読み出しは、`JsonApprovalRecordRepository`が担当する。
+
+### Application Layer
+
+Application Layerは、Approval関連ServiceおよびRepositoryそのものの専門責務を実装するのではなく、開発工程に応じてそれらを利用する。
+
+Application Layerは、少なくとも以下を制御する。
+
+```text
+いつHuman Approvalを要求するか
+
+いつApproval Recordを構築・保存するか
+
+いつApproval Validationを実行するか
+
+Validation Resultを受けて
+後続工程へ進行可能か
+
+再承認が必要か
+
+修正工程へ戻る必要があるか
+
+Stateをどのように遷移させるか
+```
+
+したがって、Application LayerはApprovalに関する各専門責務を直接抱え込むのではなく、それらを組み合わせて開発工程を進行する。
+
+### Responsibility Boundary
+
+Version 1における責務境界は、以下を基本とする。
+
+```text
+Human
+= Approval Decisionを行う
+
+Application Layer
+= Approvalが必要となる工程を制御し、
+  ServiceおよびRepositoryを利用して
+  後続工程とState Transitionを制御する
+
+Core
+├── ApprovalRecordService
+│   = Humanの判断をApproval Recordとして構築する
+│
+├── ApprovalValidationService
+│   = Approval Recordが現在のArtifactに対して
+│     有効であるかを検証する
+│
+└── ApprovalRecordRepository
+    = Approval Recordの保存・取得に必要な
+      抽象的な契約を定義する
+
+Infrastructure / Adapter
+└── JsonApprovalRecordRepository
+    = ApprovalRecordRepositoryの契約に従い、
+      JSONファイルを用いて
+      Approval Recordを永続化・読み出しする
+```
+
+### Dependency Direction
+
+Approval関連責務についても、Application Layer全体の依存方向に関する原則に従う。
+
+概念的には、以下とする。
+
+```text
+Human / UI
+     ↓
+Application Layer
+     ↓
+Core
+     ↑
+Infrastructure / Adapter
+```
+
+Coreは、Approval Recordの実際の保存場所、JSONファイル、UI、AI Runner等の外部実装詳細へ依存してはならない。
+
+Application LayerはCoreのApproval関連Serviceを利用し、必要な永続化処理についてはRepositoryを介してInfrastructure / Adapterの実装を利用する。
+
+これにより、Approvalに関する業務規則と、工程制御および保存方式を分離する。
+
+### Decision Reason
+
+Human ApprovalはSpecFlowの複数工程で共通して利用されるが、以下の責務は同一ではない。
+
+```text
+Humanが判断すること
+
+判断を正式な記録へ変換すること
+
+記録を保存すること
+
+保存された承認が現在も有効か検証すること
+
+検証結果に基づいて工程を進めること
+```
+
+これらをApplication Layerまたは単一のComponentへ集中させると、Human Decision、業務規則、工程制御、およびInfrastructureの責務が混在する。
+
+そのためVersion 1では、
+
+```text
+Decision
+Record Construction
+Validation
+Persistence
+Workflow Control
+```
+
+を分離し、それぞれを適切なLayerへ配置する。
+
+この構造により、Human Approvalの判断主体をHumanに維持したまま、Application Layerが工程を統括し、CoreがApprovalに関する共通業務規則を担い、Infrastructure / Adapterが保存方式を担当する構造とする。
+
+---
+
+## 15.19 ApprovalRecordRepositoryの抽象とJSON実装の分離
+
+**Status: Decided**
+
+Version 1では、Approval Recordの保存および読み出しに関する「必要な機能」と、「JSONファイルを用いた具体的な保存方法」を分離する。
+
+Approval Recordの永続化に関する責務は、以下の2つに分ける。
+
+```text
+ApprovalRecordRepository
+= Approval Recordを保存・取得するための抽象的な契約
+
+JsonApprovalRecordRepository
+= JSONファイルを用いて
+  Approval Recordを実際に保存・取得する実装
+```
+
+### ApprovalRecordRepository
+
+`ApprovalRecordRepository`は、Approval Recordの永続化に必要な操作を定義する抽象として扱う。
+
+少なくとも以下のような責務を持つ。
+
+```text
+Approval Recordを保存できる
+
+approval_id等を基に
+Approval Recordを取得できる
+
+必要に応じて対象Artifactに関連する
+Approval Recordを取得できる
+```
+
+`ApprovalRecordRepository`は、Approval Recordをどの形式または保存媒体へ保存するかを規定しない。
+
+したがって、以下のような具体的な実装詳細へ依存してはならない。
+
+```text
+JSON
+ファイルシステム
+SQLite
+PostgreSQL
+Cloud Storage
+その他の永続化技術
+```
+
+概念的には、以下とする。
+
+```text
+Application Layer / Core
+          ↓
+ApprovalRecordRepository
+          ↓
+  永続化方式には依存しない
+```
+
+Pythonでは、Version 1の実装時に必要に応じて`Protocol`、ABC、その他の適切な抽象化方法を使用できる。
+
+概念例：
+
+```python
+class ApprovalRecordRepository(Protocol):
+    def save(self, record):
+        ...
+
+    def get(self, approval_id):
+        ...
+```
+
+具体的なMethod名、引数、戻り値、型定義等は、実装時にApplication Layer Specificationおよび関連する型設計との整合性を確認して決定する。
+
+### JsonApprovalRecordRepository
+
+`JsonApprovalRecordRepository`は、`ApprovalRecordRepository`で定義された契約を、JSONファイルおよびファイルシステムを用いて実現する具体実装とする。
+
+Version 1では、Approval Recordを以下の場所へ保存する。
+
+```text
+projects/specflow/approvals/
+```
+
+概念的には、以下とする。
+
+```text
+ApprovalRecordRepository
+        ↑
+        │ implements
+        │
+JsonApprovalRecordRepository
+        ↓
+approvals/*.json
+```
+
+`JsonApprovalRecordRepository`は、少なくとも以下を担当する。
+
+```text
+Approval RecordをJSONへ変換する
+
+指定された保存先へ書き込む
+
+保存済みJSONを読み込む
+
+Approval Recordとして復元する
+
+ファイルが存在しない場合等の
+永続化上のErrorを返す
+```
+
+`JsonApprovalRecordRepository`は、Human Approvalの判断、Approval Recordの有効性判定、またはApplication LayerのState Transitionを担当してはならない。
+
+### Layer Placement
+
+`ApprovalRecordRepository`の抽象はCoreに配置する。
+
+`ApprovalRecordRepository`は、Approval Recordの保存・取得に必要な契約を定義するが、JSON、ファイルシステム、その他の具体的な永続化方式には依存しない。
+
+一方、`JsonApprovalRecordRepository`は、JSONおよびファイルシステムという具体的なInfrastructureへ依存するため、Infrastructure / Adapterに配置する。
+
+概念的な配置は、以下とする。
+
+```text
+Application Layer
+        ↓
+Core
+        │
+        └── ApprovalRecordRepository
+                    ↑
+                    │ implements
+                    │
+Infrastructure / Adapter
+        │
+        └── JsonApprovalRecordRepository
+```
+
+Infrastructure / Adapterは内側で定義されたRepository契約に従う。
+
+内側のLayerが、`JsonApprovalRecordRepository`、JSONファイル、または具体的な保存Pathへ直接依存する構造としてはならない。
+
+### Dependency Direction
+
+Repositoryに関する依存方向は、以下を基本とする。
+
+```text
+Application Layer
+        ↓
+ApprovalRecordRepository
+        ↑
+JsonApprovalRecordRepository
+```
+
+Application Layerは、
+
+```text
+JSONへ保存する
+```
+
+という具体的な操作ではなく、
+
+```text
+Approval Recordを保存する
+```
+
+という抽象的な能力へ依存する。
+
+これにより、将来永続化方式を変更する場合でも、Approval Recordを利用するApplication LayerおよびCoreへの影響を最小限に抑える。
+
+例えば、将来以下のような変更を行う場合でも、
+
+```text
+Version 1
+JsonApprovalRecordRepository
+        ↓
+
+Future Extension
+SqliteApprovalRecordRepository
+PostgreSQLApprovalRecordRepository
+その他のRepository実装
+```
+
+Repository契約を維持できる限り、上位の開発工程を大きく変更せずに永続化方式を交換可能とする。
+
+### Responsibility Boundary
+
+Version 1では、以下の責務分離を基本とする。
+
+```text
+ApprovalRecordService
+= Approval Recordを構築する
+
+ApprovalRecordRepository
+= Approval Recordの保存・取得に必要な
+  抽象的な契約を定義する
+
+JsonApprovalRecordRepository
+= Repository契約に従い、
+  JSONファイルを用いて
+  Approval Recordを保存・取得する
+
+ApprovalValidationService
+= Repositoryから取得されたApproval Recordが
+  現在のArtifactに対して有効かを検証する
+
+Application Layer
+= 必要なタイミングでこれらを利用し、
+  WorkflowおよびState Transitionを制御する
+```
+
+### Decision Reason
+
+Version 1ではApproval RecordをJSONファイルとして保存するが、JSONはHuman Approvalそのものの業務概念ではなく、永続化方式の一つにすぎない。
+
+Application LayerまたはCoreがJSONファイルへ直接依存した場合、将来保存方式を変更する際に、Approvalに関する業務処理まで変更する必要が生じる。
+
+そのため、
+
+```text
+何を保存・取得できる必要があるか
+```
+
+というRepositoryの契約と、
+
+```text
+実際にどのように保存・取得するか
+```
+
+というInfrastructure上の実装を分離する。
+
+これにより、Approvalに関する業務規則と永続化技術を分離し、Version 1の実装を単純に保ちながら、将来の保存方式変更にも対応可能な構造とする。
