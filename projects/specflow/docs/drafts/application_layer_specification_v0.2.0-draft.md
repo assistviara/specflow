@@ -650,6 +650,8 @@ Codex Runnerには、Implementation Evidenceを構築するために必要な実
 
 Implementation Roleに割り当てられたCodex Runnerを使用し、Approved Implementation PlanおよびCodex Promptで承認された範囲内のImplementationとTestを実行する。
 
+Codex RunnerはImplementationおよびTestの実行を担当するが、Test ResultまたはTechnical Errorに基づく後続Workflowの判断を独自に行ってはならない。
+
 ### Input
 
 - Specification
@@ -685,7 +687,20 @@ TDD適用要否を確認
         ↓
 必要な既存Testを実行
         ↓
-実装結果をApplication Layerへ返す
+Test Execution Statusを確認
+        │
+        ├── Test正常実行
+        │       ↓
+        │  Test Resultを記録
+        │  （PASS / FAIL）
+        │       ↓
+        │  実装結果をApplication Layerへ返す
+        │
+        └── Test Execution Error
+                ↓
+           Technical Errorとして記録
+                ↓
+           実装結果をApplication Layerへ返す
 ```
 
 TDDの適用要否は、単純なファイル拡張子ではなく、変更がSystemの振る舞いを変更するかどうかを本質的な基準として判断する。
@@ -694,12 +709,58 @@ TDDの適用要否は、単純なファイル拡張子ではなく、変更がSy
 
 文書修正、コメント修正、その他Systemの振る舞いを変更しない変更については、TDDを必須としない。
 
+### Test Result Handling
+
+Test実行結果については、Testが正常に実行された結果としての`PASS`または`FAIL`と、Test実行処理そのものを正常に完了できなかった`Test Execution Error`を区別する。
+
+TDD対象のImplementationにおいて、Implementation前に期待される振る舞いを表現したTestが意図どおり`FAIL`となることは、TDD上の正常な工程として扱う。
+
+```text
+Expected Test Failure
+= TDDにおいてImplementation前に
+  意図的に確認する正常な工程
+```
+
+Implementation後にTestが正常に実行され、その結果として`FAIL`となった場合、その結果はTechnical Errorとして扱ってはならない。
+
+```text
+Test Execution Completed
+        │
+        ├── PASS
+        │      ↓
+        │  Test Resultとして記録
+        │
+        └── FAIL
+               ↓
+           Test Resultとして記録
+```
+
+Codex Runnerは、Test Resultが`FAIL`であることのみを根拠として、独自にCorrection Loopを開始してはならない。
+
+Test Resultが`PASS`または`FAIL`である場合は、その結果を実装結果の一部としてApplication Layerへ返す。
+
+Testを開始できない、Test Runnerが異常終了する、必要な実行環境を利用できない、その他Test Resultを正常に取得できない場合は、`Test Execution Error`としてApplication Layerへ返す。
+
+```text
+Test Execution Error
+        ↓
+Technical Error
+        ↓
+Application Layerへ返す
+```
+
+Codex Runner自身が、Technical Retry、Implementation Failure、Correction、Critical Change、またはHuman判断への遷移を独自に決定してはならない。
+
+Application Layerは、Test Result、Test Execution Error、およびその他のImplementation Evidenceに基づき、通常のReview工程、Technical Retry、Implementation Failure、Correction、Critical Change、またはHuman判断のいずれへ処理を進めるかを決定する。
+
 ### Output
 
 - Codex Runner実行結果
 - 作成・変更・削除したファイルに関する情報
 - 実行したCommandに関する情報
-- Test実行結果
+- Test実行状態
+- Test Result（PASS / FAIL）
+- Test Execution Error
 - ErrorおよびWarning
 - 未完了事項
 - Human Approvalが必要な事項
@@ -714,6 +775,16 @@ Codex Runnerは、Specification、Approved Implementation Plan、およびCodex 
 Codex RunnerはImplementation Evidenceの正当性を自己確定してはならない。
 
 Application LayerはCodex Runnerから返された実装結果に加え、実際のSource Code、Git Status、Git Diff、およびTest Result等を収集し、Implementation Evidenceを構築する。
+
+Codex Runnerは、Test Resultが`FAIL`であることと、Test実行処理そのものが失敗したことを混同してはならない。
+
+Test Resultが`FAIL`である場合、その事実のみを根拠としてCodex Runnerが独自に承認範囲を拡張したり、Correction Loopを開始したりしてはならない。
+
+成果物を変更せず同一の技術操作を再実行する必要がある場合、その処理をTechnical Retryとして実行可能かどうかは、15.22で定義した条件に基づきApplication Layerが判断する。
+
+Test Resultが`FAIL`であり、成果物の変更が必要な場合はTechnical Retryとして扱ってはならない。
+
+承認済みScope内で成果物を変更する場合はCorrectionとして扱い、既存のHuman Approval Scopeを超える変更が必要な場合はCritical Changeまたは上位成果物の再検討として扱う。
 
 承認範囲を超える変更がUC-07で定義したCritical Changeに該当する場合、Application LayerはImplementationを継続させず、`critical_approval_pending`へ遷移してUC-07 `Request Critical Change Approval`へ処理を渡す。
 
@@ -1087,12 +1158,20 @@ Reviewは、単にTestが成功しているかを確認する工程ではない�
 
 必要なTestが存在するか
 
+Testが正常に実行されているか
+
+Test Resultが要求された振る舞いと整合しているか
+
 既存の振る舞いを不必要に変更していないか
 
 未完了事項、Error、Warning等が残っていないか
 
 Human Approvalを必要とする変更が含まれていないか
 ```
+
+Reviewは不適合の検出、原因、および必要な修正Scopeの評価を担当する。
+
+Review自身がSource Code、Test Code、Specification、Approved Implementation Plan、またはその他の承認対象Artifactを修正してはならない。
 
 ---
 
@@ -1107,11 +1186,13 @@ Reviewでは、少なくとも以下を参照する。
 - Source Code
 - Git Diff
 - Test Code
-- Test Result
+- Test実行状態
+- Test Result（PASS / FAIL）
+- Test Execution Error
 
 Implementation EvidenceのみをReviewの根拠としてはならない。
 
-Implementation Evidenceに記録された内容と、実際のSource Code、Git Diff、Test Code、およびTest Resultを相互に比較する。
+Implementation Evidenceに記録された内容と、実際のSource Code、Git Diff、Test Code、Test実行状態、Test Result、およびTest Execution Errorを相互に比較する。
 
 Review開始前に、Specification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、Implementation Branch、および関連するGit Diff等が、同一の対象Implementationに対する一連のArtifactとして対応していることを確認する。
 
@@ -1148,16 +1229,23 @@ Reviewでは、少なくとも以下を確認する。
 
 - 必要なTestが作成または更新されているか
 - TDD対象のImplementationについて、期待される振る舞いを検証するTestが存在するか
-- 対象Testが成功しているか
-- 既存Testを含む全体Testが成功しているか
+- TDDにおけるImplementation前のExpected Test Failureが正常な工程として適切に扱われているか
+- 対象Testが正常に実行されているか
+- 対象TestのTest Resultが`PASS`であるか
+- 必要な既存Testが正常に実行されているか
+- 既存Testを含むTest Resultに`FAIL`が存在しないか
+- Test Execution Errorが存在しないか
 - TestがSpecificationまたはApproved Implementation Planで要求された振る舞いを適切に検証しているか
+- Test Resultが`FAIL`の場合、その原因がImplementation、Test Code、Specification、Approved Implementation Plan、またはその他の要因のいずれに関係するかを確認できるか
 
 #### Evidence Compliance
 
 - Implementation Evidenceに必要な情報が存在するか
 - Implementation Evidenceと実際のGit Diffが一致しているか
 - Implementation Evidenceに記録された変更ファイルと実際の変更ファイルが一致しているか
+- Test実行状態がImplementation Evidenceの記録と一致しているか
 - Test ResultがImplementation Evidenceの記録と一致しているか
+- Test Execution Errorが存在する場合、その内容がImplementation Evidenceへ適切に記録されているか
 - Error、Warning、未完了事項が適切に記録されているか
 - Specification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、およびGit Diff等の対応関係が確認できるか
 
@@ -1199,7 +1287,9 @@ Source CodeおよびGit Diffを確認し、要求されたImplementationが正�
 
 #### Test Review
 
-Test CodeおよびTest Resultを確認し、要求された振る舞いが適切に検証されているか、既存の振る舞いが維持されているかを確認する。
+Test Code、Test実行状態、Test Result、およびTest Execution Errorを確認し、要求された振る舞いが適切に検証されているか、既存の振る舞いが維持されているかを確認する。
+
+Test Resultが`FAIL`の場合は、その事実だけでReview Resultを決定せず、Source Code、Test Code、Specification、Approved Implementation Plan、Git Diff、およびImplementation Evidenceとの関係から原因と必要な修正Scopeを評価する。
 
 #### Integration Review
 
@@ -1209,13 +1299,71 @@ Test CodeおよびTest Resultを確認し、要求された振る舞いが適切
 
 ---
 
+### Test Result Evaluation
+
+Reviewでは、Testが正常に実行された結果としての`PASS`または`FAIL`と、Test実行処理そのものを正常に完了できなかった`Test Execution Error`を区別する。
+
+また、TDDにおいてImplementation前に意図的に確認するExpected Test Failureは、Implementation後のTest Resultとしての`FAIL`とは区別する。
+
+```text
+Expected Test Failure
+= TDDにおいてImplementation前に
+  意図的に確認する正常な工程
+
+Test Result = PASS
+= Testが正常に実行され、
+  期待された振る舞いを満たした結果
+
+Test Result = FAIL
+= Testが正常に実行されたが、
+  期待された振る舞いを満たしていない結果
+
+Test Execution Error
+= Test Resultそのものを
+  正常に取得できなかった技術的問題
+```
+
+Implementation後にTestが正常に実行され、その結果として`FAIL`となった場合、その事実をTechnical Errorまたは`implementation_failed`として扱ってはならない。
+
+Reviewは、Test Code、Test Result、Source Code、Git Diff、Specification、Approved Implementation Plan、およびImplementation Evidenceを相互に比較し、Test Resultが`FAIL`となった原因と、修正に必要なScopeを評価する。
+
+```text
+Test Result = FAIL
+        ↓
+原因および必要な修正Scopeを評価
+        │
+        ├── Human Approval Scope内で
+        │   Correction可能
+        │       ↓
+        │  REVISION_REQUIRED
+        │
+        └── Human Approval Scope内で
+            安全にCorrectionできない
+                ↓
+           HUMAN_REVIEW_REQUIRED
+```
+
+Test Resultが`FAIL`であることのみを根拠として、Reviewが自動的に`REVISION_REQUIRED`と判断してはならない。
+
+Specificationの不足・矛盾・不明確さ、Approved Implementation Planの変更、Human Approval Scopeを超える変更、Critical Change、その他Human判断を必要とする問題が原因である場合は、`HUMAN_REVIEW_REQUIRED`として扱う。
+
+一方、Testを開始できない、Test Runnerが異常終了する、必要な実行環境を利用できない、その他Test Resultを正常に取得できない問題は`Test Execution Error`として扱う。
+
+`Test Execution Error`について、Review自身が成果物を変更して解消しようとしてはならない。
+
+Technical Retryとして処理可能か、またはFailure Stateとして扱う必要があるかについては、Application Layerが10.4.1、10.5、および15.22で定義した規則に従って判断する。
+
+---
+
 ### Review Result
 
 Review結果は、少なくとも以下のいずれかとして扱う。
 
 ```text
 APPROVED
+
 REVISION_REQUIRED
+
 HUMAN_REVIEW_REQUIRED
 ```
 
@@ -1223,9 +1371,13 @@ HUMAN_REVIEW_REQUIRED
 
 Specification、Approved Implementation Plan、および承認されたImplementation Scopeに適合し、Review上の重大な問題が確認されない場合。
 
+必要なTestが正常に実行され、要求された振る舞いおよび既存の正常な振る舞いについて、Review上問題となるTest Resultが確認されないことを含む。
+
 #### REVISION_REQUIRED
 
-承認された範囲内で修正可能なImplementation上の問題が確認された場合。
+承認されたHuman Approval Scope内でCorrection可能なImplementation上の問題が確認された場合。
+
+Test Resultが`FAIL`の場合であっても、その原因および必要な修正が既存のHuman Approval Scope内で安全にCorrection可能であることを確認した場合に`REVISION_REQUIRED`として扱うことができる。
 
 #### HUMAN_REVIEW_REQUIRED
 
@@ -1242,7 +1394,10 @@ Critical Changeが必要
 
 Humanによる設計判断が必要
 
-安全に自動修正を継続できない
+Test ResultがFAILとなった原因または
+必要な修正Scopeを安全に確定できない
+
+安全に自動Correctionを継続できない
 ```
 
 ---
@@ -1256,12 +1411,13 @@ Reviewは、少なくとも以下を出力する。
 - 適合または不適合となった項目
 - 不適合箇所
 - 判断根拠
+- Testに関する評価
 - 修正対象
 - 修正工程の返却先
 - Humanへの確認事項
 - 未解決事項
 
-`REVISION_REQUIRED`の場合は、後続のCorrection Instructionおよび修正ループで利用できるよう、修正対象とその根拠を明確にする。
+`REVISION_REQUIRED`の場合は、後続のCorrection InstructionおよびCorrection Loopで利用できるよう、修正対象、その根拠、および既存のHuman Approval Scope内で修正可能と判断した理由を明確にする。
 
 `HUMAN_REVIEW_REQUIRED`の場合は、AIが判断を補完せず、Humanが判断すべき事項を明確にして処理を返す。
 
@@ -1273,19 +1429,32 @@ ReviewはSpecification自体を変更してはならない。
 
 ReviewはApproved Implementation Plan自体を変更してはならない。
 
+ReviewはSource CodeまたはTest Codeを変更してはならない。
+
 Reviewは、CodexがImplementation Evidence内に記述した自己評価のみを根拠としてはならない。
 
 以下を相互に比較して判断する。
 
 ```text
 Specification
+
 Approved Implementation Plan
+
 Codex Prompt
+
 Implementation Evidence
+
 Source Code
+
 Git Diff
+
 Test Code
+
+Test実行状態
+
 Test Result
+
+Test Execution Error
 ```
 
 CodexがImplementation Evidence内で、
@@ -1298,6 +1467,10 @@ out_of_scope_changes = []
 
 同様に、SpecificationまたはApproved Implementation Planで要求されたImplementationが、Source Code、Git Diff、Test Code、またはTest Resultから確認できない場合は、Implementation不足として扱う。
 
+Reviewは、Test Resultが`FAIL`であることと、Test実行処理そのものが失敗したことを混同してはならない。
+
+Reviewは不適合の検出、原因、および必要な修正Scopeの評価を担当するが、Review自身がSource Code、Test Code、Specification、Approved Implementation Plan、またはその他の承認対象Artifactを修正してはならない。
+
 ReviewによってSpecification、Approved Implementation Plan、またはHuman Approval Scopeそのものの変更が必要と判断された場合は、Review側で変更してはならない。
 
 その場合は、
@@ -1308,9 +1481,14 @@ HUMAN_REVIEW_REQUIRED
 
 として、対応する工程またはHumanへ判断を返す。
 
-Review結果が`REVISION_REQUIRED`の場合は、15.11で定義した修正ループの規則に従う。
+Review Resultが`REVISION_REQUIRED`の場合は、15.11および15.22で定義したCorrection Loopの規則に従う。
 
-自動修正を行う場合であっても、修正回数上限、Early Stop Condition、Convergence Detection、およびHuman Escalationの規則を無視してはならない。
+自動Correctionを行う場合であっても、Automatic Correction Limit、Early Stop Condition、Convergence Detection、およびHuman Escalationの規則を無視してはならない。
+
+Reviewが`Test Execution Error`を検出した場合、Review自身がTechnical Retryを実行したり、成果物を変更して問題を解消したりしてはならない。
+
+Technical Retryとして処理可能かどうか、および復旧不能時にどのFailure Stateへ遷移するかは、Application Layerが関連するState Transitionおよび15.22の規則に従って判断する。
+
 ---
 
 ## UC-10 Request Final Approval
@@ -2580,7 +2758,9 @@ Critical Change Approvalの有効性は、UC-07および15.4で定義したAppro
 
 ## 10.4.1 Implementation Failure Transition
 
-Implementation中に、Codex Runnerの実行失敗、Test失敗、またはその他の理由によりImplementationを正常に完了できず、定められた範囲で処理を継続できない場合は、`implementation_failed`へ遷移する。
+Implementation中に、Codex Runnerの実行失敗、Test実行処理そのものの失敗、実行環境上の問題、またはその他の技術的理由によりImplementation工程を正常に継続または完了できない場合は、`implementation_failed`へ遷移する。
+
+ただし、Technical Errorが発生した時点で直ちに`implementation_failed`へ遷移するのではなく、15.22で定義した条件に従い、安全にTechnical Retryを実行可能かを確認する。
 
 ```text
 implementing
@@ -2609,11 +2789,76 @@ Technical Retry可能？
         Human判断へ返す
 ```
 
-`implementation_failed`は、TDDにおける期待されたTest失敗を示すStateではない。
+### Test Failureとの境界
+
+`implementation_failed`は、Testが正常に実行された結果として`FAIL`となったこと自体を示すStateではない。
+
+Testに関する結果は、少なくとも以下を区別する。
+
+```text
+TDDにおける期待されたTest失敗
+
+Testが正常に実行された結果としてのFAIL
+
+Test実行処理そのものの失敗
+```
 
 TDD対象のImplementationにおいて、Implementation前に期待される振る舞いを表現したTestが意図どおり失敗することは正常な工程として扱い、それ自体を`implementation_failed`への遷移理由としてはならない。
 
-`implementation_failed`への遷移は、Codex Runnerの実行失敗、Implementation後のTest失敗、実行環境上の問題、またはその他の理由により、現在のImplementationを正常に継続または完了できない場合に使用する。
+また、Implementation後にTestが正常に実行され、その結果として`FAIL`となった場合も、それ自体をTechnical Errorまたは`implementation_failed`として扱ってはならない。
+
+この場合は、Test ResultをImplementation Evidenceへ記録し、Source Code、Test Code、Git Diff、その他のImplementation EvidenceとともにReview工程へ渡す。
+
+概念的には、以下とする。
+
+```text
+Test Execution
+        │
+        ├── Expected FAIL before Implementation
+        │       ↓
+        │  TDD上の正常な工程
+        │       ↓
+        │  implementingを継続
+        │
+        ├── Test Execution Completed
+        │       +
+        │     Result = PASS
+        │       ↓
+        │  Implementation Evidence
+        │       ↓
+        │  Review
+        │
+        ├── Test Execution Completed
+        │       +
+        │     Result = FAIL
+        │       ↓
+        │  Implementation Evidence
+        │       ↓
+        │  Review
+        │       ↓
+        │  必要に応じて
+        │  REVISION_REQUIRED
+        │  または
+        │  HUMAN_REVIEW_REQUIRED
+        │
+        └── Test Execution Error
+                ↓
+           Technical Error
+                ↓
+           Technical Retry判定
+```
+
+Testが正常に実行された結果としての`FAIL`について、Application LayerまたはCodex Runnerが独自に成果物を修正し、Testを通過するまで無制限にImplementationを継続してはならない。
+
+修正が必要である場合は、Review Resultおよび15.11、15.22で定義したCorrectionの規則に従う。
+
+修正に必要な変更が既存のSpecification、Approved Implementation Plan、またはHuman Approval Scopeを超える場合は、通常のCorrectionとして扱わず、Critical Changeまたは上位成果物の再検討として扱う。
+
+### Technical Error
+
+Testを開始できない、Test Runnerが異常終了する、必要な実行環境を利用できない、その他Test Resultそのものを正常に取得できない問題は、Test Resultとしての`FAIL`ではなくTechnical Errorとして扱う。
+
+`implementation_failed`への遷移は、Codex Runnerの実行失敗、Test実行処理そのものの失敗、実行環境上の問題、またはその他の技術的理由により、現在のImplementation工程を正常に継続または完了できない場合に使用する。
 
 Technical Retryが可能な場合は、15.22で定義した条件および制限に従い、成果物を変更せず同一の技術操作を再実行できる。
 
@@ -2622,6 +2867,63 @@ Technical Retryによって解消できない場合、またはTechnical Retry�
 `implementation_failed`へ遷移した後は、自動的に別のAI Runnerへ切り替えたり、成果物を修正して処理を継続したりしてはならない。
 
 停止理由、現在の状態、影響範囲、および再開に必要なHuman操作を記録してHumanへ判断を返す。
+
+### Responsibility Boundary
+
+Version 1では、Testに関する以下の概念を混同しない。
+
+```text
+Expected Test Failure
+= TDDにおいてImplementation前に
+  意図的に確認する正常な工程
+
+Test Result = FAIL
+= Testは正常に実行されたが、
+  期待された振る舞いを満たしていない結果
+
+Test Execution Error
+= Test処理そのものを
+  正常に実行または完了できない技術的問題
+
+Technical Retry
+= 成果物を変更せず、
+  同一の技術操作を安全に再実行する処理
+
+implementation_failed
+= Technical Retryによって復旧できない、
+  またはTechnical Retryとして
+  安全に処理できない技術的失敗により、
+  Implementation工程を正常に継続できないState
+```
+
+したがって、以下を基本とする。
+
+```text
+Expected Test Failure
+≠ implementation_failed
+
+Test Result = FAIL
+≠ Technical Error
+
+Test Result = FAIL
+≠ implementation_failed
+
+Test Execution Error
+= Technical Errorの候補
+
+Technical Error
+≠ 直ちにimplementation_failed
+
+Technical Retry成功
+→ implementingを維持
+
+Technical Retry不能または復旧失敗
+→ implementation_failed
+```
+
+この区別により、Testが正常に問題を検出した場合と、Testそのものを正常に実行できなかった場合を分離する。
+
+TestによってImplementation上の問題が検出された場合はReviewおよびCorrectionの経路で扱い、実行環境等の技術的問題についてはTechnical RetryおよびImplementation Failureの経路で扱う。
 
 ---
 
@@ -5143,79 +5445,188 @@ Documentation / Non-Behavior Change
 
 **Status: Decided**
 
-Version 1では、ChatGPT Reviewによって修正が必要と判断された場合、Codexによる自動修正を一定回数まで許可する。
+Version 1では、UC-09 `Review Implementation`によるReview Resultが`REVISION_REQUIRED`であり、既存のHuman Approval Scope内でCorrection可能と判断された場合、Codexによる自動Correctionを一定回数まで許可する。
 
-ただし、修正ループの制御を最大回数のみに依存させない。
+本節でいうCorrectionは、15.22で定義した`Correction`を意味する。
 
-修正過程において異常または収束しない兆候を検出した場合は、最大回数へ到達する前であっても自動修正を停止し、Humanによる判断を要求する。
+成果物を変更せず同一の技術操作を再実行する`Technical Retry`はCorrectionではなく、本節で定義するMaximum Correction Countには含めない。
+
+自動Correctionは、Test Resultが`FAIL`であることのみを根拠として開始してはならない。
+
+Test Resultが`FAIL`の場合は、UC-09で定義したReviewによって原因および必要な修正Scopeを評価し、Review Resultが`REVISION_REQUIRED`であり、既存のHuman Approval Scope内でCorrection可能と判断された場合にのみ、自動Correction Loopへ進むことができる。
+
+ただし、Correction Loopの制御を最大回数のみに依存させない。
+
+Correction過程において異常、悪化、非収束、承認範囲外変更、またはその他安全に自動継続できない兆候を検出した場合は、最大回数へ到達する前であっても自動Correctionを停止し、Humanによる判断を要求する。
 
 基本原則は、以下とする。
 
 ```text
-正常に収束している修正
-    → AIによる自動修正を継続
+REVISION_REQUIRED
+        ↓
+Human Approval Scope内で
+Correction可能
+        ↓
+正常に収束している
+        → AIによる自動Correctionを継続
 
-異常または非収束を検出
-    → 早期停止
-    → Human Review Required
+異常・悪化・非収束を検出
+        → Early Stop
+        → Human Review Required
 
-最大修正回数へ到達
-    → 自動修正停止
-    → Human Review Required
+Maximum Correction Countへ到達
+        → Automatic Correction Stop
+        → Human Review Required
 ```
+
+---
 
 ### Correction Loop
 
-基本的な修正ループは、以下とする。
+基本的なCorrection Loopは、以下とする。
 
 ```text
 Codex Implementation
         ↓
+Test実行
+        ↓
+Implementation Evidence構築
+        ↓
 ChatGPT Review
         │
-        ├─ APPROVED
+        ├── APPROVED
         │       ↓
         │  Human Final Approval Candidate
         │
-        ├─ REVISION_REQUIRED
+        ├── REVISION_REQUIRED
         │       ↓
-        │  異常・停止条件確認
+        │  Correction Scope確認
         │       │
-        │  ┌────┴────┐
-        │  │         │
-        │ 問題なし   問題あり
-        │  │         │
-        │  ↓         ↓
-        │ 修正回数確認  Early Stop
-        │  │         ↓
-        │  │    Human Review Required
-        │  │
-        │ ┌┴────────┐
-        │ │         │
-        │ 上限未満   上限到達
-        │ │         │
-        │ ↓         ↓
-        │ Codex     Stop
-        │ Correction │
-        │ ↓         ↓
-        │ Re-Review Human Review Required
+        │       ├── Human Approval Scope内
+        │       │       ↓
+        │       │  異常・停止条件確認
+        │       │       │
+        │       │  ┌────┴────┐
+        │       │  │         │
+        │       │ 問題なし   問題あり
+        │       │  │         │
+        │       │  ↓         ↓
+        │       │ 修正回数確認 Early Stop
+        │       │  │         ↓
+        │       │  │    Human Review Required
+        │       │  │
+        │       │ ┌┴────────┐
+        │       │ │         │
+        │       │ 上限未満   上限到達
+        │       │ │         │
+        │       │ ↓         ↓
+        │       │ Codex     Stop
+        │       │ Correction │
+        │       │ ↓         ↓
+        │       │ Test再実行 Human Review Required
+        │       │ ↓
+        │       │ 新しいImplementation Evidenceを生成
+        │       │ ↓
+        │       │ Re-Review
+        │       │
+        │       └── Human Approval Scope内で
+        │           安全にCorrectionできない
+        │                   ↓
+        │             Human Review Required
         │
-        └─ HUMAN_REVIEW_REQUIRED
+        └── HUMAN_REVIEW_REQUIRED
                 ↓
            Human Review Required
 ```
 
-Humanは、通常の修正ループへ毎回介入する必要はない。
+Humanは、通常のCorrection Loopへ毎回介入する必要はない。
 
-Specification、Approved Implementation Planおよび既存の承認範囲内で修正可能であり、修正が正常に収束している場合は、CodexとChatGPT Reviewの間で自動修正を継続できる。
+Specification、Approved Implementation Plan、および既存のHuman Approval Scope内でCorrection可能であり、Correctionが正常に収束している場合は、CodexとChatGPT Reviewの間で自動Correctionを継続できる。
+
+ただし、Codex Correction後は、修正された成果物をそのままRe-Reviewへ渡してはならない。
+
+Correction後は、少なくとも以下を実行する。
+
+```text
+Codex Correction
+        ↓
+対象Testを再実行
+        ↓
+必要な既存Testを再実行
+        ↓
+Test実行状態を確認
+        ↓
+Test Resultおよび
+Test Execution Errorを記録
+        ↓
+新しいImplementation Evidenceを生成
+        ↓
+Re-Review
+```
+
+Re-Reviewでは、Correction後の現在の成果物だけでなく、Correction前のReview Result、Correction内容、Test Result、およびCorrection Historyとの比較を行う。
+
+---
+
+### CorrectionとTechnical Retryの境界
+
+CorrectionとTechnical Retryを混同してはならない。
+
+```text
+Correction
+= 成果物を変更して
+  Reviewで検出された問題を修正する処理
+
+Technical Retry
+= 成果物を変更せず
+  同一の技術操作を再実行する処理
+```
+
+Test Resultが`FAIL`であり、問題を解消するためにSource Code、Test Code、またはその他の成果物を変更する場合はCorrectionとして扱う。
+
+Testを開始できない、Test Runnerが異常終了する、必要な実行環境を利用できない等のTechnical Errorに対し、成果物を変更せず同一のTest実行を再試行する場合はTechnical Retryとして扱う。
+
+Technical RetryはCorrectionではないため、Correction Countを増加させてはならない。
+
+```text
+Test Result = FAIL
+        ↓
+Review
+        ↓
+REVISION_REQUIRED
+        ↓
+成果物を変更
+        ↓
+Correction
+        ↓
+Correction Count +1
+```
+
+一方、
+
+```text
+Test Execution Error
+        ↓
+Technical Error
+        ↓
+成果物を変更せず再実行
+        ↓
+Technical Retry
+        ↓
+Correction Countは変更しない
+```
+
+とする。
+
+Technical Retryの実行条件、制限、および復旧不能時の処理は、10.4.1および15.22で定義した規則に従う。
 
 ---
 
 ### Maximum Correction Count
 
-Version 1では、初回Implementationを修正回数には含めない。
+Version 1では、初回ImplementationをCorrection Countには含めない。
 
-ChatGPT Reviewによる`REVISION_REQUIRED`を受けてCodexが修正を実行した時点で、1回の修正として数える。
+UC-09による`REVISION_REQUIRED`を受け、Codexが成果物を変更するCorrectionを実行した時点で、1回のCorrectionとして数える。
 
 概念的には、以下とする。
 
@@ -5224,45 +5635,68 @@ Initial Implementation
         ↓
 Review
         ↓
+REVISION_REQUIRED
+        ↓
 Correction 1
         ↓
+Test
+        ↓
+Evidence Update
+        ↓
 Review
+        ↓
+REVISION_REQUIRED
         ↓
 Correction 2
         ↓
+Test
+        ↓
+Evidence Update
+        ↓
 Review
         ↓
+REVISION_REQUIRED
+        ↓
 Correction 3
+        ↓
+Test
+        ↓
+Evidence Update
         ↓
 Review
 ```
 
-Version 1における自動修正の最大回数は、原則として**3回**とする。
+Version 1における自動Correctionの最大回数は、原則として**3回**とする。
 
-3回の自動修正を実施してもReviewが適合とならない場合は、それ以上CodexとChatGPT Reviewのみで修正を継続せず、自動修正を停止してHumanへ判断を返す。
+3回の自動Correctionを実施してもReviewが`APPROVED`とならない場合は、それ以上CodexとChatGPT ReviewのみでCorrectionを継続せず、自動Correctionを停止してHumanへ判断を返す。
 
-最大回数は無限ループ防止のSafety Limitとして扱う。
+Maximum Correction Countは、無限ループ防止のSafety Limitとして扱う。
+
+Maximum Correction Countは、自動Correctionを必ず3回まで実行することを意味しない。
+
+Early Stop Conditionを検出した場合は、Correction Countが3回未満であっても自動Correctionを停止する。
 
 ---
 
 ### Early Stop
 
-最大修正回数は、自動修正を必ずその回数まで実行することを意味しない。
-
-以下のような状態を検出した場合は、最大回数へ到達する前であっても修正ループを停止する。
+以下のような状態を検出した場合は、Maximum Correction Countへ到達する前であってもCorrection Loopを停止する。
 
 ```text
 同一または実質的に同一のReview指摘が繰り返される
 
-修正によって新たなPlan外変更が発生する
+Correctionによって新たなPlan外変更が発生する
 
-修正のたびに変更対象ファイルが不合理に増加する
+Correctionのたびに変更対象ファイルが不合理に増加する
 
-修正によって、それまで成功していたTestが失敗する
+Correctionによって、それまで成功していたTestがFAILとなる
 
-Test Resultが修正前より悪化する
+Test ResultがCorrection前より悪化する
 
-修正によって新たなErrorまたは重大なWarningが発生する
+Correction後に、それまで正常に実行できていたTestで
+Test Execution Errorが発生する
+
+Correctionによって新たなErrorまたは重大なWarningが発生する
 
 Approved Implementation Planの範囲内では解決できない
 
@@ -5272,7 +5706,11 @@ Implementation Plan自体の修正が必要と判断される
 
 Architecture上の新たな判断が必要になる
 
-既存のHuman承認範囲を超える変更が必要になる
+既存のHuman Approval Scopeを超える変更が必要になる
+
+Critical Changeが必要になる
+
+Correctionの原因または影響範囲を安全に確定できない
 ```
 
 これらを検出した場合は、
@@ -5289,18 +5727,20 @@ Human Review Required
 
 へ遷移する。
 
+Early Stop後に、CodexまたはChatGPT Reviewが独自に問題を解消したものとしてCorrection Loopを再開してはならない。
+
 ---
 
 ### Convergence Detection
 
-Version 1では、修正ループが単に継続可能かだけでなく、修正が問題解決へ向かって収束しているかを確認する。
+Version 1では、Correction Loopが単に継続可能かだけでなく、Correctionが問題解決へ向かって収束しているかを確認する。
 
 例えば、以下は非収束または悪化の兆候として扱う。
 
 ```text
 同じ問題が解消されない
 
-修正するたびに別の問題が発生する
+Correctionするたびに別の問題が発生する
 
 変更範囲が拡大し続ける
 
@@ -5308,43 +5748,94 @@ Plan外変更が増加する
 
 Test失敗数が増加する
 
-以前成功していたTestが失敗する
+以前成功していたTestがFAILとなる
 
-Review指摘数または重大度が改善しない
+Test Execution Errorが新たに発生する
+
+Review指摘数が改善しない
+
+Review指摘の重大度が改善しない
+
+Correctionによって解決した問題より
+新たに発生した問題の影響が大きい
 ```
 
 このような状態では、
 
 ```text
-まだ最大回数に達していない
+まだMaximum Correction Countに達していない
 ```
 
-ことだけを理由として自動修正を継続してはならない。
+ことだけを理由として自動Correctionを継続してはならない。
+
+Convergence Detectionでは、単純なTest失敗数またはReview指摘数だけでなく、問題の重大度、変更範囲、既存の正常な振る舞いへの影響、およびHuman Approval Scopeとの関係を考慮する。
+
+---
+
+### Test Result Handling in Correction Loop
+
+Correction後のTestについても、UC-06およびUC-09で定義した以下の区別を維持する。
+
+```text
+Expected Test Failure
+
+Test Result = PASS
+
+Test Result = FAIL
+
+Test Execution Error
+```
+
+Correction後にTestが正常に実行され、その結果として`FAIL`となった場合、その事実をTechnical Errorとして扱ってはならない。
+
+当該Test ResultはImplementation Evidenceへ記録し、Re-Reviewによって原因、残存問題、および必要なCorrection Scopeを評価する。
+
+一方、Correction後にTest Resultそのものを正常に取得できない場合は`Test Execution Error`として扱う。
+
+`Test Execution Error`がTechnical Retryとして安全に処理可能な場合は、15.22で定義した範囲内でTechnical Retryを実行できる。
+
+Technical Retryによって復旧した場合は、Correction Countを増加させず、Correction後のTest工程を継続する。
+
+Technical Retryによって復旧できない場合、またはTechnical Retryとして安全に処理できない場合は、自動Correction Loopを継続せず、関連するFailure StateまたはHuman判断へ処理を返す。
 
 ---
 
 ### Human Escalation
 
-修正ループが早期停止または最大回数到達によって停止した場合、Application Layerは状態をHuman判断が必要な状態へ遷移させる。
+Correction LoopがEarly StopまたはMaximum Correction Count到達によって停止した場合、Application Layerは状態をHuman判断が必要な状態へ遷移させる。
 
 Humanへ提示する情報には、少なくとも以下を含める。
 
 ```text
 Original Implementation Evidence
+
+Current Implementation Evidence
+
 Correction History
+
 Review History
+
 Current Source Code
+
 Git Diff
+
+Test Execution Status
+
 Test Results
+
+Test Execution Error
+
 Remaining Review Issues
+
 Stop Reason
+
 Correction Count
 ```
 
 Humanは、状況に応じて以下を判断できる。
 
 ```text
-追加修正を許可する
+追加Correctionを許可する
 
 Implementation Planを修正する
 
@@ -5352,41 +5843,74 @@ Specificationへ戻る
 
 Architecture上の判断を行う
 
+Critical Change Approval工程へ進める
+
 Implementation Branchを破棄する
 
 別の実装方針を選択する
+
+Implementationを中止する
 ```
 
-Humanによる判断なしに、自動的に修正回数上限を解除してはならない。
+Humanによる判断なしに、自動的にMaximum Correction Countを解除してはならない。
+
+Humanが追加Correctionを許可した場合であっても、その許可Scopeを超えてCorrectionを実行してはならない。
+
+Specification、Approved Implementation Plan、またはHuman Approval Scopeそのものが変更された場合は、以前のApprovalを変更後のArtifactに対する有効なApprovalとして自動的に引き継いではならない。
 
 ---
 
 ### Correction History
 
-各修正について、何を指摘され、何を修正し、その結果がどう変化したかを追跡可能にする。
+各Correctionについて、何を指摘され、何を修正し、その結果がどう変化したかを追跡可能にする。
 
 最低限、以下を識別できるようにする。
 
 ```text
 correction_number
+
 review_issues
+
 correction_summary
+
 changed_files
+
+test_execution_status
+
 test_result
+
+test_execution_error
+
 remaining_issues
 ```
 
-これにより、Application LayerおよびChatGPT Reviewは、単一の修正結果だけでなく、修正ループ全体の推移を確認できる。
+これにより、Application LayerおよびChatGPT Reviewは、単一のCorrection結果だけでなく、Correction Loop全体の推移を確認できる。
 
-特に、同一指摘の繰り返しやTest Resultの悪化等を検出するために使用する。
+特に、以下の検出に使用する。
+
+```text
+同一指摘の繰り返し
+
+Test Resultの悪化
+
+Test Execution Errorの新規発生
+
+変更範囲の拡大
+
+Review指摘数または重大度の非改善
+```
+
+Technical Retryを実行した場合は、その事実を必要に応じて実行履歴へ記録する。
+
+ただし、Technical RetryをCorrection History上の新たなCorrectionとして数えてはならない。
 
 ---
 
 ### Review Rule
 
-ChatGPT Reviewは、各修正を独立したImplementationとしてのみ評価してはならない。
+ChatGPT Reviewは、各Correctionを独立したImplementationとしてのみ評価してはならない。
 
-必要に応じて以前のReviewおよび修正結果と比較し、
+必要に応じて以前のReview、Correction結果、Test Result、およびImplementation Evidenceと比較し、
 
 ```text
 問題が減っているか
@@ -5396,11 +5920,17 @@ ChatGPT Reviewは、各修正を独立したImplementationとしてのみ評価�
 新しい問題を発生させていないか
 
 変更範囲が不必要に拡大していないか
+
+Test Resultが改善しているか
+
+Test Execution Errorが新たに発生していないか
+
+Human Approval Scope内に留まっているか
 ```
 
 を確認する。
 
-したがって、修正ループの評価では、
+したがって、Correction Loopの評価では、
 
 ```text
 Current Result
@@ -5410,40 +5940,103 @@ Current Result
 
 ```text
 Correction History
++
+Review History
++
+Implementation Evidence
 ```
 
 もReview Contextとして利用する。
+
+Review自身がCorrectionを実行してはならない。
+
+ReviewはCorrectionの必要性、問題の原因、および必要なCorrection Scopeを評価し、その結果をApplication Layerへ返す。
+
+---
+
+### Responsibility Boundary
+
+Correction Loopにおける基本的な責務は、以下とする。
+
+```text
+Codex Runner
+= 承認されたCorrection Scope内で
+  成果物を修正する
+  Testを実行する
+  実行結果を返す
+
+ChatGPT Review
+= Correction結果を評価する
+  問題の残存、改善、悪化、
+  非収束およびScope逸脱を検出する
+
+Application Layer
+= Correction Loopを制御する
+  Correction Countを管理する
+  Early Stop Conditionを確認する
+  Convergenceを評価する
+  Technical Retryとの境界を管理する
+  必要に応じてHumanへEscalationする
+
+Human
+= AIおよびApplication Layerの
+  判断権限を超える事項を決定する
+```
+
+Codex Runner、ChatGPT Review、およびApplication Layerは、それぞれに定義された責務を超えてHuman Approvalを代替してはならない。
 
 ---
 
 ### Decision Reason
 
-修正ループを無制限に許可すると、CodexとChatGPT Reviewが収束しない修正を繰り返す可能性がある。
+Correction Loopを無制限に許可すると、CodexとChatGPT Reviewが収束しないCorrectionを繰り返す可能性がある。
 
-一方、最大回数だけで修正ループを制御すると、明らかに悪化または非収束している場合でも、設定された回数まで不要な修正を継続する可能性がある。
+一方、Maximum Correction CountだけでCorrection Loopを制御すると、明らかに悪化または非収束している場合でも、設定された回数まで不要なCorrectionを継続する可能性がある。
 
-SpecFlowでは、Humanがすべての修正へ逐次介入するのではなく、AIによって安全に解決可能な修正については自動化する。
+また、Technical RetryとCorrectionを区別しない場合、成果物を変更していない単純な技術操作の再実行までCorrection Countとして数えられ、Correction Loopの状態を正しく評価できなくなる。
+
+SpecFlowでは、HumanがすべてのCorrectionへ逐次介入するのではなく、AIによって安全に解決可能なCorrectionについては自動化する。
 
 ただし、
 
 ```text
-自動修正が正常に収束している
+既存のHuman Approval Scope内である
+
+        +
+
+Correctionが正常に収束している
+
+        +
+
+新たな重大な問題を発生させていない
 ```
 
 ことを自律継続の条件とする。
 
-異常、悪化、非収束、承認範囲外変更等を検出した場合は、最大回数にかかわらず早期停止し、Humanへ判断を返す。
+異常、悪化、非収束、承認範囲外変更、Critical Change、Test Execution Errorの継続等を検出した場合は、Maximum Correction CountにかかわらずEarly Stopし、Humanへ判断を返す。
 
 これにより、
 
 ```text
 Humanの不要な介入を減らす
+
         +
-無駄なAI修正ループを防止する
+
+安全なCorrectionを自動化する
+
         +
-異常を早期に検出する
+
+無駄なAI Correction Loopを防止する
+
         +
-SpecificationおよびPlanからの逸脱拡大を防止する
+
+異常および非収束を早期に検出する
+
+        +
+
+Specification、Plan、
+Human Approval Scopeからの
+逸脱拡大を防止する
 ```
 
 ことを両立する。
@@ -5452,17 +6045,27 @@ SpecificationおよびPlanからの逸脱拡大を防止する
 
 ```text
 Maximum Correction Count
+
         +
+
 Early Stop Conditions
+
         +
+
 Convergence Detection
+
         +
+
+Test Result Monitoring
+
+        +
+
 Human Escalation
 ```
 
-によって修正ループを制御する。
+によってCorrection Loopを制御する。
 
-自動修正の最大回数は原則3回とする。
+自動Correctionの最大回数は原則3回とする。
 
 ---
 
