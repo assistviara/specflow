@@ -1340,7 +1340,7 @@ Test Result = FAIL
         └── Human Approval Scope内で
             安全にCorrectionできない
                 ↓
-           HUMAN_REVIEW_REQUIRED
+           Human判断へ返す
 ```
 
 Test Resultが`FAIL`であることのみを根拠として、Reviewが自動的に`REVISION_REQUIRED`と判断してはならない。
@@ -2337,9 +2337,9 @@ Review Result
     │       │       │
     │       │       ├── 上限未満
     │       │       │       ↓
-    │       │       │   修正指示生成
+    │       │       │   Correction Instruction生成
     │       │       │       ↓
-    │       │       │   Codex再実装
+    │       │       │   Codex Correction
     │       │       │       ↓
     │       │       │   再テスト
     │       │       │       ↓
@@ -3080,7 +3080,8 @@ Technical Retry可能？
         │      │
         │      ├── Recovery Success
         │      │       ↓
-        │      │   reviewingを維持
+        │      │   reviewingを維持し、
+        │      │   Review処理を継続
         │      │
         │      └── Recovery Failed
         │              ↓
@@ -3426,7 +3427,7 @@ state_history/*.json
 - PromptResultがAI実行可能でない
 - ChatGPT RunnerまたはCodex Runnerの実行に失敗し、定められた範囲で処理を継続できない
 - CodexがHuman承認を必要とする重要変更の必要性を報告した
-- Implementation後の対象Testまたは全体Testが期待に反して失敗し、自動修正可能な範囲で解消できない
+- Implementation後の対象Testまたは全体Testが期待に反して`FAIL`となり、UC-09によるReviewの結果、既存のHuman Approval Scope内で安全にCorrectionできない、またはCorrection Loopによって解消できない
 - Implementation Evidenceが不足している
 - Reviewに必要な成果物が不足している
 - Specificationに不足・矛盾・不明確さがあり、現在の承認範囲内で処理を継続できない
@@ -5472,11 +5473,11 @@ Correction可能
 
 異常・悪化・非収束を検出
         → Early Stop
-        → Human Review Required
+        → Human判断へ返す
 
 Maximum Correction Countへ到達
         → Automatic Correction Stop
-        → Human Review Required
+        → Human判断へ返す
 ```
 
 ---
@@ -5513,7 +5514,7 @@ ChatGPT Review
         │       │  ↓         ↓
         │       │ 修正回数確認 Early Stop
         │       │  │         ↓
-        │       │  │    Human Review Required
+        │       │  │    Human判断へ返す
         │       │  │
         │       │ ┌┴────────┐
         │       │ │         │
@@ -5523,7 +5524,7 @@ ChatGPT Review
         │       │ Codex     Stop
         │       │ Correction │
         │       │ ↓         ↓
-        │       │ Test再実行 Human Review Required
+        │       │ Test再実行 Human判断へ返す
         │       │ ↓
         │       │ 新しいImplementation Evidenceを生成
         │       │ ↓
@@ -5532,11 +5533,11 @@ ChatGPT Review
         │       └── Human Approval Scope内で
         │           安全にCorrectionできない
         │                   ↓
-        │             Human Review Required
+        │             Human判断へ返す
         │
         └── HUMAN_REVIEW_REQUIRED
                 ↓
-           Human Review Required
+           Human判断へ返す
 ```
 
 Humanは、通常のCorrection Loopへ毎回介入する必要はない。
@@ -5722,7 +5723,7 @@ Early Stop Condition Detected
         ↓
 Automatic Correction Stop
         ↓
-Human Review Required
+Human判断へ返す
 ```
 
 へ遷移する。
@@ -6789,7 +6790,9 @@ Codex Runner Failure
 
 のようなFallback Routingは、Version 1では行わない。
 
-Runner実行不能時は、失敗状態を記録し、再試行可能な場合は定められた範囲で再試行し、それでも処理できない場合は停止またはHuman判断が必要な状態へ遷移する。
+Runner実行不能時は、失敗内容を記録し、15.22で定義したTechnical Retryとして安全に処理可能な場合は、成果物およびHuman Approval Scopeを変更せず、同一のRunnerによる同一の技術操作を定められた範囲で再実行できる。
+
+Technical Retryによって復旧できない場合、またはTechnical Retryとして安全に処理できない場合は、自動的に別のAI Runnerへ切り替えず、停止またはHuman判断が必要な状態へ遷移する。
 
 これにより、Humanが認識しないまま異なるAIへ処理主体が変更されることを防止する。
 
@@ -8340,7 +8343,7 @@ Application Layer
         │
         │ Workflow上の意味を判断
         ↓
-Continue / Stop / Retry / Human Escalation
+Continue / Stop / Technical Retry / Human Escalation
 ```
 
 ---
@@ -8648,11 +8651,13 @@ Git Operation Resultは、Human Decisionを代替するものではない。
 
 ---
 
-### Retry
+### Technical Retry
 
 Git操作に失敗した場合、すべてのErrorについて自動的に再実行してはならない。
 
-自動Retryを許可する場合は、
+Git操作を再実行する場合は、15.22で定義した`Technical Retry`の条件および制限に従う。
+
+Git操作におけるTechnical Retryは、少なくとも以下を満たさなければならない。
 
 ```text
 同一の承認対象を変更しない
@@ -8661,18 +8666,14 @@ Human Approval Scopeを超えない
 
 Repository状態を破壊しない
 
+成果物を変更しない
+
+同一のGit操作を再実行する
+
 失敗原因が安全に再実行可能である
 
 再実行によって新たな業務判断を必要としない
 ```
-
-ことを満たす必要がある。
-
-安全なRetry条件を確認できない場合は、自動Retryを行わずApplication LayerへResultを返す。
-
-具体的にどのErrorを自動Retry可能とするか、およびRetry回数等については、関連するCorrection Loopおよび実装方針との整合性を確認して別途決定する。
-
----
 
 ### Human Escalation
 
@@ -9144,7 +9145,7 @@ Correction
 
 Critical Change
 
-Human Review Required
+Human Review
 
 Stop
 ```
