@@ -508,7 +508,9 @@ Application Layer
 
 Approval Validationに失敗した場合、Application LayerはそのApproval Recordを前提として後続工程へ進行してはならず、`plan_approved`へ遷移してはならない。
 
-必要に応じて、Humanへの再承認または適切な修正工程へ処理を返す。
+この場合、Humanによる次の判断が行われるまで`plan_approval_pending`を維持し、Humanへ判断を返す。
+
+Humanは、必要に応じて再承認、Implementation Planの修正、または中止等の次の操作を判断する。
 
 ### Output
 
@@ -623,6 +625,16 @@ Codex RunnerがSpecificationまたはApproved Implementation Planに存在しな
 - 使用したSpecificationの参照
 - 使用したApproved Implementation Planの参照
 - Prompt生成結果
+
+### Transition
+
+Codex Prompt生成工程を開始する場合、Application Layerは`implementation_prompt_generating`へ遷移する。
+
+Codex Promptが正常に生成され、使用したSpecificationおよびApproved Implementation Planとの対応関係を確認でき、Codex Runnerへ渡すImplementation Promptとして利用可能であることを確認した場合は、`implementation_ready`へ遷移する。
+
+Codex Prompt生成に失敗した場合、または生成結果を安全にImplementationへ使用できない場合は、`implementation_ready`へ遷移してはならない。
+
+その場合は、停止理由および現在の状態を記録し、定められたFailure HandlingまたはHuman判断へ処理を返す。
 
 ### Rule
 
@@ -765,6 +777,18 @@ Application Layerは、Test Result、Test Execution Error、およびその他�
 - 未完了事項
 - Human Approvalが必要な事項
 - 成功または失敗
+
+### Transition
+
+有効なCodex PromptおよびImplementation開始に必要なInputが確認され、UC-06によるImplementation実行を開始する場合、Application Layerは`implementation_ready`から`implementing`へ遷移する。
+
+Implementationが承認されたScope内で正常に完了し、必要なTest実行およびImplementation Evidence構築に必要な実行結果の取得が完了した場合、Application Layerは`implementation_completed`へ遷移する。
+
+Implementationを正常に継続または完了できない場合は、`implementation_completed`へ遷移してはならない。
+
+Codex Runnerの実行失敗、Test実行処理そのものの失敗、実行環境上の問題、またはその他の技術的理由によりImplementation工程を正常に継続または完了できない場合は、10.4.1で定義したImplementation Failure Transitionに従う。
+
+Critical Changeが必要となった場合は、`implementation_completed`へ遷移せず、`critical_approval_pending`へ遷移してUC-07へ処理を渡す。
 
 ### Rule
 
@@ -990,8 +1014,11 @@ critical_approval_pending
         │      │
         │      └── invalid
         │            ↓
-        │        再承認または
-        │        適切な工程へ返却
+        │        implementingへ戻らない
+        │            ↓
+        │        critical_approval_pendingを維持
+        │            ↓
+        │        Human判断へ返す
         │
         ├── 修正
         │      ↓
@@ -1339,6 +1366,8 @@ Test Result = FAIL
         │
         └── Human Approval Scope内で
             安全にCorrectionできない
+                ↓
+           HUMAN_REVIEW_REQUIRED
                 ↓
            Human判断へ返す
 ```
@@ -3195,11 +3224,15 @@ final_approval_pending
         │      │             ↓
         │      │        completedへ遷移しない
         │      │             ↓
+        │      │        final_approval_pendingを維持
+        │      │             ↓
         │      │        Human判断へ返す
         │      │
         │      └── 無効
         │             ↓
         │        mergeを実行しない
+        │             ↓
+        │        final_approval_pending維持
         │             ↓
         │        Human判断へ返す
         │
@@ -5532,6 +5565,8 @@ ChatGPT Review
         │       │
         │       └── Human Approval Scope内で
         │           安全にCorrectionできない
+        │                   ↓
+        │            HUMAN_REVIEW_REQUIRED   
         │                   ↓
         │             Human判断へ返す
         │
