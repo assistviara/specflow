@@ -410,6 +410,337 @@ Phase 1は、
 Phase 2 Plan Generation & Plan Approvalへ進む。
 
 ### Phase 2 Plan Generation & Plan Approval
+#### Purpose
+Phase 2では、
+有効に承認されたSpecificationを基にImplementation Plan Draftを生成し、
+HumanによるImplementation Planの確認および承認判断を
+Workflowとして実行可能にする。
+
+本Phaseでは、
+UC-02 `Generate Implementation Plan Draft`、
+UC-03 `Request Plan Approval`、
+およびUC-04 `Revise Implementation Plan`
+に必要なApplication Layerの処理を実装する。
+
+Implementation Plan Draftの生成には、
+既存のPlan Prompt生成基盤およびChatGPT Runnerを利用する。
+
+生成されたImplementation PlanはDraftとして扱い、
+Humanによる有効なApprovalが確認されるまで、
+承認済みImplementation Planとして扱ってはならない。
+
+HumanがImplementation Planを承認した場合は、
+Phase 1で構築したApproval基盤を利用して
+Approval Recordを構築・保存し、
+現在のImplementation Planとの整合性を検証する。
+
+有効なImplementation Plan Approvalが確認された場合にのみ、
+後続のCodex Prompt生成工程へ進行可能とする。
+
+Humanが修正を要求した場合は、
+Humanの修正理由を基にImplementation Plan Draftを再生成し、
+再びHuman Approvalを必要とする状態へ戻す。
+
+Humanが中止を判断した場合は、
+後続工程へ進行してはならない。
+
+Phase 2の目的は、
+Implementationそのものを開始することではなく、
+
+Specification
+        ↓
+Implementation Plan Draft
+        ↓
+Human Decision
+        ↓
+Approval Validation
+        ↓
+Approved Implementation Plan
+
+というPlan生成・承認境界を、
+Application Layer上で安全に成立させることである。
+
+#### Scope
+
+Phase 2の対象は、Implementation Plan Draftの生成、
+HumanによるPlan Approval、
+Plan Approvalの有効性検証、
+およびHumanから修正依頼を受けた場合の
+Implementation Plan Draft再生成に必要なApplication Layer処理とする。
+
+Phase 2では、少なくとも以下を対象とする。
+
+- 有効に承認されたSpecificationをPlan生成Inputとして受け取る
+- Specification Approvalの有効性を確認する
+- Plan生成開始時に`plan_generating`へ遷移する
+- 既存のPlan Prompt生成基盤を利用してPromptを生成する
+- `PromptResult`を`PromptAdapter`によって`AIRequest`へ変換する
+- ChatGPT RunnerをApplication Layerから呼び出す
+- ChatGPT Runnerの実行結果を受け取る
+- Implementation Plan Draftを生成結果として扱う
+- 使用したSpecificationとの対応関係を保持する
+- Plan生成成功後に`plan_approval_pending`へ遷移する
+- Implementation Plan DraftをHumanへ提示可能な状態にする
+- Humanから承認、修正依頼、または中止のDecisionを受け取る
+- Human DecisionからApproval Recordを構築する
+- Approval Recordを`ApprovalRecordRepository`を介して保存する
+- 現在のImplementation PlanからArtifact Hashを算出する
+- Approval Recordと現在のImplementation Planの同一性を検証する
+- 有効なApprovalが確認された場合に`plan_approved`へ遷移する
+- Approval Validationが失敗した場合に`plan_approval_pending`を維持する
+- Humanから修正依頼を受けた場合にImplementation Plan修正工程へ処理を渡す
+- Humanの修正理由、現在のImplementation Plan Draft、元のSpecificationを基に修正版Draftを生成する
+- 修正版Draft生成後に再びPlan Approvalを必要とする状態へ戻す
+- Humanが中止を判断した場合に後続工程への進行を停止する
+
+Phase 2では、以下は実装対象外とする。
+
+- Codex用Implementation Promptの生成
+- Codex RunnerによるImplementation
+- UC-06で定義されたCodex RunnerによるImplementationとしての
+  Source CodeまたはTest Codeの変更
+- Implementation Evidenceの構築
+- ChatGPTによるImplementation Review
+- Correction Loop
+- Critical Change Approval
+- Final Approval
+- `developer`へのmerge
+
+これらは後続Phaseで扱う。
+
+Phase 2では、
+Implementation Plan Draftの生成および承認Workflowを成立させるために必要な範囲を超えて、
+後続Implementation工程の責務を先行実装してはならない。
+
+#### Implementation Targets
+
+Phase 2では、
+UC-02、UC-03、およびUC-04をApplication Layer上で実行するために必要な
+Use Case、DTO、既存Coreとの接続、およびPhase 1で構築した
+State / Approval基盤との統合を実装する。
+
+主なImplementation Targetは以下とする。
+
+##### Plan Generation
+
+UC-02 `Generate Implementation Plan Draft`を実行する
+Application Layer Use Caseを実装する。
+
+このUse Caseは、少なくとも以下を行う。
+
+- 現在のSpecificationおよびSpecification Approval情報をInputとして受け取る
+- Specification Approvalが有効であることを確認する
+- Plan生成開始時にCurrent Stateを`plan_generating`へ遷移させる
+- 既存の`PlanPromptGenerator`を利用して`PromptResult`を取得する
+- `PromptAdapter`を利用して`PromptResult`を`AIRequest`へ変換する
+- ChatGPT Runnerを呼び出す
+- `AIResponse`を受け取る
+- Implementation Plan Draftとして利用可能な生成結果を返す
+- 使用したSpecificationとの対応情報を保持する
+- 正常にPlan Draftを生成できた場合にCurrent Stateを`plan_approval_pending`へ遷移させる
+- Plan生成に失敗した場合は、成功Stateへ遷移せずFailure Handlingへ処理を返す
+
+##### Plan Approval
+
+UC-03 `Request Plan Approval`を実行する
+Application Layer Use Caseを実装する。
+
+このUse Caseは、少なくとも以下を行う。
+
+- 現在のImplementation Plan DraftをHuman Decisionの対象として扱う
+- Humanから承認、修正依頼、または中止のDecisionを受け取る
+- Human DecisionをApplication Layer自身が生成または代替しない
+- Phase 1で構築した`ApprovalRecordService`を利用してApproval Recordを構築する
+- Phase 1で構築した`ApprovalRecordRepository`を介してApproval Recordを保存する
+- 現在のImplementation PlanからArtifact Hashを算出する
+- Approval Recordと現在のImplementation Planとの同一性およびApprovalの有効性を検証する
+- 有効なApprovalが確認された場合に`plan_approved`へ遷移する
+- Approval Validationが失敗した場合は`plan_approved`へ遷移せず、`plan_approval_pending`を維持する
+- Humanによる修正依頼または中止を、対応する後続処理へ渡す
+
+##### Plan Revision
+
+UC-04 `Revise Implementation Plan`を実行する
+Application Layer Use Caseを実装する。
+
+HumanがImplementation Planの修正を要求した場合は、
+Current Stateを`plan_revision_requested`へ遷移させ、
+Implementation Plan修正工程へ処理を渡す。
+
+修正版Implementation Plan Draftの生成を開始する場合は、
+`plan_generating`へ遷移する。
+
+このUse Caseは、少なくとも以下をInputとして扱う。
+
+- 現在のImplementation Plan Draft
+- Humanの修正理由
+- 元のSpecification
+- 必要な関連情報
+
+修正版Implementation Plan Draftを生成した場合は、
+前版との対応を識別可能にし、
+Current Stateを`plan_approval_pending`へ遷移させ、
+再びHumanによるPlan Approvalを必要とする状態へ戻す。
+
+修正版Draftを、
+Human Approvalなしに`plan_approved`として扱ってはならない。
+
+##### DTO
+
+Phase 2で追加するInput / Output DTOは、
+Phase 1で定めたApplication Layer DTOの規則に従う。
+
+DTOはApplication Layerの境界を表現するために使用し、
+CoreまたはInfrastructureの内部表現を
+Presentation Layerへ直接公開するために使用してはならない。
+
+##### Integration
+
+Phase 2では、新たなState保存機構またはApproval保存機構を重複実装せず、
+Phase 1で構築した以下の基盤を利用する。
+
+- Current State管理
+- State Transition History
+- Approval Record
+- Approval Record Repository
+- Artifact HashによるApproval Validation
+
+既存Coreについては、
+Phase 2のUse Caseから必要な公開Interfaceを通じて利用し、
+CoreからApplication Layerへの逆依存を導入してはならない。
+
+#### Tests
+
+Phase 2の実装では、
+追加または変更する振る舞いについて原則としてTDDを適用する。
+
+Testは、単にUse Caseが実行できることだけでなく、
+Specificationで定義されたPlan生成、Human Approval、
+Approval Validation、Plan Revision、およびState Transitionが
+正しく維持されることを検証する。
+
+少なくとも以下をTest対象とする。
+
+##### Plan Generation Tests
+
+- 有効なSpecification Approvalが確認された場合にPlan生成を開始できること
+- Plan生成開始時にCurrent Stateが`plan_generating`へ遷移すること
+- `PlanPromptGenerator`から`PromptResult`を取得できること
+- `PromptAdapter`によって`PromptResult`を`AIRequest`へ変換できること
+- Application LayerからChatGPT Runnerを呼び出せること
+- ChatGPT Runnerから`AIResponse`を受け取れること
+- 正常な生成結果をImplementation Plan Draftとして扱えること
+- 生成されたImplementation Plan Draftと使用したSpecificationとの対応関係を保持できること
+- Plan Draft生成成功後にCurrent Stateが`plan_approval_pending`へ遷移すること
+- Specification Approvalが無効な場合にPlan生成を開始しないこと
+- Plan生成に失敗した場合に`plan_approval_pending`へ遷移しないこと
+
+##### Plan Approval Tests
+
+- `plan_approval_pending`のImplementation Plan DraftをHuman Decisionの対象として扱えること
+- Humanによる承認Decisionを受け取れること
+- Human DecisionからApproval Recordを構築できること
+- Approval Recordを`ApprovalRecordRepository`を介して保存できること
+- 現在のImplementation PlanからArtifact Hashを算出できること
+- Approval RecordのArtifact Hashと現在のImplementation PlanのArtifact Hashを比較できること
+- 有効なApprovalが確認された場合にCurrent Stateが`plan_approved`へ遷移すること
+- Approval Validationが失敗した場合に`plan_approved`へ遷移しないこと
+- Approval Validationが失敗した場合に`plan_approval_pending`を維持すること
+- Application LayerがHuman Approvalを独自に生成または代替しないこと
+
+##### Plan Revision Tests
+
+- Humanによる修正要求を受け取れること
+- 修正要求を受けた場合にCurrent Stateが`plan_revision_requested`へ遷移すること
+- 修正版Implementation Plan Draftの生成開始時に`plan_generating`へ遷移すること
+- 現在のImplementation Plan Draft、Humanの修正理由、および元のSpecificationを修正Inputとして扱えること
+- 修正版Implementation Plan Draftを生成できること
+- 修正版Implementation Plan Draftと前版との対応関係を識別できること
+- 修正版Draft生成後にCurrent Stateが`plan_approval_pending`へ遷移すること
+- 修正版DraftがHuman Approvalなしに`plan_approved`として扱われないこと
+
+##### State Transition Tests
+
+Phase 2で少なくとも以下のState Transitionを検証する。
+
+```text
+specification_ready
+        ↓
+plan_generating
+        ↓
+plan_approval_pending
+        ↓
+plan_approved
+```
+また、HumanによるPlan Revisionについて、
+少なくとも以下のState Transitionを検証する。
+
+```text
+plan_approval_pending
+        ↓
+plan_revision_requested
+        ↓
+plan_generating
+        ↓
+plan_approval_pending
+```
+
+##### Approval Validation Tests
+
+- Approval対象のArtifact Pathを識別できること
+- Approval対象のArtifact Hashを取得できること
+- Approval Recordが現在のImplementation Planを対象としていることを確認できること
+- Artifact Hashが一致する場合にApprovalを有効として扱えること
+- Artifact Hashが一致しない場合にApprovalを無効として扱うこと
+- Approval後にImplementation Planが変更された場合、以前のApprovalを有効として扱わないこと
+- 無効なApprovalを根拠として後続のCodex Prompt生成工程へ進めないこと
+
+##### Cancellation Tests
+
+- Humanが中止を判断した場合にCurrent Stateが`cancelled`へ遷移すること
+- `cancelled`へ遷移した場合に後続のCodex Prompt生成工程へ進まないこと
+- Application LayerがHumanの中止判断を変更または無視しないこと
+- AI Runnerによって中止後のWorkflowが自動的に再開されないこと
+
+##### Dependency and Regression Tests
+
+- Phase 2のUse Caseから既存Coreの公開Interfaceを利用できること
+- CoreからApplication Layerへの逆依存を導入していないこと
+- Phase 1で構築したState管理基盤を再利用できること
+- Phase 1で構築したApproval RecordおよびApproval Record Repositoryを再利用できること
+- Phase 1で構築したApproval Validation基盤を再利用できること
+- Phase 2のために重複したState保存機構を追加していないこと
+- Phase 2のために重複したApproval保存機構を追加していないこと
+- Phase 1までの既存Testが引き続き成功すること
+- Phase 2の追加によって既存の正常な振る舞いにRegressionが発生していないこと
+
+#### Completion Conditions
+
+Phase 2は、以下をすべて満たした場合に完了とする。
+
+- 有効なSpecification Approvalを確認した場合にのみImplementation Plan Draft生成を開始できる
+- Plan生成開始時にCurrent Stateを`plan_generating`へ遷移できる
+- 既存の`PlanPromptGenerator`および`PromptAdapter`を利用してChatGPT Runnerを実行できる
+- ChatGPT Runnerの生成結果をImplementation Plan Draftとして扱える
+- Implementation Plan Draftと、その生成に使用したSpecificationとの対応関係を保持できる
+- Plan Draft生成成功後にCurrent Stateを`plan_approval_pending`へ遷移できる
+- Humanによる承認、修正依頼、または中止のDecisionを受け取れる
+- Humanによる承認DecisionからApproval Recordを構築・保存できる
+- 現在のImplementation PlanとApproval RecordのArtifact Hashを用いてApproval Validationを実行できる
+- 有効なApprovalが確認された場合にのみCurrent Stateを`plan_approved`へ遷移できる
+- Approval Validationが失敗した場合に`plan_approved`へ遷移せず、`plan_approval_pending`を維持できる
+- Humanによる修正要求を受けた場合に`plan_revision_requested`へ遷移できる
+- Plan Revision開始時に`plan_generating`へ遷移し、修正版Implementation Plan Draftを生成できる
+- 修正版Implementation Plan Draft生成後に`plan_approval_pending`へ戻し、再度Human Approvalを要求できる
+- 修正版Implementation Plan DraftをHuman Approvalなしに`plan_approved`として扱わない
+- Humanが中止を判断した場合に`cancelled`へ遷移し、後続工程へ進行しない
+- Application LayerまたはAI RunnerがHuman ApprovalまたはHumanの中止判断を独自に生成、変更、無視、または代替しない
+- Phase 1で構築したState管理、State Transition History、Approval Record、Approval Record Repository、およびApproval Validation基盤を再利用できる
+- CoreからApplication Layerへの逆依存を導入していない
+- Phase 2のためにState保存機構またはApproval保存機構を重複実装していない
+- Phase 2で追加または変更した振る舞いに対するTestが成功する
+- Phase 1までの既存Testがすべて成功する
+- Phase 2の実装が、Codex RunnerによるImplementation、Implementation Evidence、Review、Correction、Final Approval、Merge等の後続Phaseの責務へ侵入していない
 
 ### Phase 3 Implementation Execution Foundation
 
