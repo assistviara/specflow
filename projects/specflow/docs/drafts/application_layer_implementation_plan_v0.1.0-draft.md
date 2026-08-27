@@ -743,6 +743,134 @@ Phase 2は、以下をすべて満たした場合に完了とする。
 - Phase 2の実装が、Codex RunnerによるImplementation、Implementation Evidence、Review、Correction、Final Approval、Merge等の後続Phaseの責務へ侵入していない
 
 ### Phase 3 Implementation Execution Foundation
+#### Purpose
+
+Phase 3では、
+Humanによって有効に承認されたSpecificationおよびImplementation Planを基に、
+Codex Runnerへ渡すImplementation Promptを生成し、
+承認されたScope内でImplementationおよびTestを実行できる
+Application Layerの実行基盤を構築する。
+
+本Phaseでは、
+UC-05 `Generate Codex Implementation Prompt`および
+UC-06 `Execute Implementation`
+に必要なApplication Layerの処理を実装する。
+
+Codex Prompt生成では、
+SpecificationおよびApproved Implementation Planとの対応関係を維持し、
+Implementation Scope、許可された変更範囲、TDD要件、
+Completion Conditions、Stop Conditions、
+およびHuman Approvalを必要とする条件を
+Codex Runnerへ明示できる状態を成立させる。
+
+有効なCodex Promptが生成され、
+Implementation開始に必要なInputが確認された場合にのみ、
+Codex RunnerによるImplementationを開始できる。
+
+Codex Runnerは、
+承認されたScope内でImplementationおよびTestを実行し、
+その実行結果をApplication Layerへ返す。
+
+Application Layerは、
+Codex Runner自身に後続Workflowの判断を委ねず、
+Test Result、Test Execution Error、
+Human Approvalを必要とする事項、
+その他の実行結果を受け取り、
+後続工程への進行可否を制御する。
+
+Testが正常に実行された結果としての`PASS`または`FAIL`と、
+Test実行処理そのものを正常に完了できなかった
+`Test Execution Error`を明確に区別する。
+
+Test Resultが`FAIL`であることのみを理由として、
+Technical Error、Implementation Failure、
+または自動Correctionとして扱ってはならない。
+
+Technical Errorが発生した場合は、
+定められたTechnical RetryおよびImplementation Failureの規則に従う。
+
+Implementation中に、
+Specification、Approved Implementation Plan、
+Codex Prompt、または既存のHuman Approval Scopeを超える
+Critical Changeが必要となった場合は、
+Implementationを継続せず、
+Human Approvalを必要とする工程へ処理を渡す。
+
+Phase 3の目的は、
+Implementation Evidenceそのものを完成させることではなく、
+
+Approved Implementation Plan
+        ↓
+Codex Prompt
+        ↓
+Implementation Ready
+        ↓
+Codex Implementation
+        ↓
+Test Execution
+        ↓
+Implementation Result
+
+というImplementation実行境界を、
+Application Layer上で安全に成立させることである。
+
+Implementation Evidenceの構築および保存は、
+Phase 4で扱う。
+
+#### Scope
+
+Phase 3の対象は、
+有効に承認されたSpecificationおよびImplementation Planを基にした
+Codex Promptの生成と、
+Codex RunnerによるImplementationおよびTest実行に必要な
+Application Layer処理とする。
+
+Phase 3では、少なくとも以下を対象とする。
+
+- Specification ApprovalおよびImplementation Plan Approvalの有効性を確認する
+- Codex Prompt生成開始時に`implementation_prompt_generating`へ遷移する
+- SpecificationおよびApproved Implementation Planを基にCodex Promptを生成する
+- 生成されたCodex Promptと、使用したSpecificationおよびApproved Implementation Planとの対応関係を保持する
+- Codex Promptが承認済みImplementation Scopeを拡張していないことを確認する
+- Codex PromptにImplementation Scope、許可された変更範囲、TDD要件、Completion Conditions、Stop Conditions、およびHuman Approvalを必要とする条件を含める
+- Codex PromptをCodex Runnerへ渡すImplementation Promptとして利用可能であることを確認する
+- Codex Prompt生成成功後に`implementation_ready`へ遷移する
+- Codex Prompt生成に失敗した場合または安全にImplementationへ使用できない場合に`implementation_ready`へ遷移しない
+- Implementation開始に必要なInputを確認する
+- Implementation開始時に`implementation_ready`から`implementing`へ遷移する
+- Codex RunnerをApplication Layerから呼び出す
+- Codex Runnerに承認されたScope内でImplementationおよびTestを実行させる
+- Codex RunnerからImplementationおよびTestの実行結果を受け取る
+- 作成・変更・削除したファイルに関する情報を受け取る
+- 実行したCommandに関する情報を受け取る
+- Test実行状態およびTest Resultを受け取る
+- `PASS`、`FAIL`、および`Test Execution Error`を区別する
+- Error、Warning、未完了事項、およびHuman Approvalが必要な事項を受け取る
+- Test Resultが`FAIL`であることのみを理由としてTechnical ErrorまたはImplementation Failureとして扱わない
+- Test Resultが`FAIL`であることのみを理由としてCodex RunnerにCorrectionを開始させない
+- Technical Errorが発生した場合にTechnical RetryまたはImplementation Failureの規則へ処理を渡す
+- Implementationが承認されたScope内で正常に完了し、必要なTest実行およびImplementation Evidence構築に必要な実行結果を取得できた場合に`implementation_completed`へ遷移する
+- Implementationを正常に継続または完了できない場合に`implementation_completed`へ遷移しない
+- Critical Changeが必要となった場合にImplementationを継続せず`critical_approval_pending`へ遷移し、UC-07へ処理を渡す
+- Critical Changeに対する有効なHuman Approvalが確認されるまで、当該変更を含むImplementationを再開しない
+
+Phase 3では、以下は実装対象外とする。
+
+- Implementation Evidenceの最終的な構築および保存
+- ChatGPT RunnerによるImplementation Review
+- Review Resultに基づくCorrection Loop
+- Critical Changeに対するHuman Approvalそのものの取得・記録・検証
+- Final Approval
+- `developer`へのmerge
+
+これらは後続Phaseで扱う。
+
+Phase 3では、
+Codex RunnerにApplication LayerのWorkflow判断責務を移してはならない。
+
+Codex RunnerはImplementationおよびTestの実行を担当し、
+Application Layerはその実行結果を受けて、
+後続Workflowへ進行可能かどうかを制御する。
 
 ### Phase 4 Implementation Evidence
 
