@@ -872,6 +872,423 @@ Codex RunnerはImplementationおよびTestの実行を担当し、
 Application Layerはその実行結果を受けて、
 後続Workflowへ進行可能かどうかを制御する。
 
+#### Implementation Targets
+
+Phase 3では、
+UC-05およびUC-06をApplication Layer上で実行するために必要な
+Use Case、DTO、既存CoreおよびAI Runnerとの接続、
+ならびにPhase 1およびPhase 2で構築した
+State / Approval基盤との統合を実装する。
+
+主なImplementation Targetは以下とする。
+
+##### Codex Prompt Generation
+
+UC-05 `Generate Codex Implementation Prompt`を実行する
+Application Layer Use Caseを実装する。
+
+このUse Caseは、少なくとも以下を行う。
+
+- 現在のSpecificationおよびApproved Implementation PlanをInputとして受け取る
+- Specification ApprovalおよびImplementation Plan Approvalの有効性を確認する
+- Approvalの有効性を、対応するApproval Recordおよび現在のArtifact Hashとの整合性によって確認する
+- Codex Prompt生成開始時にCurrent Stateを`implementation_prompt_generating`へ遷移させる
+- SpecificationおよびApproved Implementation Planを基にCodex Promptを生成する
+- Codex PromptにImplementation Scopeを反映する
+- Codex Promptに許可された変更範囲を反映する
+- Codex PromptにTDD要件を反映する
+- Codex PromptにCompletion ConditionsおよびStop Conditionsを反映する
+- 承認範囲を超える変更が必要となる場合にHuman Approvalを要求する条件をCodex Promptへ明示する
+- Codex PromptによってSpecificationまたはApproved Implementation Planで承認されたImplementation Scopeを拡張しない
+- Codex Runner自身にImplementation Evidenceの正当性を自己確定させない
+- Codex RunnerにImplementation Evidence構築に必要な実行結果を報告させる
+- 生成されたCodex Promptと、使用したSpecificationおよびApproved Implementation Planとの対応関係を保持する
+- 生成されたCodex PromptがCodex Runnerへ渡すImplementation Promptとして利用可能であることを確認する
+- Codex Promptが正常に生成され、安全にImplementationへ使用できる場合にCurrent Stateを`implementation_ready`へ遷移させる
+- Codex Prompt生成に失敗した場合、または安全にImplementationへ使用できない場合に`implementation_ready`へ遷移しない
+- Prompt生成に失敗した場合は、停止理由および現在のStateを保持し、定められたFailure HandlingまたはHuman判断へ処理を返す
+
+##### Implementation Execution
+
+UC-06 `Execute Implementation`を実行する
+Application Layer Use Caseを実装する。
+
+このUse Caseは、少なくとも以下を行う。
+
+- 現在のSpecification、Approved Implementation Plan、およびCodex PromptをInputとして受け取る
+- Implementation BranchおよびBase CommitをInputとして受け取る
+- Codex Promptが現在のSpecificationおよびApproved Implementation Planに対応していることを確認する
+- Implementation開始に必要なInputが揃っていることを確認する
+- Implementation開始時にCurrent Stateを`implementation_ready`から`implementing`へ遷移させる
+- Implementation Roleに割り当てられたCodex RunnerをApplication Layerから呼び出す
+- Codex RunnerにSpecification、Approved Implementation Plan、およびCodex Promptで承認されたScope内でImplementationを実行させる
+- TDD対象のImplementationについて、定められたTDD適用ルールに従ってTest作成・変更、期待されるTest失敗の確認、必要最小限のImplementation、およびTest実行を行わせる
+- TDD対象外のImplementationについても、承認されたScope内で必要なImplementationおよびTest実行を行わせる
+- Codex RunnerからImplementationおよびTestの実行結果を受け取る
+- 作成・変更・削除したファイルに関する情報を受け取る
+- 実行したCommandに関する情報を受け取る
+- Test実行状態、Test Result、およびTest Execution Errorを受け取る
+- Error、Warning、未完了事項、およびHuman Approvalが必要な事項を受け取る
+- Codex RunnerにTest ResultまたはTechnical Errorを根拠とした後続Workflowを独自に判断させない
+- Codex RunnerにImplementation Evidenceの正当性を自己確定させない
+- Implementation Evidence構築に必要な実行結果をApplication Layerへ返させる
+- Implementationが承認されたScope内で正常に完了し、必要なTest実行およびImplementation Evidence構築に必要な実行結果を取得できた場合にCurrent Stateを`implementation_completed`へ遷移させる
+- Implementationを正常に継続または完了できない場合に`implementation_completed`へ遷移しない
+- Codex Runnerの実行失敗、Test Execution Error、実行環境上の問題、またはその他のTechnical Errorが発生した場合に、定められたFailure Handlingへ処理を渡す
+- 承認されたScopeを超える変更が必要となった場合にCodex Runnerへ当該変更を実行させない
+- Critical Changeが必要となった場合にCurrent Stateを`critical_approval_pending`へ遷移させ、UC-07へ処理を渡す
+- Critical Changeに対する有効なHuman Approvalが確認されるまで、当該変更を含むImplementationを再開しない
+
+##### Test Result Handling
+
+UC-06におけるTest実行結果について、
+Application LayerがTest ResultとTechnical Errorを
+明確に区別して扱うための処理を実装する。
+
+少なくとも以下を行う。
+
+- Testが正常に実行された結果としての`PASS`をTest Resultとして扱う
+- Testが正常に実行された結果としての`FAIL`をTest Resultとして扱う
+- Test実行処理そのものを正常に完了できなかった場合を`Test Execution Error`として扱う
+- `PASS`または`FAIL`と`Test Execution Error`を同一の状態として扱わない
+- Test Resultが`FAIL`であることのみを理由としてTechnical Errorとして扱わない
+- Test Resultが`FAIL`であることのみを理由として`implementation_failed`へ遷移しない
+- Test Resultが`FAIL`であることのみを理由としてCorrectionを自動的に開始しない
+- Test Resultが`FAIL`の場合も、Implementation Evidence構築に必要なTest Resultとして後続工程へ渡す
+- `Test Execution Error`が発生した場合はTechnical Errorとして扱い、定められたTechnical RetryまたはImplementation Failureの規則へ処理を渡す
+- Test ResultまたはTest Execution Errorを根拠とした後続Workflowの判断をCodex Runner自身に行わせない
+- Application LayerがTest実行結果を受け取り、State Transitionおよび後続Workflowを制御する
+
+##### Technical Retry and Implementation Failure
+
+UC-06においてTechnical Errorが発生した場合に、
+Application LayerがTechnical Retryの可否を判定し、
+Implementationを安全に継続できない場合に
+Implementation Failureとして扱うための処理を実装する。
+
+少なくとも以下を行う。
+
+- Codex Runnerの実行失敗、Test Execution Error、実行環境上の問題、その他の技術的理由による失敗をTechnical Errorとして受け取る
+- Technical Errorが発生したことのみを理由として直ちに`implementation_failed`へ遷移しない
+- Technical Errorについて、安全にTechnical Retryを実行可能かを判定する
+- Technical Retryでは承認対象Artifactを変更しない
+- Technical RetryではSource CodeまたはTest Codeを変更しない
+- Technical RetryではSpecificationを変更しない
+- Technical RetryではApproved Implementation Planを変更しない
+- Technical RetryではHuman Approval Scopeを変更しない
+- Technical Retryによって新たな設計判断を行わない
+- Technical Retryによって破壊的変更を発生させない
+- 同一入力および同一条件による同一の技術操作を安全に再実行可能な場合にのみTechnical Retryを許可する
+- Technical Retryによって成果物または承認対象の内容を変更しない
+- Technical RetryをImplementation Correction LoopのCorrection Countに含めない
+- Technical Retryによって復旧した場合は`implementing`を維持し、Implementation工程を継続する
+- Technical Retryによって復旧できない場合は`implementation_failed`へ遷移する
+- Technical Retryとして安全に処理できないTechnical Errorの場合は`implementation_failed`へ遷移する
+- `implementation_failed`へ遷移した場合は、自動的に成果物を修正してImplementationを継続せず、Human判断へ処理を返す
+- Testが正常に実行された結果としての`FAIL`をTechnical ErrorまたはImplementation Failureとして扱わない
+- TDDにおけるExpected Test FailureをTechnical ErrorまたはImplementation Failureとして扱わない
+
+##### Critical Change Detection and Handoff
+
+UC-06によるImplementation中に、
+既存のSpecification、Approved Implementation Plan、
+Codex Prompt、またはHuman Approval Scopeを超える変更が
+必要となった場合に、
+Application LayerがImplementationを停止し、
+UC-07へ処理を渡すための境界を実装する。
+
+少なくとも以下を行う。
+
+- Codex RunnerからHuman Approvalが必要な事項を受け取る
+- Implementation中に必要となった変更が、現在承認されているImplementation Scope内で実行可能かを確認する
+- Specificationを超える変更を自動的に実行しない
+- Approved Implementation Planを超える変更を自動的に実行しない
+- Codex Promptで許可された範囲を超える変更を自動的に実行しない
+- Human Approval Scopeを超える変更を自動的に実行しない
+- 承認されたScopeを超える変更を通常のCorrectionとして扱わない
+- 承認されたScopeを超える変更をTechnical Retryとして扱わない
+- Critical Changeが必要となった場合にImplementationを継続しない
+- Critical Changeが必要となった場合に`implementation_completed`へ遷移しない
+- Critical Changeが必要となった場合にCurrent Stateを`critical_approval_pending`へ遷移させる
+- Critical Changeに関する情報をUC-07へ渡す
+- Critical Changeに対する有効なHuman Approvalが確認されるまで、当該変更を含むImplementationを再開しない
+- Critical Change ApprovalなしにCodex Runnerへ承認範囲外の変更を実行させない
+- Critical Change Approval後にImplementationを再開する場合も、Humanによって承認された変更範囲を超えない
+
+##### DTO and Application Layer Interface
+
+Phase 3で実装するUC-05およびUC-06では、
+Application Layer Specificationで定義されたDTOの基本方針に従い、
+UseCaseの正式なInput / Output契約として
+`dataclass(frozen=True)`を基本とするDTOを使用する。
+
+DTOは、
+Application Layerと他のLayerまたはInterfaceとの間で
+必要なデータを受け渡すための契約として扱い、
+DTO自身にWorkflowの進行判断、
+AI Runnerの実行、
+State Transition、
+Human Approvalの判断等の処理を持たせない。
+
+Phase 3では、
+SpecificationのDTO命名規則に従い、
+UC-05およびUC-06との対応関係が明確になる名称を使用する。
+
+少なくとも以下のInput / Output DTOを実装する。
+
+```text
+GenerateCodexPromptInput
+GenerateCodexPromptOutput
+
+ExecuteImplementationInput
+ExecuteImplementationOutput
+```
+
+##### State, Approval, and Runner Integration
+
+Phase 3では、
+UC-05およびUC-06を個別の処理として実装するだけでなく、
+Phase 1およびPhase 2で構築したState Management、
+Approval Validation、
+ならびに既存のAI Runner基盤と統合し、
+Application LayerがImplementation実行工程を
+一貫して制御できる構造を実装する。
+
+Application Layerは、
+Current Stateのみを根拠として
+SpecificationまたはImplementation Planが
+有効に承認されていると判断してはならない。
+
+Codex Prompt生成へ進む前に、
+対応するApproval RecordとCurrent Artifactの整合性を
+`ApprovalValidationService`によって確認し、
+有効なHuman Approvalが確認された場合にのみ
+後続工程へ進行する。
+
+少なくとも以下を行う。
+
+- UC-05開始前にSpecification Approvalの有効性を確認する
+- UC-05開始前にImplementation Plan Approvalの有効性を確認する
+- Approval Validationでは、対応するApproval RecordとCurrent Artifact Hashとの整合性を確認する
+- Approval Validationに失敗した場合はCodex Prompt生成またはImplementation実行へ進行しない
+- Codex Prompt生成開始時にCurrent Stateを`implementation_prompt_generating`へ遷移させる
+- Codex Prompt生成が正常に完了し、安全にImplementationへ使用できる場合にのみ`implementation_ready`へ遷移させる
+- UC-06開始時にCurrent StateおよびImplementation開始に必要なInputを確認する
+- UC-06開始時に`implementation_ready`から`implementing`へ遷移させる
+- Implementationが承認されたScope内で正常に完了し、必要な実行結果を取得できた場合に`implementation_completed`へ遷移させる
+- Technical Error、Critical Change、その他Implementationを正常に継続できない状態では、正常系のState Transitionを行わない
+- State Transition発生時には、Phase 1で構築したState Management基盤を利用してCurrent Stateを更新する
+- State Transition HistoryをPhase 1で定義した方式に従って記録する
+
+AI Runnerとの統合では、
+Application LayerがAI製品そのものを
+UseCaseの本質的な責務として扱わない構造を維持する。
+
+Application Layerは概念的に、
+
+```text id="6o3eqv"
+UseCase
+   ↓
+Required AI Role
+   ↓
+Version 1 Runner Assignment
+   ↓
+AIRequest
+   ↓
+Assigned Runner
+   ↓
+AIResponse
+   ↓
+Application Layer
+   ↓
+Workflow Control
+```
+
+##### Tests
+
+Phase 3の実装では、
+追加または変更する振る舞いについて原則としてTDDを適用する。
+
+UC-05およびUC-06について、
+正常系だけでなく、
+Approval Validation失敗、
+Codex Prompt生成失敗、
+Test ResultとTest Execution Errorの区別、
+Technical Retry、
+Implementation Failure、
+Critical Change、
+および不正なState Transitionを防止する振る舞いをTestする。
+
+少なくとも以下をTest対象とする。
+
+###### Codex Prompt Generation
+
+- 有効に承認されたSpecificationおよびImplementation Planを基にCodex Promptを生成できること
+- Specification Approvalが有効でない場合にCodex Prompt生成へ進まないこと
+- Implementation Plan Approvalが有効でない場合にCodex Prompt生成へ進まないこと
+- Approval ValidationにおいてApproval RecordとCurrent Artifact Hashが一致しない場合にCodex Prompt生成へ進まないこと
+- Codex Prompt生成開始時にCurrent Stateが`implementation_prompt_generating`へ遷移すること
+- 生成されたCodex PromptにImplementation Scopeを反映できること
+- 生成されたCodex PromptにAllowed ChangesおよびForbidden Changesを反映できること
+- 生成されたCodex PromptにTDD Requirementsを反映できること
+- 生成されたCodex PromptにCompletion ConditionsおよびStop Conditionsを反映できること
+- 生成されたCodex PromptにRequired Execution Result Reportingを反映できること
+- Human Approvalが必要となる条件をCodex Promptへ反映できること
+- Codex PromptがSpecificationおよびApproved Implementation Planで承認されたScopeを拡張しないこと
+- 生成されたCodex Promptと、使用したSpecificationおよびApproved Implementation Planとの対応関係を保持できること
+- Codex Promptが正常に生成され、安全にImplementationへ使用できる場合に`implementation_ready`へ遷移すること
+- Codex Prompt生成に失敗した場合に`implementation_ready`へ遷移しないこと
+- Codex Promptを安全にImplementationへ使用できない場合に`implementation_ready`へ遷移しないこと
+- Prompt生成失敗時に停止理由および現在のStateを保持できること
+
+###### Implementation Execution
+
+- 有効なCodex Promptおよび必要なInputが揃っている場合にImplementationを開始できること
+- Implementation開始時にCurrent Stateが`implementation_ready`から`implementing`へ遷移すること
+- 必要なInputが不足している場合にImplementationを開始しないこと
+- Codex Promptが現在のSpecificationおよびApproved Implementation Planに対応していない場合にImplementationを開始しないこと
+- Implementation Roleに割り当てられたCodex Runnerを呼び出せること
+- Codex Runnerへ承認されたImplementation Scopeを渡せること
+- TDD対象のImplementationについてTDD適用ルールに従って実行できること
+- TDD対象外の変更について承認されたScope内でImplementationを実行できること
+- Codex Runnerから作成・変更・削除したファイルに関する情報を受け取れること
+- Codex Runnerから実行したCommandに関する情報を受け取れること
+- Codex RunnerからTest実行状態およびTest Resultを受け取れること
+- Codex RunnerからError、Warning、未完了事項、およびHuman Approvalが必要な事項を受け取れること
+- Implementationが承認されたScope内で正常に完了し、必要な実行結果を取得できた場合に`implementation_completed`へ遷移すること
+- Implementationを正常に継続または完了できない場合に`implementation_completed`へ遷移しないこと
+
+###### Test Result Handling
+
+- Testが正常に実行され結果が`PASS`の場合にTest Resultとして扱えること
+- Testが正常に実行され結果が`FAIL`の場合にTest Resultとして扱えること
+- TDDにおけるExpected Test Failureを正常なTDD工程として扱えること
+- Expected Test Failureのみを理由として`implementation_failed`へ遷移しないこと
+- Implementation後のTest Resultが`FAIL`であることのみを理由としてTechnical Errorとして扱わないこと
+- Implementation後のTest Resultが`FAIL`であることのみを理由として`implementation_failed`へ遷移しないこと
+- Test Resultが`FAIL`であることのみを理由としてCorrectionを自動的に開始しないこと
+- Test Resultが`PASS`または`FAIL`の場合にImplementation Evidence構築に必要な実行結果として後続工程へ渡せること
+- Test実行処理そのものを正常に完了できない場合に`Test Execution Error`として扱えること
+- `Test Execution Error`とTest Resultとしての`FAIL`を区別できること
+- `Test Execution Error`をTechnical ErrorとしてTechnical RetryまたはImplementation Failureの判定へ渡せること
+
+###### Technical Retry and Implementation Failure
+
+- Technical Error発生時に直ちに`implementation_failed`へ遷移せず、Technical Retry可能性を判定すること
+- 成果物を変更せず同一の技術操作を安全に再実行可能な場合にTechnical Retryを実行できること
+- Technical RetryによってSpecificationを変更しないこと
+- Technical RetryによってApproved Implementation Planを変更しないこと
+- Technical RetryによってSource CodeまたはTest Codeを変更しないこと
+- Technical RetryによってHuman Approval Scopeを変更しないこと
+- Technical Retryによって新たな設計判断または破壊的変更を行わないこと
+- Technical RetryをCorrection Countに含めないこと
+- Technical Retryによって復旧した場合に`implementing`を維持できること
+- Technical Retryによって復旧できない場合に`implementation_failed`へ遷移すること
+- Technical Retryとして安全に処理できない場合に`implementation_failed`へ遷移すること
+- `implementation_failed`への遷移後に自動的に成果物を修正してImplementationを継続しないこと
+- `implementation_failed`への遷移後にHuman判断へ処理を返すこと
+
+###### Critical Change
+
+- Specificationを超える変更を自動的に実行しないこと
+- Approved Implementation Planを超える変更を自動的に実行しないこと
+- Codex Promptで許可された範囲を超える変更を自動的に実行しないこと
+- Human Approval Scopeを超える変更を自動的に実行しないこと
+- 承認されたScopeを超える変更をTechnical Retryとして扱わないこと
+- 承認されたScopeを超える変更を通常のCorrectionとして扱わないこと
+- Critical Changeが必要となった場合にImplementationを継続しないこと
+- Critical Changeが必要となった場合に`implementation_completed`へ遷移しないこと
+- Critical Changeが必要となった場合に`critical_approval_pending`へ遷移すること
+- Critical Changeに関する情報をUC-07へ渡せること
+- 有効なCritical Change Approvalが確認されるまで当該変更を含むImplementationを再開しないこと
+
+###### DTO and Interface
+
+- `GenerateCodexPromptInput`および`GenerateCodexPromptOutput`を`dataclass(frozen=True)`として扱えること
+- `ExecuteImplementationInput`および`ExecuteImplementationOutput`を`dataclass(frozen=True)`として扱えること
+- UC-05に必要なInput情報を`GenerateCodexPromptInput`で受け渡せること
+- UC-05に必要なOutput情報を`GenerateCodexPromptOutput`で返せること
+- UC-06に必要なInput情報を`ExecuteImplementationInput`で受け渡せること
+- UC-06に必要なOutput情報を`ExecuteImplementationOutput`で返せること
+- Application Layer DTO自身がWorkflow判断またはAI実行処理を担当しないこと
+- Application LayerのInput / Output DTOと`AIRequest` / `AIResponse`の責務を分離できていること
+
+###### State, Approval, and Runner Integration
+
+- Application LayerがCurrent Stateのみを根拠としてHuman Approvalを有効と判断しないこと
+- Approval Validation成功時のみ承認を前提とした後続工程へ進行できること
+- Approval Validation失敗時に承認を前提とした後続工程へ進行しないこと
+- State Transition発生時にCurrent Stateが正しく更新されること
+- State Transition発生時にState Transition Historyが記録されること
+- Codex Prompt Generation RoleにVersion 1で定義されたRunner Assignmentを利用できること
+- Implementation RoleにVersion 1で定義されたRunner Assignmentを利用できること
+- Application Layerから既存の`AIRequest`および`AIResponse`を利用できること
+- Application Layerから既存のAI Runner基盤を利用できること
+- Application Layer内に既存Runnerと同等の責務を重複実装していないこと
+- AI RunnerがHuman Approvalを独自に確定しないこと
+- AI RunnerがState Transitionまたは後続Workflowを独自に確定しないこと
+- Application LayerがAIResponseおよび実行結果を受けて後続Workflowを制御できること
+- Application LayerがHuman Approvalそのものを生成、推定、補完、または代替しないこと
+
+Phase 3で追加または変更する対象Testに加えて、
+既存Test Suiteを実行し、
+Phase 1およびPhase 2を含む既存機能に
+Regressionが発生していないことを確認する。
+
+#### Completion Conditions
+
+Phase 3は、
+UC-05 `Generate Codex Implementation Prompt`および
+UC-06 `Execute Implementation`に必要な
+Application Layerの実行基盤が成立し、
+以下の条件をすべて満たした場合に完了とする。
+
+- 有効に承認されたSpecificationおよびImplementation Planを基にCodex Promptを生成できる
+- Specification ApprovalおよびImplementation Plan Approvalの有効性を、対応するApproval RecordとCurrent Artifact Hashとの整合性によって確認できる
+- 有効なApprovalを確認できない場合にCodex Prompt生成またはImplementation実行へ進行しない
+- Codex PromptにImplementation Scope、Allowed Changes、Forbidden Changes、TDD Requirements、Completion Conditions、Stop Conditions、Required Execution Result Reporting、およびHuman Approval Required Conditionsを反映できる
+- Codex PromptがSpecificationおよびApproved Implementation Planで承認されたScopeを拡張しない
+- 生成されたCodex Promptと、使用したSpecificationおよびApproved Implementation Planとの対応関係を確認できる
+- Codex Prompt生成開始時に`implementation_prompt_generating`へ遷移できる
+- Codex Promptが正常に生成され、安全にImplementationへ使用できる場合にのみ`implementation_ready`へ遷移できる
+- Codex Prompt生成に失敗した場合または安全にImplementationへ使用できない場合に`implementation_ready`へ遷移しない
+- 有効なCodex PromptおよびImplementation開始に必要なInputが確認された場合にのみImplementationを開始できる
+- Implementation開始時に`implementation_ready`から`implementing`へ遷移できる
+- Implementation Roleに割り当てられたCodex RunnerをApplication Layerから呼び出し、承認されたScope内でImplementationおよびTestを実行できる
+- Codex RunnerからImplementationおよびTestの実行結果をApplication Layerへ返すことができる
+- 作成・変更・削除したファイル、実行Command、Test実行状態、Test Result、Test Execution Error、Error、Warning、未完了事項、およびHuman Approvalが必要な事項を後続工程で利用可能な実行結果として取得できる
+- Testが正常に実行された結果としての`PASS`および`FAIL`と、Test実行処理そのものを正常に完了できなかった`Test Execution Error`を区別できる
+- TDDにおけるExpected Test Failureを正常なTDD工程として扱える
+- Test Resultが`FAIL`であることのみを理由としてTechnical Error、`implementation_failed`、または自動Correctionとして扱わない
+- `Test Execution Error`その他のTechnical Error発生時に、安全なTechnical Retryの可否を判定できる
+- Technical Retryでは成果物、Specification、Approved Implementation Plan、およびHuman Approval Scopeを変更せず、Correction Countを増加させない
+- Technical Retryによって復旧した場合に`implementing`を維持してImplementationを継続できる
+- Technical Retryによって復旧できない場合、またはTechnical Retryとして安全に処理できない場合に`implementation_failed`へ遷移し、自動的に成果物を変更せずHuman判断へ処理を返すことができる
+- Implementationが承認されたScope内で正常に完了し、必要なTest実行およびImplementation Evidence構築に必要な実行結果を取得できた場合に`implementation_completed`へ遷移できる
+- Implementationを正常に継続または完了できない場合に`implementation_completed`へ遷移しない
+- Specification、Approved Implementation Plan、Codex Prompt、またはHuman Approval Scopeを超えるCritical Changeを自動的に実行しない
+- Critical Changeが必要となった場合にImplementationを停止し、`critical_approval_pending`へ遷移してUC-07へ処理を渡すことができる
+- Critical Changeに対する有効なHuman Approvalが確認されるまで、当該変更を含むImplementationを再開しない
+- Application LayerのInput / Output DTOと`AIRequest` / `AIResponse`の責務が分離されている
+- Phase 3で必要となるInput / Output DTOを`dataclass(frozen=True)`を基本として扱える
+- Application LayerがRole-based Fixed Assignmentを利用して適切なAI Runnerを呼び出せる
+- AI RunnerがHuman Approval、State Transition、Technical Retry、Implementation Failure、Correction、Critical Change、またはその他の後続Workflowを独自に確定しない
+- Application LayerがAI Runnerから返された結果を基に、Specificationで定義されたState Transitionおよび後続Workflowを制御できる
+- State Transition発生時にCurrent StateおよびState Transition Historyを正しく更新・記録できる
+- Application LayerまたはAI RunnerがHuman Approvalを生成、推定、補完、または代替しない
+- Implementation Evidenceの最終的な構築および保存をPhase 3へ取り込まず、Phase 4との責務境界を維持している
+- Phase 3で追加または変更した振る舞いに対するTestがすべて成功する
+- Phase 1およびPhase 2を含む既存Test Suiteがすべて成功し、Regressionが発生していない
+
+以上を満たした時点で、
+Phase 3 `Implementation Execution Foundation`を完了とする。
+
+Phase 3完了後は、
+Phase 4 `Implementation Evidence`へ進み、
+Phase 3で取得したImplementationおよびTestの実行結果と、
+実際のRepositoryおよびTestの状態を基に、
+Review可能なImplementation Evidenceの構築および保存を実装する。
+
 ### Phase 4 Implementation Evidence
 
 ### Phase 5 Review & Correction
