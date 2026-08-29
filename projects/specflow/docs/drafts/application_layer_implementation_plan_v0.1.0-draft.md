@@ -1291,6 +1291,1340 @@ Review可能なImplementation Evidenceの構築および保存を実装する。
 
 ### Phase 4 Implementation Evidence
 
+#### Purpose
+
+Phase 4では、
+
+Phase 3 `Implementation Execution Foundation`によって取得された
+Codex RunnerのImplementation実行結果と、
+実際のRepositoryおよびTestの状態を収集・照合し、
+
+Review工程で検証可能な
+Implementation Evidenceを構築・保存する
+Application Layerの基盤を実装する。
+
+本Phaseでは、
+
+UC-08 `Collect Implementation Evidence`
+
+に必要なApplication Layerの処理を実装する。
+
+Implementation Evidenceは、
+単なるDebug LogまたはCodex Runnerによる自己申告として扱わず、
+
+- Specification
+- Approved Implementation Plan
+- Codex Prompt
+- Implementation Result
+- Source Code
+- Git Status
+- Git Diff
+- Test Code
+- Test Result
+
+を相互に関連付け、
+Implementationにおいて実際に何が行われたかを
+後続のReview工程から検証可能な構造化されたEvidenceとして扱う。
+
+Application Layerは、
+Codex Runnerから返されたImplementationおよびTestの実行結果に加え、
+可能な範囲で実際のRepositoryおよびTestの状態を取得し、
+両者を照合したうえでImplementation Evidenceを構築する。
+
+Codex Runnerから返された情報と、
+実際のRepositoryまたはTestの状態に不一致が存在する場合は、
+その不一致を無視して正常なEvidenceとして扱わず、
+
+Error、
+Warning、
+Deviation、
+またはHuman Approvalが必要な事項として、
+内容に応じて記録できる状態を成立させる。
+
+Version 1では、
+Implementation Evidenceの正式フォーマットとしてJSONを使用し、
+`evidence/`配下へ保存する。
+
+関連するGit Diffは、
+実際のCode変更を検証するための補助Evidenceとして
+Implementation Evidenceと対応付けて保存する。
+
+Implementation Evidenceは、
+Review開始後に上書きせず、
+Correctionまたは再Implementationが行われた場合は、
+既存Evidenceを変更するのではなく、
+新しいImplementation Evidenceを生成する。
+
+これにより、
+
+Initial Implementation
+        ↓
+Implementation Evidence
+        ↓
+Review
+        ↓
+Correction / Re-Implementation
+        ↓
+New Implementation Evidence
+        ↓
+Re-Review
+
+という履歴を追跡可能にする。
+
+Phase 4の目的は、
+Implementationの適合性を最終判断することではなく、
+
+Phase 3で得られたImplementation Resultを、
+実際のRepositoryおよびTestの状態と結び付け、
+
+Specification
+        ↓
+Approved Implementation Plan
+        ↓
+Codex Prompt
+        ↓
+Implementation Result
+        ↓
+Repository / Test Verification
+        ↓
+Implementation Evidence
+        ↓
+Review Input
+
+という追跡可能なEvidence Chainを
+Application Layer上で成立させることである。
+
+Implementationの適合性、
+完全性、
+および承認範囲からの逸脱に関する最終的なReviewは、
+Phase 5で扱う。
+
+#### Scope
+
+Phase 4では、
+UC-08 `Collect Implementation Evidence`に必要な
+Application LayerのEvidence構築・保存処理を対象とする。
+
+本PhaseのScopeには、少なくとも以下を含む。
+
+- Phase 3で取得されたCodex RunnerのImplementation実行結果を受け取る
+- Evidence構築対象となるImplementationを識別する
+- 使用したSpecificationを識別する
+- 使用したApproved Implementation Planを識別する
+- 使用したCodex Promptを識別する
+- Implementation BranchおよびBase Commitを識別する
+- Codex Promptが対象SpecificationおよびApproved Implementation Planに対応していることを確認する
+- Codex Runnerから返された作成・変更・削除ファイルに関する情報を収集する
+- Codex Runnerから返されたCommand、Test Result、Error、Warning、未完了事項、およびHuman Approvalが必要な事項を収集する
+- 実際のSource Code、Git Status、Git Diff、Test Code、およびTest Resultを可能な範囲で取得する
+- Codex Runnerから返された実行結果と、実際のRepositoryおよびTestの状態を照合する
+- 作成・変更・削除されたファイルを実際のRepository状態から確認可能にする
+- Git Diffを取得または参照可能にする
+- 実行したTestおよびその結果を確認可能にする
+- TDD対象のImplementationについて、TDD実施状況をEvidenceから確認可能にする
+- Codex Runnerから返された情報と実際のRepositoryまたはTestの状態との不一致を検出する
+- 検出した不一致を、その内容に応じてError、Warning、Deviation、またはHuman Approvalが必要な事項として記録する
+- Specification、Approved Implementation Plan、Codex Prompt、Implementation Result、Repository状態、およびTest状態を相互に関連付ける
+- 第9章で定義されたRequired InformationおよびVersion 1 Formatに従ってImplementation Evidenceを構築する
+- Implementation EvidenceをJSON形式の正式記録として扱う
+- Implementation Evidenceを`evidence/`配下へ保存する
+- 関連するGit DiffをImplementation Evidenceに対応する補助Evidenceとして保存する
+- 関連するApproval Recordを識別可能な情報によってImplementation Evidenceと関連付ける
+- Review開始後のImplementation Evidenceを上書きしない
+- Correctionまたは再Implementationが行われた場合に、既存Evidenceを変更せず、新しいImplementation Evidenceを生成できる
+- 各Implementation Evidenceが、どのImplementationまたはCorrectionに対応するかを追跡可能にする
+- 構築したImplementation EvidenceおよびReviewに必要な関連情報をPhase 5へ渡せる状態にする
+
+Phase 4では、以下は実装対象外とする。
+
+- Implementationそのものの実行
+- Codex RunnerによるImplementation Scopeの拡張
+- Human Approvalの生成、推定、補完、または代替
+- ImplementationのSpecification適合性に関する最終判断
+- Implementationの完全性に関する最終判断
+- 承認範囲からの逸脱に関するReview結果の確定
+- `APPROVED`、`REVISION_REQUIRED`、`HUMAN_REVIEW_REQUIRED`等のReview Resultの決定
+- Correction Loopの実行
+- Final Approval
+- `developer` branchへのMerge
+
+これらのうち、
+Implementationの適合性、完全性、および承認範囲からの逸脱に関するReviewは、
+Phase 5 `Review & Correction`で扱う。
+
+Phase 4は、
+
+Implementation Result
+        ↓
+Repository / Test State Collection
+        ↓
+Result Verification
+        ↓
+Implementation Evidence Construction
+        ↓
+Evidence Persistence
+        ↓
+Review Input
+
+までを責務範囲とする。
+
+Application LayerはImplementation Evidenceを構築するが、
+Evidenceの内容からImplementationの適合性を最終判断してはならない。
+
+#### Implementation Targets
+
+##### Implementation Evidence Collection
+
+UC-08 `Collect Implementation Evidence`を実行する
+Application Layer Use Caseを実装する。
+
+このUse Caseは、
+Phase 3で取得されたImplementation実行結果と、
+Implementation Evidence構築に必要な関連情報を収集し、
+Review可能なImplementation Evidenceを構築するための
+入力情報を成立させる。
+
+少なくとも以下を行う。
+
+- Evidence構築対象となるImplementationを識別する
+- Phase 3で取得されたCodex RunnerのImplementation実行結果を受け取る
+- 対象Implementationで使用したSpecificationを識別する
+- 対象Implementationで使用したApproved Implementation Planを識別する
+- 対象Implementationで使用したCodex Promptを識別する
+- Implementation Branchを識別する
+- Base Commitを識別する
+- Source Codeに関する情報を取得する
+- Git Statusに関する情報を取得する
+- Git Diffに関する情報を取得する
+- Test Codeに関する情報を取得する
+- Test Resultに関する情報を取得する
+- 実行したCommandに関する情報を収集する
+- ErrorおよびWarningを収集する
+- 未完了事項を収集する
+- Human Approvalが必要な事項を収集する
+- 関連するApproval Recordを識別可能な情報を収集する
+- 使用したCodex Promptが、対象SpecificationおよびApproved Implementation Planに対応するPromptであることを確認可能な情報を保持する
+
+Codex Runnerから返された情報だけを
+Implementation Evidenceの根拠としてはならない。
+
+Application Layerは、
+Codex Runnerから返されたImplementation実行結果に加えて、
+可能な範囲で実際のRepositoryおよびTestの状態を取得し、
+後続の照合処理で両者を比較可能な状態にする。
+
+本処理では、
+収集された情報のみを根拠として
+ImplementationのSpecification適合性、
+完全性、
+または承認範囲からの逸脱に関する最終判断を行わない。
+
+これらのReview判断は、
+Phase 5 `Review & Correction`の責務とする。
+
+##### Repository and Test State Verification
+
+Implementation Evidenceを
+Codex Runnerの自己申告だけに依存させないため、
+
+Application Layerが、
+Codex Runnerから返されたImplementation実行結果と、
+実際のRepositoryおよびTestの状態を
+照合可能にする処理を実装する。
+
+少なくとも以下を行う。
+
+- 対象ImplementationのImplementation Branchを確認する
+- 対象ImplementationのBase Commitを確認する
+- 実際のGit Statusを取得または参照する
+- 実際のGit Diffを取得または参照する
+- 実際のSource Codeの状態を確認可能にする
+- 実際のTest Codeの状態を確認可能にする
+- 実行されたTestおよびTest Resultを確認可能にする
+- Codex Runnerが報告した作成ファイルと実際のRepository状態を照合する
+- Codex Runnerが報告した変更ファイルと実際のRepository状態を照合する
+- Codex Runnerが報告した削除ファイルと実際のRepository状態を照合する
+- Codex Runnerが報告したTest実行情報と実際のTest状態を照合する
+- Codex Runnerが報告したImplementation結果とGit Diffとの対応関係を確認可能にする
+- Git Diffから実際に行われたCode変更をReview工程で確認可能にする
+- RepositoryおよびTestの実状態を、後続のImplementation Evidence構築処理へ渡す
+
+Codex Runnerから返された情報と、
+実際のRepositoryまたはTestの状態に不一致が存在する場合、
+その不一致を無視してEvidenceを正常として扱ってはならない。
+
+不一致が検出された場合は、
+その内容を後続のEvidence構築処理へ渡し、
+
+- Error
+- Warning
+- Deviation
+- Human Approvalが必要な事項
+
+のいずれとして記録すべきかを
+内容に応じて扱える状態にする。
+
+RepositoryおよびTest State Verificationは、
+ImplementationがSpecificationまたは
+Approved Implementation Planに適合しているかを
+最終判断する処理ではない。
+
+本処理の責務は、
+
+Codex Runner Report
+        ↓
+Actual Repository / Test State
+        ↓
+Comparison
+        ↓
+Verified Information / Detected Inconsistency
+        ↓
+Implementation Evidence Construction
+
+という検証可能な情報経路を成立させることである。
+
+Implementationの適合性、
+完全性、
+および承認範囲からの逸脱に関する最終的な評価は、
+Phase 5 `Review & Correction`で行う。
+
+##### Implementation Evidence Structure and Serialization
+
+収集・照合されたImplementation情報を、
+第9章で定義されたVersion 1の形式に従って
+Implementation Evidenceとして構造化する処理を実装する。
+
+Version 1のImplementation Evidenceは、
+少なくとも以下の主要ブロックを持つ。
+
+- identity
+- basis
+- scope
+- changes
+- verification
+- deviations
+- codex_summary
+
+`identity`では、
+対象となるImplementationを識別可能にする。
+
+少なくとも以下を保持する。
+
+- implementation_id
+- created_at
+- status
+
+`basis`では、
+Implementationが何を根拠として実行されたかを
+追跡可能にする。
+
+少なくとも以下を保持する。
+
+- Specificationのpathおよびhash
+- Approved Implementation Planのpathおよびhash
+- Codex Promptのpathおよびhash
+
+`scope`では、
+承認されたImplementation Scopeを記録する。
+
+少なくとも以下を保持する。
+
+- target_paths
+- allowed_changes
+- forbidden_changes
+
+`changes`では、
+実際に行われた変更を記録する。
+
+少なくとも以下を保持する。
+
+- created_files
+- modified_files
+- deleted_files
+- git_diff_path
+- change_summary
+
+`verification`では、
+Implementation後に実施された検証を記録する。
+
+少なくとも以下を保持する。
+
+- commands
+- tests_created_or_modified
+- target_test_result
+- full_test_result
+- errors
+- warnings
+
+`deviations`では、
+承認されたScopeとの不一致および
+未解決事項を記録する。
+
+少なくとも以下を保持する。
+
+- out_of_scope_changes
+- unplanned_changes
+- unfinished_items
+- human_approval_required
+
+`codex_summary`では、
+Codex Runnerから返されたImplementation実行結果を、
+実際のRepositoryおよびTestの状態とは区別したうえで
+追跡可能な形で保持する。
+
+Implementation Evidenceには、
+第9章で定義されたRequired Informationとして、
+必要に応じて以下も関連付ける。
+
+- 関連するApproval Recordの識別情報
+- Implementationの実行開始・終了に関する情報
+- Error
+- Warning
+- 未完了事項
+- Human Approvalが必要な事項
+
+Humanによる承認・判断そのものの正式な証拠は、
+Implementation Evidenceへ重複して保存しない。
+
+Human Approvalの正式記録は、
+`approvals/*.json`に保存されたApproval Recordを正本とし、
+Implementation Evidenceから必要なApproval Recordを
+識別・参照可能にする。
+
+Version 1では、
+Implementation Evidenceの正式フォーマットとしてJSONを使用する。
+
+Application Layerは、
+構築したImplementation Evidenceを
+安定してJSONへSerializationできるようにする。
+
+SerializationされたJSONから、
+Implementation Evidenceの構造および内容を
+失うことなく復元可能な形式を使用する。
+
+Human向けMarkdownまたはLogを
+Implementation Evidenceの正式記録として
+JSONと二重管理しない。
+
+Implementation Evidenceの構造化およびSerializationは、
+Evidenceに記録された内容から
+Implementationの適合性を最終判断する責務を持たない。
+
+本処理の責務は、
+
+Collected / Verified Information
+        ↓
+Evidence Structure
+        ↓
+JSON Serialization
+        ↓
+Persistable Implementation Evidence
+
+という、
+機械的に保存・参照・比較可能な
+Implementation Evidenceを成立させることである。
+
+##### Evidence Persistence and Git Diff
+
+構築されたImplementation Evidenceおよび
+関連するGit Diffを、
+後続のReview工程から安定して参照できるように
+保存・取得する処理を実装する。
+
+Version 1では、
+Implementation Evidenceを
+`evidence/`配下へ保存する。
+
+Implementation Evidenceの正式記録は
+JSON形式とする。
+
+関連するGit Diffは、
+実際のCode変更を検証するための補助Evidenceとして、
+対応するImplementation Evidenceと関連付けて保存する。
+
+概念的な保存構造は、以下とする。
+
+projects/specflow/
+└── evidence/
+    ├── implementation_001.json
+    ├── implementation_001.diff
+    ├── implementation_002.json
+    └── implementation_002.diff
+
+少なくとも以下を行う。
+
+- 構築されたImplementation EvidenceをJSONとして保存できる
+- 保存されたImplementation Evidenceを取得できる
+- 保存されたJSONからImplementation Evidenceを復元できる
+- Implementation Evidenceに対応するGit Diffを保存できる
+- Implementation Evidenceから対応するGit Diffを識別・参照できる
+- Git Diffが、どのImplementation Evidenceに対応する補助Evidenceであるかを追跡できる
+- 各Implementation Evidenceを一意に識別可能にする
+- Initial ImplementationとCorrectionまたは再ImplementationによるEvidenceを区別可能にする
+- 既存のImplementation Evidenceを保持したまま、新しいImplementation Evidenceを追加保存できる
+- 後続のReview工程から対象Implementation Evidenceおよび関連Git Diffを取得できる
+
+JSONをImplementation Evidenceの正本として扱う。
+
+Git Diffは、
+Implementation Evidenceそのものの代替ではなく、
+Evidenceに記録された変更内容と
+実際のCode変更を照合するための
+補助Evidenceとして扱う。
+
+Human向けMarkdownまたは`log.txt`を、
+Implementation Evidenceの正式記録として
+JSONと二重保存しない。
+
+Human-readableな表示が必要となる場合は、
+保存されたJSONからUI等によって
+表示用データを生成することを前提とする。
+
+Review開始後は、
+対象となるImplementation Evidenceを
+上書きしてはならない。
+
+Correctionまたは再Implementationが行われた場合は、
+既存Evidenceを更新するのではなく、
+新しいImplementation Evidenceおよび
+対応するGit Diffを生成・保存する。
+
+概念的には、以下の関係を保持する。
+
+Initial Implementation
+        ↓
+implementation_001.json
+implementation_001.diff
+        ↓
+Review
+        ↓
+Correction 1
+        ↓
+implementation_002.json
+implementation_002.diff
+        ↓
+Re-Review
+
+これにより、
+Initial Implementationから
+各CorrectionおよびRe-ReviewまでのEvidenceを失わず、
+Implementation履歴を追跡可能にする。
+
+Evidence Persistence処理は、
+保存されたEvidenceの内容から
+Implementationの適合性を判断する責務を持たない。
+
+本処理の責務は、
+
+Implementation Evidence
+        +
+Related Git Diff
+        ↓
+Persistence
+        ↓
+Stable Retrieval
+        ↓
+Review Input
+
+という、
+後続工程から再現・参照可能な
+Evidence保存基盤を成立させることである。
+
+##### TDD Evidence
+
+TDD対象となるImplementationについて、
+TDDが定められた手順に従って実施されたことを
+後続のReview工程から確認可能にするため、
+TDDに関する実行情報をImplementation Evidenceへ記録する。
+
+TDD対象のImplementationでは、
+少なくとも以下を確認可能な形で保持する。
+
+- tests_created_or_modified
+- test_commands
+- initial_test_result
+- target_test_result
+- full_test_result
+
+`tests_created_or_modified`では、
+対象Implementationのために
+作成または変更されたTestを識別可能にする。
+
+`test_commands`では、
+TDDおよびImplementation後の検証において
+実際に実行されたTest Commandを記録する。
+
+`initial_test_result`では、
+必要に応じてImplementation前に確認した
+期待されるTest失敗を記録する。
+
+期待されるTDD上のTest失敗は、
+Technical ErrorまたはImplementation Failureと
+混同してはならない。
+
+`target_test_result`では、
+対象Implementationに対応するTestの
+Implementation後の結果を記録する。
+
+`full_test_result`では、
+必要な既存Testを含む
+全体Testの実行結果を記録する。
+
+TDD対象外のImplementationについても、
+TDDを適用しなかったこと、および
+必要に応じてその理由を
+Implementation Evidenceから確認可能にする。
+
+TDDの適用が技術的に困難、
+または合理的でない場合に、
+Codex Runnerが独自判断でTDDを省略したものとして
+正常なEvidenceを成立させてはならない。
+
+その場合は、
+TDDを実施できなかった理由をEvidenceへ記録し、
+必要に応じてHumanまたは後続のReview工程へ
+判断を渡せる状態にする。
+
+Test Resultが`PASS`であることのみを根拠として、
+ImplementationがSpecificationまたは
+Approved Implementation Planに適合していると
+Phase 4で判断してはならない。
+
+同様に、
+Test Resultが`FAIL`であることのみを根拠として、
+Phase 4がCorrection Loopを開始してはならない。
+
+Phase 4におけるTDD Evidenceの責務は、
+
+TDD Requirement
+        ↓
+Test Creation / Modification
+        ↓
+Initial Test Result
+        ↓
+Implementation
+        ↓
+Target Test Result
+        ↓
+Full Test Result
+        ↓
+Implementation Evidence
+
+という実行経路を
+後続のReview工程から検証可能にすることである。
+
+TDDの適切性、
+Testの必要十分性、
+Implementationとの対応関係、
+およびTest Resultを含むImplementation全体の適合性は、
+Phase 5 `Review & Correction`で評価する。
+
+##### Evidence Inconsistency Handling
+
+Codex Runnerから返されたImplementation実行結果と、
+実際のRepositoryまたはTestの状態との間に
+不一致またはEvidence不足が存在する場合に、
+
+その事実を失わずImplementation Evidenceへ反映し、
+後続のReview工程から確認可能にする処理を実装する。
+
+少なくとも以下の不一致または不足を
+検出・記録可能にする。
+
+- Codex Runnerが報告した作成ファイルと実際のRepository状態が一致しない
+- Codex Runnerが報告した変更ファイルと実際のRepository状態が一致しない
+- Codex Runnerが報告した削除ファイルと実際のRepository状態が一致しない
+- Codex Runnerが報告していない変更がGit Diffに存在する
+- Codex Runnerが報告した変更がGit Diffから確認できない
+- Codex Runnerが報告したTest実行情報と実際のTest Resultが一致しない
+- 必要なGit Statusを取得または参照できない
+- 必要なGit Diffを取得または参照できない
+- 必要なTest Resultを取得または確認できない
+- Evidence構築に必要なSpecificationを識別できない
+- Evidence構築に必要なApproved Implementation Planを識別できない
+- Evidence構築に必要なCodex Promptを識別できない
+- Codex Promptと対象SpecificationまたはApproved Implementation Planとの対応関係を確認できない
+- Implementation BranchまたはBase Commitを識別できない
+- その他、Reviewに必要なEvidenceが不足または矛盾している
+
+検出された不一致または不足を、
+無視、削除、または正常な情報として補完してはならない。
+
+内容に応じて、
+
+- Error
+- Warning
+- Deviation
+- Human Approvalが必要な事項
+
+としてImplementation Evidenceから
+確認可能な形で保持する。
+
+Application Layerは、
+Evidenceに不足または不一致が存在することを
+検出・記録できるが、
+
+その事実だけを根拠として
+Implementationの最終的な適合性判断を行ってはならない。
+
+また、
+不足しているEvidenceを推測によって生成したり、
+Codex Runnerの自己申告によって補完したりしてはならない。
+
+Humanによる判断が必要な不一致または不足については、
+`human_approval_required`として
+後続工程へ引き渡せる状態にする。
+
+Evidence Inconsistency Handlingは、
+
+Runner Report
+        +
+Actual Repository / Test State
+        ↓
+Comparison
+        ↓
+Mismatch / Missing Evidence Detection
+        ↓
+Error / Warning / Deviation /
+Human Approval Required
+        ↓
+Implementation Evidence
+        ↓
+Review
+
+という情報経路を成立させる。
+
+不一致またはEvidence不足が、
+Specification違反、
+Approved Implementation Planからの逸脱、
+Correction対象、
+またはHuman Review対象に該当するかという
+最終的な評価は、
+
+Phase 5 `Review & Correction`で行う。
+
+##### Evidence Immutability and Traceability
+
+Implementation Evidenceの履歴を保持し、
+Initial ImplementationからCorrection、
+Re-Implementation、およびRe-Reviewまでを
+追跡可能にする処理を実装する。
+
+Reviewが開始されたImplementation Evidenceは、
+その後の処理によって上書きまたは置換してはならない。
+
+CorrectionまたはRe-Implementationが行われた場合は、
+既存のImplementation Evidenceを変更するのではなく、
+新しいImplementation Evidenceを生成する。
+
+少なくとも以下を可能にする。
+
+- 各Implementation Evidenceを識別可能にする
+- 各Evidenceが対象とするImplementationを識別可能にする
+- Initial Implementationに対応するEvidenceを保持する
+- Correction後のImplementationに対応する新しいEvidenceを保持する
+- Re-Implementationに対応する新しいEvidenceを保持する
+- 各Evidenceに対応するGit Diffを識別可能にする
+- 各Evidenceが使用したSpecificationを追跡可能にする
+- 各Evidenceが使用したApproved Implementation Planを追跡可能にする
+- 各Evidenceが使用したCodex Promptを追跡可能にする
+- 関連するApproval Recordを識別可能にする
+- Implementationの実行開始・終了に関する情報を追跡可能にする
+- Initial ImplementationとCorrectionまたはRe-ImplementationによるEvidenceを区別可能にする
+- 後続のReview工程が、対象とするEvidenceを明確に識別できるようにする
+- 過去のEvidenceを保持したまま、新しいEvidenceを追加できるようにする
+
+概念的には、以下の履歴を保持する。
+
+Initial Implementation
+        ↓
+implementation_001.json
+implementation_001.diff
+        ↓
+Review
+        ↓
+Correction 1
+        ↓
+implementation_002.json
+implementation_002.diff
+        ↓
+Re-Review
+        ↓
+Correction 2
+        ↓
+implementation_003.json
+implementation_003.diff
+        ↓
+Re-Review
+
+このとき、
+`implementation_002.json`を生成するために
+`implementation_001.json`を変更してはならない。
+
+同様に、
+後続のCorrectionまたはRe-Implementationによって
+過去のEvidenceおよび対応するGit Diffを
+上書きしてはならない。
+
+各Implementation Evidenceは、
+その時点で実際に行われたImplementationと
+RepositoryおよびTestの状態を表す
+独立したEvidenceとして扱う。
+
+Evidence間の追跡可能性を確保するために、
+少なくとも、
+
+- implementation_id
+- 対象Implementationを識別する情報
+- 関連するSpecification
+- 関連するApproved Implementation Plan
+- 関連するCodex Prompt
+- 関連するGit Diff
+- 関連するApproval Record
+
+を用いて、
+各Evidenceの根拠および関連Artifactを
+識別可能にする。
+
+ただし、
+Human Approvalの正式な記録そのものを
+Implementation Evidenceへ複製してはならない。
+
+Human Approvalの正本はApproval Recordとし、
+Implementation Evidenceでは
+必要なApproval Recordを識別・参照可能にする。
+
+Evidence Immutability and Traceabilityの責務は、
+
+Implementation
+        ↓
+Evidence N
+        ↓
+Review
+        ↓
+Correction / Re-Implementation
+        ↓
+Evidence N+1
+        ↓
+Re-Review
+
+という履歴を失わず、
+
+「どのImplementationに対して、
+どのEvidenceが生成され、
+何を根拠としてReviewされたか」
+
+を後から追跡可能にすることである。
+
+本処理は、
+過去Evidenceと新しいEvidenceを比較して
+どちらがSpecificationに適合しているかを
+最終判断する責務を持たない。
+
+その評価は、
+Phase 5 `Review & Correction`で行う。
+
+##### DTO and Application Layer Interface
+
+UC-08 `Collect Implementation Evidence`を
+Application Layerから一貫した方法で実行できるように、
+
+Implementation Evidence構築に必要なInputおよびOutputを
+Application LayerのInterfaceとして扱えるようにする。
+
+Inputでは、
+少なくとも以下の情報を受け取る、
+またはApplication Layerから識別・取得可能にする。
+
+- 対象Implementationを識別する情報
+- Codex Prompt
+- Codex RunnerのImplementation実行結果
+- Specification
+- Approved Implementation Plan
+- Implementation Branch
+- Base Commit
+- Source Codeに関する情報
+- Git Statusに関する情報
+- Git Diffに関する情報
+- Test Codeに関する情報
+- Test Resultに関する情報
+- 実行したCommandに関する情報
+- Error
+- Warning
+- 未完了事項
+- Human Approvalが必要な事項
+- 関連するApproval Recordを識別する情報
+
+Application Layerは、
+Inputとして渡された情報と、
+実際のRepositoryおよびTestから取得した情報を
+区別して扱えるようにする。
+
+Outputでは、
+少なくとも以下を後続処理から利用可能にする。
+
+- 構築されたImplementation Evidence
+- Implementation Evidenceを識別する情報
+- 関連するGit Diff
+- Evidence構築結果
+- Evidenceの不足に関する情報
+- Evidenceの不一致に関する情報
+- Human Approvalが必要な事項
+
+InputおよびOutputは、
+Application Layerとその外部との境界を
+明確に表現できる構造として定義する。
+
+Application LayerのInterfaceは、
+Infrastructure固有の保存形式、
+Git操作の具体的実装、
+またはRunner固有の内部実装へ
+直接依存しないようにする。
+
+Repository、
+Git、
+Test実行環境、
+およびEvidence保存処理の具体的な実装は、
+Application Layerから利用可能な抽象を介して扱う。
+
+Codex Runnerから返されたImplementation実行結果を、
+そのままImplementation Evidenceとして
+Outputしてはならない。
+
+Application Layerは、
+
+Runner Result
+        +
+Actual Repository / Test State
+        ↓
+Collection / Verification
+        ↓
+Implementation Evidence Construction
+        ↓
+Persistence
+        ↓
+Application Layer Output
+
+という処理を調整する。
+
+DTOまたはApplication Layer Interfaceは、
+Human Approvalを生成、
+推定、
+補完、
+または代替する機能を持たない。
+
+また、
+Implementation Evidenceの構築結果を根拠として、
+ImplementationのSpecification適合性、
+完全性、
+またはReview Resultを
+Application Layer Interface自身が決定してはならない。
+
+具体的なDTO名、
+Use Case名、
+Repository abstraction名、
+およびInfrastructure implementation名については、
+
+既存のApplication Layerの命名規則および
+Specificationで定義された責務との整合性を維持し、
+Implementation時に新たな仕様を導入しない範囲で決定する。
+
+本Interfaceの責務は、
+
+Phase 3 Implementation Result
+        ↓
+Phase 4 Application Layer
+        ↓
+Implementation Evidence
+        ↓
+Phase 5 Review Input
+
+というApplication Layer上の境界を
+明確に成立させることである。
+
+##### Phase 5 Review Handoff
+
+Phase 4で構築・保存されたImplementation Evidenceおよび
+関連するArtifactを、
+Phase 5 `Review & Correction`から
+検証可能な状態で利用できるようにする。
+
+Phase 5へのReview Inputとして、
+少なくとも以下を識別・参照可能にする。
+
+- Specification
+- Approved Implementation Plan
+- Codex Prompt
+- Implementation Evidence
+- Source Code
+- Git Diff
+- Test Code
+- Test Result
+
+必要に応じて、
+以下についてもReview工程から確認可能にする。
+
+- Implementation Branch
+- Base Commit
+- Git Status
+- 実行したCommand
+- Error
+- Warning
+- Evidenceの不足に関する情報
+- Evidenceの不一致に関する情報
+- 未完了事項
+- Human Approvalが必要な事項
+- 関連するApproval Recordを識別する情報
+
+Phase 5へ渡すImplementation Evidenceは、
+Codex Runnerの自己申告だけから構築されたものではなく、
+
+Codex Runner Result
+        +
+Actual Repository State
+        +
+Actual Test State
+        ↓
+Collection / Verification
+        ↓
+Implementation Evidence
+
+というPhase 4の処理を経たものとする。
+
+ただし、
+Phase 5はImplementation Evidenceの内容だけを根拠として
+Reviewを完結してはならない。
+
+Review工程から、
+
+- Specification
+- Approved Implementation Plan
+- Codex Prompt
+- Source Code
+- Git Diff
+- Test Code
+- Test Result
+
+をImplementation Evidenceと比較できる状態を維持する。
+
+Implementation Evidenceに
+`out_of_scope_changes`が存在しないと記録されていても、
+実際のGit DiffまたはSource Codeから
+承認範囲外の変更が確認される可能性を排除しない。
+
+同様に、
+Implementation Evidence上ではImplementationが完了していても、
+SpecificationまたはApproved Implementation Planで要求された内容が
+Source Code、Git Diff、またはTestから確認できない可能性を排除しない。
+
+これらの判断は、
+Phase 4で確定するのではなく、
+Phase 5のReviewによって行う。
+
+Phase 4は、
+Phase 5がReviewに必要なArtifactおよびEvidenceを
+識別・取得・比較できる状態を成立させるところまでを責務とする。
+
+Phase 4では、
+
+- `APPROVED`
+- `REVISION_REQUIRED`
+- `HUMAN_REVIEW_REQUIRED`
+
+等のReview Resultを決定しない。
+
+また、
+
+- Correctionの開始
+- Correction回数の更新
+- Re-Reviewの実行
+- Final Approvalへの遷移
+- `developer` branchへのMerge
+
+を実行しない。
+
+これらは後続Phaseの責務とする。
+
+Phase 4とPhase 5の境界は、
+
+Implementation Execution
+        ↓
+Implementation Result
+        ↓
+Phase 4
+Evidence Collection / Verification
+        ↓
+Implementation Evidence
+        +
+Actual Artifacts / Test Results
+        ↓
+Phase 5
+Review & Correction
+
+とする。
+
+Phase 4の完了とは、
+Implementationが適合していると判断された状態ではなく、
+
+Phase 5が、
+Implementation Evidenceと実際のArtifactおよびTest Resultを用いて
+ImplementationをReviewできる状態が成立したことを意味する。
+
+
+#### Tests
+
+##### Implementation Evidence Collection
+
+少なくとも以下をTest対象とする。
+
+- UC-08 `Collect Implementation Evidence`をApplication Layerから実行できること
+- Phase 3で取得されたCodex RunnerのImplementation実行結果を受け取れること
+- Evidence構築対象となるImplementationを識別できること
+- 対象Implementationで使用したSpecificationを識別できること
+- 対象Implementationで使用したApproved Implementation Planを識別できること
+- 対象Implementationで使用したCodex Promptを識別できること
+- Implementation Branchを識別できること
+- Base Commitを識別できること
+- Source Codeに関する情報を取得または後続処理へ渡せること
+- Git Statusに関する情報を取得または後続処理へ渡せること
+- Git Diffに関する情報を取得または後続処理へ渡せること
+- Test Codeに関する情報を取得または後続処理へ渡せること
+- Test Resultに関する情報を取得または後続処理へ渡せること
+- 実行したCommandに関する情報を収集できること
+- ErrorおよびWarningを収集できること
+- 未完了事項を収集できること
+- Human Approvalが必要な事項を収集できること
+- 関連するApproval Recordを識別可能な情報を収集できること
+- Codex Promptと対象SpecificationおよびApproved Implementation Planとの対応関係を確認可能な情報を保持できること
+- Codex Runnerから返された情報と、実際のRepositoryおよびTestから取得した情報を区別して扱えること
+- Codex Runnerから返された情報だけを根拠としてImplementation Evidenceを正常なEvidenceとして確定しないこと
+- Evidence収集処理がImplementationのSpecification適合性を最終判断しないこと
+- Evidence収集処理がReview Resultを決定しないこと
+
+##### Repository and Test State Verification
+
+少なくとも以下をTest対象とする。
+
+- 対象ImplementationのImplementation Branchを確認できること
+- 対象ImplementationのBase Commitを確認できること
+- 実際のGit Statusを取得または参照できること
+- 実際のGit Diffを取得または参照できること
+- 実際のSource Codeの状態を確認可能であること
+- 実際のTest Codeの状態を確認可能であること
+- 実行されたTestおよびTest Resultを確認可能であること
+- Codex Runnerが報告した作成ファイルと実際のRepository状態を照合できること
+- Codex Runnerが報告した変更ファイルと実際のRepository状態を照合できること
+- Codex Runnerが報告した削除ファイルと実際のRepository状態を照合できること
+- Codex Runnerが報告したTest実行情報と実際のTest状態を照合できること
+- Codex Runnerが報告したImplementation結果とGit Diffとの対応関係を確認可能であること
+- Git Diffから実際に行われたCode変更を確認可能であること
+- RepositoryおよびTestの実状態を後続のImplementation Evidence構築処理へ渡せること
+- Codex Runnerから返された情報と実際のRepository状態が一致しない場合、その不一致を検出できること
+- Codex Runnerから返された情報と実際のTest状態が一致しない場合、その不一致を検出できること
+- 検出された不一致を無視して正常な照合結果として扱わないこと
+- 検出された不一致を後続のEvidence構築処理へ渡せること
+- RepositoryまたはTestの実状態を取得できない場合、その不足を正常な情報として補完しないこと
+- Repository and Test State VerificationがImplementationのSpecification適合性を最終判断しないこと
+- Repository and Test State VerificationがReview Resultを決定しないこと
+
+##### Evidence Structure and Serialization
+
+少なくとも以下をTest対象とする。
+
+- 収集・照合されたImplementation情報からVersion 1のImplementation Evidenceを構築できること
+- Implementation Evidenceが`identity`ブロックを保持できること
+- `identity`が少なくとも`implementation_id`、`created_at`、`status`を保持できること
+- Implementation Evidenceが`basis`ブロックを保持できること
+- `basis`がSpecificationのpathおよびhashを保持できること
+- `basis`がApproved Implementation Planのpathおよびhashを保持できること
+- `basis`がCodex Promptのpathおよびhashを保持できること
+- Implementation Evidenceが`scope`ブロックを保持できること
+- `scope`が少なくとも`target_paths`、`allowed_changes`、`forbidden_changes`を保持できること
+- Implementation Evidenceが`changes`ブロックを保持できること
+- `changes`が少なくとも`created_files`、`modified_files`、`deleted_files`、`git_diff_path`、`change_summary`を保持できること
+- Implementation Evidenceが`verification`ブロックを保持できること
+- `verification`が少なくとも`commands`、`tests_created_or_modified`、`target_test_result`、`full_test_result`、`errors`、`warnings`を保持できること
+- Implementation Evidenceが`deviations`ブロックを保持できること
+- `deviations`が少なくとも`out_of_scope_changes`、`unplanned_changes`、`unfinished_items`、`human_approval_required`を保持できること
+- Implementation Evidenceが`codex_summary`ブロックを保持できること
+- `codex_summary`に保持されたCodex Runnerの情報と、実際のRepositoryおよびTestから取得した情報を区別できること
+- 関連するApproval Recordを識別可能な情報を保持できること
+- Implementationの実行開始・終了に関する情報を保持できること
+- Human Approvalの正式記録そのものをImplementation Evidenceへ複製しないこと
+- Approval RecordをHuman Approvalの正本として参照可能であること
+- Implementation EvidenceをJSONへSerializationできること
+- SerializationされたJSONからImplementation Evidenceを復元できること
+- Serializationと復元を行っても必要なEvidence情報が失われないこと
+- JSONをVersion 1のImplementation Evidenceの正式記録として扱えること
+- Human向けMarkdownまたはLogをJSONと並ぶ別の正式記録として生成することを必須としないこと
+- Evidenceの構造化またはSerialization処理がImplementationのSpecification適合性を最終判断しないこと
+- Evidenceの構造化またはSerialization処理がReview Resultを決定しないこと
+
+##### Evidence Persistence and Retrieval
+
+少なくとも以下をTest対象とする。
+
+- Implementation Evidenceを`evidence/`配下へJSONとして保存できること
+- Implementation Evidenceごとに識別可能な保存先を決定できること
+- 保存されたImplementation Evidenceを後から取得できること
+- 保存されたJSONからImplementation Evidenceを復元できること
+- 保存前と取得・復元後で必要なEvidence情報が失われないこと
+- Git DiffをImplementation Evidenceに関連する補助証跡として保存できること
+- Implementation Evidenceから関連するGit Diffの保存先を識別できること
+- 保存されたGit Diffを後から取得または参照できること
+- Evidence JSONとGit Diffの対応関係を確認できること
+- Implementation Evidenceの`changes.git_diff_path`から対応するGit Diffを識別できること
+- Git DiffをImplementation Evidence JSONの代替となる正式記録として扱わないこと
+- Implementation Evidence JSONをVersion 1の正式なEvidence記録として扱うこと
+- Evidence保存時に既存のImplementation Evidenceを意図せず上書きしないこと
+- CorrectionまたはReimplementationにより新しいEvidenceが必要な場合、既存Evidenceとは別のEvidenceとして保存できること
+- Evidence保存処理に失敗した場合、保存成功として扱わないこと
+- Git Diffの保存または取得に失敗した場合、その不足を正常な証跡として補完しないこと
+- 保存されたEvidenceおよびGit DiffをPhase 5 Reviewへ渡せること
+- Evidence Persistence処理がImplementationのSpecification適合性を最終判断しないこと
+- Evidence Persistence処理がReview Resultを決定しないこと
+
+##### TDD Evidence
+
+少なくとも以下をTest対象とする。
+
+- TDD対象となるImplementationについて、TDD実施状況をImplementation Evidenceへ記録できること
+- 作成または変更されたTestを`tests_created_or_modified`として記録できること
+- Test実行に使用したCommandを記録できること
+- TDDにおける初期Test Resultを`initial_test_result`として記録できること
+- 対象Testの最終結果を`target_test_result`として記録できること
+- Full Test Suiteの結果を`full_test_result`として記録できること
+- Test ResultについてPASS、FAIL、Technical Errorを区別可能な情報を保持できること
+- 初期Test Resultと最終Test Resultを区別して保持できること
+- 対象Testの結果とFull Test Suiteの結果を区別して保持できること
+- TDDに関する情報を後からPhase 5 Reviewで確認可能であること
+- TDDが要求される変更について、TDD Evidenceが不足している場合、その不足を確認可能な状態で記録できること
+- TDDを適用しなかった場合、その理由を記録可能であること
+- Codex Runnerが独自判断でTDDを省略したことを正常なTDD実施として扱わないこと
+- TDDを適用しなかった理由についてHumanの判断が必要な場合、`human_approval_required`へ反映可能であること
+- Codex Runnerから報告されたTest Resultだけでなく、実際に確認されたTest ResultをEvidenceへ反映できること
+- Test Resultを取得できない場合、推測によってPASSまたはFAILとして補完しないこと
+- TDD Evidenceの不足または不一致を無視して正常なEvidenceとして扱わないこと
+- TDD Evidenceの収集・記録処理がImplementationのSpecification適合性を最終判断しないこと
+- TDD Evidenceの収集・記録処理がReview Resultを決定しないこと
+
+##### Evidence Inconsistency Handling
+
+少なくとも以下をTest対象とする。
+
+- Codex Runnerの報告と実際のRepository状態との不一致をImplementation Evidenceへ記録できること
+- Codex Runnerの報告と実際のTest状態との不一致をImplementation Evidenceへ記録できること
+- Specification、Approved Implementation Plan、Codex Promptの対応関係に不一致がある場合、その不一致を記録できること
+- Implementation BranchまたはBase Commitに不一致がある場合、その不一致を記録できること
+- Git StatusまたはGit Diffから想定外の変更が確認された場合、その内容を記録できること
+- 許可されたScope外の変更を`out_of_scope_changes`として記録できること
+- Approved Implementation Planにない変更を`unplanned_changes`として記録できること
+- 未完了のImplementation項目を`unfinished_items`として記録できること
+- Humanの判断が必要な事項を`human_approval_required`として記録できること
+- Evidence構築に必要な情報が不足している場合、その不足を確認可能な形で記録できること
+- RepositoryまたはTestの実状態を取得できない場合、その取得不能をEvidence上で確認できること
+- ErrorとWarningを区別して記録できること
+- Deviationとして扱う情報を他の通常情報と区別して保持できること
+- 不一致または不足が存在する場合、それを正常な情報へ置き換えないこと
+- 不一致または不足が存在する場合、それをEvidenceから削除または隠蔽しないこと
+- 不明な情報を推測によって補完しないこと
+- Codex Runnerの自己申告によって実際のRepositoryまたはTestとの不一致を解消済みとして扱わないこと
+- 不一致または不足を保持したImplementation EvidenceをPhase 5 Reviewへ渡せること
+- 不一致の検出だけを理由としてPhase 4が`PASS`、`REVISION_REQUIRED`、`HUMAN_REVIEW_REQUIRED`等のReview Resultを決定しないこと
+- 不一致の検出だけを理由としてApplication LayerがHuman Approvalを代替しないこと
+- Evidence Inconsistency HandlingがImplementationのSpecification適合性を最終判断しないこと
+
+##### Evidence Immutability and Traceability
+
+少なくとも以下をTest対象とする。
+
+- Implementation Evidenceを一意に識別できること
+- 保存されたImplementation Evidenceから対象Implementationを識別できること
+- Implementation Evidenceから基礎となったSpecificationを識別できること
+- Implementation Evidenceから基礎となったApproved Implementation Planを識別できること
+- Implementation Evidenceから基礎となったCodex Promptを識別できること
+- Implementation EvidenceからImplementation BranchおよびBase Commitを識別できること
+- Implementation Evidenceから関連するGit Diffを識別できること
+- Implementation Evidenceから関連するApproval Recordを識別可能であること
+- Reviewに使用されたImplementation Evidenceを後から上書きしないこと
+- Reviewに使用されたImplementation Evidenceの内容を後から変更しないこと
+- Review開始後にEvidenceの不足または誤りが判明しても、既存Evidenceを修正して履歴を置き換えないこと
+- Correction後には既存Evidenceを更新するのではなく、新しいImplementation Evidenceを生成できること
+- Reimplementation後には既存Evidenceを更新するのではなく、新しいImplementation Evidenceを生成できること
+- Correction前のImplementation Evidenceを履歴として保持できること
+- Reimplementation前のImplementation Evidenceを履歴として保持できること
+- 複数のImplementation Evidenceが存在する場合、それぞれを独立したEvidenceとして識別できること
+- 新旧のImplementation Evidence間の関係を追跡可能な情報を保持できること
+- 新しいImplementation Evidenceから、それがどのImplementation、CorrectionまたはReimplementationに対応するか確認可能であること
+- Evidence履歴をたどることでImplementationの変更経過を確認可能であること
+- EvidenceのTraceabilityを維持したままPhase 5 Reviewへ必要なEvidenceを渡せること
+- 過去のEvidenceを新しいEvidenceで置き換えたように扱わないこと
+- EvidenceのImmutabilityを理由としてCorrectionまたはReimplementation後の新しいEvidence生成を妨げないこと
+- Evidence Immutability and Traceability処理がImplementationのSpecification適合性を最終判断しないこと
+- Evidence Immutability and Traceability処理がReview Resultを決定しないこと
+
+##### Application Layer Interface and Review Handoff
+
+少なくとも以下をTest対象とする。
+
+- UC-08 `Collect Implementation Evidence`をApplication LayerのUseCaseとして呼び出せること
+- UC-08のInput DTOを通じてEvidence構築に必要な入力を受け取れること
+- Input DTOがApplication Layerと外部境界の情報受け渡しに利用できること
+- Evidence収集、RepositoryおよびTest状態の確認、Evidence構築、保存をApplication Layerからオーケストレーションできること
+- Infrastructureの具体的な永続化実装へApplication Layerが直接依存しないこと
+- Gitに関する具体的な取得処理へApplication Layerが不適切に直接依存しないこと
+- CoreからApplication Layerへの逆依存を導入しないこと
+- Phase 4で構築されたImplementation EvidenceをOutput DTOまたは同等のApplication Layer境界を通じて返せること
+- Phase 5 Reviewが対象Implementation Evidenceを識別できること
+- Phase 5 Reviewが対象Specificationを識別または取得可能であること
+- Phase 5 Reviewが対象Approved Implementation Planを識別または取得可能であること
+- Phase 5 Reviewが対象Codex Promptを識別または取得可能であること
+- Phase 5 Reviewが対象Source Codeを確認可能であること
+- Phase 5 Reviewが対象Git Diffを確認可能であること
+- Phase 5 Reviewが対象Test Codeを確認可能であること
+- Phase 5 Reviewが対象Test Resultを確認可能であること
+- Phase 5 ReviewがEvidence上のError、Warning、Deviation、未完了事項およびHuman Approval Required事項を確認可能であること
+- Phase 5 ReviewへImplementation Evidenceだけでなく、Reviewに必要な実際のArtifactを確認可能な形で引き渡せること
+- Evidenceが不足または不整合を含む場合でも、その事実を保持したままPhase 5 Reviewへ引き渡せること
+- Phase 4からPhase 5へのHandoff時にEvidenceの内容をReview用に都合よく変更しないこと
+- Phase 4からPhase 5へのHandoffがImplementationのSpecification適合性を最終判断しないこと
+- Phase 4からPhase 5へのHandoffが`PASS`、`REVISION_REQUIRED`、`HUMAN_REVIEW_REQUIRED`等のReview Resultを決定しないこと
+- Phase 4からPhase 5へのHandoffがHuman Approvalを代替しないこと
+- Phase 4完了時点で、Phase 5がSpecification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、Source Code、Git Diff、Test CodeおよびTest Resultを用いてReviewを開始可能であること
+
+#### Completion Conditions
+
+Phase 4は、少なくとも以下の条件をすべて満たした場合に完了とする。
+
+- UC-08 `Collect Implementation Evidence`をApplication Layerから実行できること
+- Phase 3で取得されたImplementation実行結果と、実際のRepositoryおよびTestの状態を収集・照合できること
+- Codex Runnerから返された情報だけに依存せず、実際のSource Code、Git Status、Git Diff、Test CodeおよびTest ResultをEvidence構築の根拠として扱えること
+- 対象Implementation、Specification、Approved Implementation Plan、Codex Prompt、Implementation BranchおよびBase Commitを識別できること
+- Version 1のImplementation Evidenceを、`identity`、`basis`、`scope`、`changes`、`verification`、`deviations`、`codex_summary`を含む構造化された形式で構築できること
+- Implementation Evidenceを正式記録となるJSONとしてSerializationし、`evidence/`配下へ保存・取得・復元できること
+- Git DiffをImplementation Evidenceに関連する補助証跡として保存・参照できること
+- Evidence JSONとGit Diffとの対応関係を追跡できること
+- TDD対象のImplementationについて、作成または変更されたTest、実行Command、初期Test Result、対象Test ResultおよびFull Test Suite ResultをReview可能なEvidenceとして記録できること
+- PASS、FAILおよびTechnical Errorを区別して扱えること
+- TDDを適用しなかった場合、その理由および必要に応じたHuman判断事項をEvidenceから確認できること
+- Codex Runnerの報告と実際のRepositoryまたはTest状態との不一致を検出し、その事実をEvidenceへ記録できること
+- Scope外変更、Plan外変更、未完了事項、Error、WarningおよびHuman Approvalが必要な事項を、必要に応じてEvidenceから確認できること
+- 不足、不一致または不明な情報を推測によって正常な情報へ補完しないこと
+- 関連するApproval Recordを識別可能であり、Human Approvalの正式記録そのものをImplementation Evidenceへ重複して保持しないこと
+- Reviewに使用されたImplementation Evidenceを後から上書きまたは変更しないこと
+- CorrectionまたはReimplementationが行われた場合、既存Evidenceを保持したまま新しいImplementation Evidenceを生成・保存できること
+- 複数世代のImplementation Evidenceおよび関連ArtifactのTraceabilityを維持できること
+- Application LayerがEvidence収集、実状態の確認、Evidence構築、保存およびPhase 5へのHandoffをオーケストレーションできること
+- Application LayerからInfrastructureの具体実装への不適切な直接依存、およびCoreからApplication Layerへの逆依存を導入していないこと
+- Phase 5 ReviewがSpecification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、Source Code、Git Diff、Test CodeおよびTest Resultを確認可能な状態で引き継げること
+- Evidenceに不足または不整合が存在する場合でも、その事実を保持したままPhase 5 Reviewへ引き継げること
+- Phase 4がImplementationのSpecification適合性を最終判断しないこと
+- Phase 4が`PASS`、`REVISION_REQUIRED`、`HUMAN_REVIEW_REQUIRED`等のReview Resultを決定しないこと
+- Phase 4がHuman Approvalを代替しないこと
+- Phase 4で追加または変更した振る舞いに対するTestが成功すること
+- 既存Testを含むFull Test Suiteが成功し、Phase 4の変更によって既存機能を破壊していないこと
+- Phase 5 `Review & Correction`がImplementationの検証を開始できる状態になっていること
+
 ### Phase 5 Review & Correction
 
 ### Phase 6 Final Approval & Merge
