@@ -3430,4 +3430,1922 @@ Phase 5は、少なくとも以下をすべて満たした場合に完了とす�
 
 ### Phase 6 Final Approval & Merge
 
+#### Purpose
+
+Phase 6では、
+
+Phase 5でReview Resultが`APPROVED`となり、
+Review上の未解決事項が存在しないImplementationについて、
+
+HumanによるFinal Approvalを取得・記録・検証し、
+有効なFinal Approvalが確認された場合にのみ、
+承認されたImplementationを`developer`へ安全にMergeできる
+Application LayerのFinal Approval & Merge基盤を構築する。
+
+Final Approvalでは、
+
+Review Report、Review Result、対象Implementation Branch、
+Base Commit、現在のHEAD Commit、Implementation Evidence、
+Git Diffおよび対象Implementationを識別する情報を基に、
+
+Humanが最終Reviewを経た特定時点のImplementationを
+`developer`へ取り込んでよいか判断できるようにする。
+
+HumanへFinal Approvalを求める前に、
+Final Approval Target Artifactを構築して承認対象を確定し、
+
+Human DecisionをFinal Approval Recordとして記録するとともに、
+保存されたFinal Approval Recordが
+現在のFinal Approval Target Artifactおよび対象Implementationに対して
+有効であることを検証できるようにする。
+
+Application Layer、AI Runnerその他のComponentは、
+Humanの代わりにFinal Approval Decisionを生成してはならない。
+
+有効なFinal Approvalが確認された場合にのみ、
+UC-12 `Merge Approved Implementation`へ進み、
+
+Final Approvalの有効性、
+対象Implementationの同一性、
+Repositoryが安全にMerge可能な状態であること、
+Merge処理そのものが正常に完了したこと、
+および対象Implementationが`developer`へ
+正しく取り込まれたことを確認する。
+
+HumanによるFinal Approvalのみを理由として
+`completed`へ遷移してはならず、
+
+Mergeが成功し、
+承認された対象Implementationが`developer`へ
+正しく取り込まれたことを確認できた場合にのみ
+`completed`へ遷移できるようにする。
+
+Final Approvalが無効である場合、
+Repositoryが安全にMerge可能でない場合、
+Merge処理が失敗した場合、
+またはMerge結果を正常に確認できない場合は、
+
+`completed`へ遷移せず、
+Specificationで定義されたStateを維持して
+Humanへ判断を返す。
+
+また、
+
+HumanがFinal Approvalではなく、
+実装修正、Plan修正、Specification再検討、
+または中止を選択した場合は、
+
+そのHuman Decisionに従って
+対応する工程へ処理を戻す、または`cancelled`へ遷移する。
+
+Phase 6では、
+Human Final Approvalの代替、
+未承認ImplementationのMerge、
+無効なFinal Approval Recordの再利用、
+およびMerge成功確認前の`completed`への遷移を行わない。
+
+#### Scope
+
+Phase 6では、主としてUC-10 `Request Final Approval`および
+UC-12 `Merge Approved Implementation`に対応する
+Application LayerのFinal Approval & Merge基盤を実装対象とする。
+
+対象範囲には、少なくとも以下を含む。
+
+- Phase 5から引き渡されたReview ResultおよびReview Reportの確認
+- Final Approval工程へ進行可能であることの確認
+- 対象Implementation Branchの識別
+- Base Commitおよび現在のHEAD Commitの識別
+- Implementation Evidenceの参照
+- Git Diffの参照
+- Final Approval Target Artifactの構築
+- Final Approval Target Artifactによる承認対象Implementationの固定
+- Final Approval Target ArtifactのArtifact Hash算出
+- HumanへのFinal Approval要求
+- Human Final Approval Decisionの受領
+- Final Approval Recordの構築
+- Final Approval Recordの保存
+- Final Approval Recordと現在のFinal Approval Target Artifactとの整合性検証
+- Final Approval Recordと対象Implementationとの同一性検証
+- Final Approval後のBranchおよびHEAD Commitの変更検出
+- 無効なFinal Approval RecordによるMergeの防止
+- Humanが実装修正、Plan修正、Specification再検討または中止を選択した場合のRouting
+- UC-12開始前のMerge Preconditions確認
+- Repositoryが安全にMerge可能な状態であることの確認
+- 承認されたImplementation Branchの`developer`へのMerge
+- Merge処理結果の確認
+- 対象Implementationが`developer`へ正しく取り込まれたことの確認
+- Merge成功時の`completed`へのState Transition
+- Merge失敗時またはMerge結果を確認できない場合の`completed`遷移防止
+- Final Approval Validation失敗時のMerge実行防止
+- Final ApprovalおよびMergeに関するState Transition Historyの記録
+- Human判断が必要となる状態での安全な停止およびHandoff
+
+Phase 6では、
+HumanによるFinal Approval Decisionそのものを
+Application LayerまたはAI Runnerが生成してはならない。
+
+また、
+
+Review Resultが`REVISION_REQUIRED`または
+`HUMAN_REVIEW_REQUIRED`であるImplementationを
+Final Approval工程へ進めてはならない。
+
+HumanによるFinal Approvalのみを理由として
+`completed`へ遷移してはならず、
+
+有効なFinal Approval、
+Merge Preconditions、
+Merge処理の成功、
+および対象Implementationが`developer`へ
+正しく取り込まれたことを確認できた場合にのみ、
+`completed`への遷移を許可する。
+
+Final Approval後に対象Implementation、
+HEAD CommitまたはFinal Approval Target Artifactが変更され、
+保存されたFinal Approval Recordとの同一性を確認できない場合は、
+
+以前のFinal Approvalを現在のImplementationに対する
+有効な承認として再利用せず、
+Mergeを実行しない。
+
+Phase 6の対象外とするものは、以下とする。
+
+- Phase 5で実施するImplementation Reviewそのもの
+- Review Resultの生成
+- Review Reportの生成
+- Correction内容の独自決定
+- Human Final Approval Decisionの自動生成
+- Final ApprovalされていないImplementationのMerge
+- 無効なApproval Recordを有効なものとして扱うこと
+- SpecificationまたはApproved Implementation Planを
+  Application Layerが独自に変更すること
+- Phase 7で実施するApplication Layer全体のIntegration、
+  End-to-End ValidationおよびMVP Completion確認
+
+  #### Implementation Targets
+
+##### 1. Final Approval Entry Validation
+
+Phase 5から引き継がれたImplementationについて、
+UC-10 `Request Final Approval`を開始する前に、
+
+少なくとも、
+
+- Review Result
+- Review Report
+- 対象Implementation Branch
+- Base Commit
+- 現在のHEAD Commit
+- Implementation Evidence
+- Git Diff
+- 対象Implementationを識別する情報
+
+を取得し、
+Final Approval工程へ進行可能な状態であることを
+確認できるようにする。
+
+Final Approval工程へ進むためには、
+
+- Review Resultが`APPROVED`であること
+- Review Reportを参照できること
+- 対象Implementation Branchを識別できること
+- Base Commitを識別できること
+- 現在のHEAD Commitを識別できること
+- Implementation Evidenceを参照できること
+- Git Diffを参照できること
+
+を確認する。
+
+Review Resultが`REVISION_REQUIRED`または
+`HUMAN_REVIEW_REQUIRED`である場合は、
+Final Approval工程へ進んではならない。
+
+また、
+
+Final Approvalに必要なArtifactまたは
+対象Implementationを識別する情報が不足している場合は、
+
+Application LayerまたはAI Runnerが
+不足情報を推測または補完して
+Final Approval工程を開始してはならない。
+
+Final Approval工程へ進行可能であることを確認できた場合にのみ、
+対象Implementationを`final_approval_pending`として扱い、
+HumanへFinal Approvalを要求できるようにする。
+
+
+##### 2. Final Approval Target Artifact
+
+HumanへFinal Approvalを求める前に、
+
+Humanが最終Reviewを経て
+`developer`へ取り込むことを承認する
+特定時点のImplementationを識別するため、
+
+Final Approval Target Artifactを
+構築できるようにする。
+
+Final Approval Target Artifactには、
+少なくとも以下を含める。
+
+- implementation_branch
+- head_commit
+- base_commit
+- implementation_evidence_reference
+- git_diff_reference
+- review_report_reference
+
+Final Approval Target Artifactによって、
+
+Humanへ提示した承認対象Implementationと、
+後続のFinal Approval Record、
+Approval Validation、
+およびUC-12 `Merge Approved Implementation`で扱う
+対象Implementationを、
+
+同一の承認対象Artifactとして
+識別できるようにする。
+
+Final Approval Target Artifactは、
+HumanへFinal Approvalを要求する前に確定し、
+
+Human Decision受領後に
+Application LayerまたはAI Runnerが
+承認対象の意味または内容を独自に変更してはならない。
+
+Final Approval Target Artifactについて、
+Specificationで定義された同一の算出規則に従って
+Artifact Hashを算出できるようにし、
+
+後続のFinal Approval Recordおよび
+Approval Validationにおいて、
+Humanが承認したArtifactと
+現在の対象Artifactとの同一性を
+検証できるようにする。
+
+##### 3. Human Final Approval Decision
+
+Final Approval Target Artifactを確定した後、
+
+UC-10 `Request Final Approval`に従い、
+対象Implementationを`developer`へ取り込んでよいかについて、
+HumanへFinal Approvalを要求できるようにする。
+
+Humanへは、
+
+Final Approval Target Artifact、
+Review Report、
+Review Result、
+Implementation Evidence、
+Git Diff、
+対象Implementation Branch、
+Base Commitおよび現在のHEAD Commit等、
+
+Final Approval Decisionに必要な情報を
+確認可能な形で提示できるようにする。
+
+Final Approval DecisionはHumanのみが行い、
+
+Application Layer、
+ApprovalRecordService、
+ApprovalRecordRepository、
+AI Runner、
+その他のComponentが、
+
+Humanの代わりにFinal Approval Decisionを
+生成、推測または補完してはならない。
+
+Human Decisionとして、少なくとも、
+
+- Final Approval
+- Implementation Correction
+- Plan Revision
+- Specification Reconsideration
+- Cancellation
+
+を後続処理から識別可能な形で
+受け取れるようにする。
+
+HumanがFinal Approvalを選択した場合は、
+
+確定済みのFinal Approval Target Artifactに対する
+Human Decisionとして記録工程へ渡す。
+
+HumanがFinal Approval以外の判断を行った場合は、
+
+そのDecisionをFinal Approvalとして扱わず、
+対応する修正、再検討またはCancellation工程へ
+Routingできるようにする。
+
+Human Decisionを受領したことのみを理由として、
+`completed`へ遷移してはならない。
+
+
+##### 4. Final Approval Record and Validation
+
+HumanがFinal Approvalを選択した場合、
+
+確定済みのFinal Approval Target Artifactに対する
+Human Decisionを、
+Final Approval Recordとして
+構築および保存できるようにする。
+
+Final Approval Recordの構築には、
+既存のApprovalRecordServiceを利用し、
+
+保存にはApprovalRecordRepositoryを利用する。
+
+Version 1では、
+既存のJsonApprovalRecordRepositoryを利用して、
+Final Approval Recordを`approvals/`配下へ
+JSON形式で保存できるようにする。
+
+Final Approval Recordには、
+少なくとも以下を保持する。
+
+- approval_id
+- artifact_type
+- artifact_path
+- artifact_hash
+- decision
+- approved_at
+- comment
+
+Final Approvalの場合、
+
+`artifact_path`は
+Final Approval Target Artifactを参照し、
+
+`artifact_hash`には、
+Specificationで定義された算出規則に従って
+Final Approval Target Artifactから算出したHashを記録する。
+
+UC-12 `Merge Approved Implementation`へ進む前に、
+
+既存のApprovalValidationServiceを利用して、
+保存されたFinal Approval Recordが、
+
+現在のFinal Approval Target Artifactおよび
+対象Implementationに対して
+有効であることを検証できるようにする。
+
+Approval Validationでは、少なくとも、
+
+- Final Approval Recordが存在すること
+- decisionがFinal Approvalを示していること
+- 対象Implementation Branchが一致すること
+- 現在のHEAD Commitが承認時点と一致すること
+- Final Approval Target Artifactが一致すること
+- Final Approval Recordのartifact_hashと、
+  現在のFinal Approval Target Artifactから
+  同一の算出規則で計算したArtifact Hashが一致すること
+
+を確認する。
+
+Final Approval後に、
+
+対象Implementation Branch、
+HEAD Commit、
+Final Approval Target Artifact、
+またはArtifact Hashの同一性を
+確認できなくなった場合は、
+
+以前のFinal Approval Recordを
+現在のImplementationに対する
+有効なFinal Approvalとして扱ってはならない。
+
+Final Approval Validationに成功した場合にのみ、
+UC-12 `Merge Approved Implementation`へ
+進めるようにする。
+
+Final Approval Validationに失敗した場合は、
+
+Mergeを実行せず、
+`completed`へ遷移せず、
+`final_approval_pending`を維持して
+Humanへ判断を返す。
+
+##### 5. Human Decision Routing
+
+UC-10 `Request Final Approval`において
+Humanから受領したFinal Approval Decisionに基づき、
+
+Application LayerがSpecificationで定義された
+適切な後続工程へ処理をRoutingできるようにする。
+
+HumanがFinal Approvalを選択し、
+
+Final Approval Recordが正常に構築・保存され、
+現在のFinal Approval Target Artifactおよび
+対象Implementationに対する有効性を確認できた場合にのみ、
+
+UC-12 `Merge Approved Implementation`へ
+処理を進めることができるようにする。
+
+HumanがImplementation Correctionを選択した場合は、
+
+`correction_requested`へ遷移し、
+指定されたImplementation修正工程へ
+処理を戻せるようにする。
+
+修正後のImplementationを、
+以前にFinal Approvalの対象となったImplementationと
+自動的に同一であるとみなしてはならない。
+
+修正後は必要なImplementation、
+ReviewおよびFinal Approval工程を
+再度実行できるようにする。
+
+HumanがPlan Revisionを選択した場合は、
+Implementation Plan修正工程へ処理を戻す。
+
+HumanがSpecification Reconsiderationを選択した場合は、
+Specification策定・修正工程へ処理を戻す。
+
+HumanがCancellationを選択した場合は、
+`cancelled`へ遷移できるようにする。
+
+Implementation Correction、
+Plan Revision、
+Specification Reconsiderationによって、
+
+既存のSpecification、
+Approved Implementation Plan、
+Human Approval Scope、
+または既存Approvalの対象Artifactとの
+同一性が失われる場合は、
+
+以前のApproval Recordを
+変更後のArtifactに対する有効なApprovalとして
+自動的に引き継いではならない。
+
+変更内容が既存のHuman Approval Scopeを超える場合は、
+通常のCorrectionとして処理せず、
+
+Specificationで定義された
+Critical Changeまたは上位成果物の再検討として
+必要なApproval工程へRoutingする。
+
+Application LayerまたはAI Runnerは、
+
+Human Decisionとは異なるRoutingを独自に選択したり、
+Human Decisionを推測、補完または変更したりしてはならない。
+
+
+##### 6. Merge Preconditions and Repository Safety
+
+UC-12 `Merge Approved Implementation`を開始する前に、
+
+対象Implementationについて
+Final Approvalの有効性および
+Mergeに必要なPreconditionsを確認できるようにする。
+
+少なくとも、
+
+- Review Resultが`APPROVED`であること
+- Final Approval Recordが存在すること
+- Final Approval Target Artifactが存在すること
+- Final Approval Validationが成功していること
+- 対象Implementation Branchを識別できること
+- 現在のHEAD Commitを識別できること
+- Base Commitを識別できること
+- Implementation Evidenceを参照できること
+- Review Reportを参照できること
+
+を確認する。
+
+必要に応じてGit StatusおよびGit Diffを取得し、
+
+Repositoryが承認されたImplementationを
+`developer`へ安全にMerge可能な状態であることを
+確認できるようにする。
+
+Merge開始直前にも、
+
+対象Implementation Branch、
+現在のHEAD Commit、
+Final Approval Target Artifact、
+およびFinal Approval Recordの対応関係を確認し、
+
+HumanによるFinal Approval後に
+承認対象Implementationが変更されていないことを
+検証できるようにする。
+
+Final Approvalが有効であることと、
+Repositoryが安全にMerge可能な状態であることを
+別の確認事項として扱う。
+
+有効なFinal Approvalが存在していても、
+
+Repositoryの状態によって
+安全なMergeを確認できない場合は、
+Mergeを実行してはならない。
+
+また、
+
+RepositoryがMerge可能な状態であっても、
+現在のImplementationに対する
+有効なFinal Approvalを確認できない場合は、
+Mergeを実行してはならない。
+
+Merge PreconditionsまたはRepository Safetyを
+確認できない場合は、
+
+Application LayerまたはAI Runnerが
+状態を推測または独自に補完して
+Mergeを開始してはならない。
+
+安全なMergeを確認できない状態を
+`completed`として扱わず、
+
+`final_approval_pending`を維持して
+Humanへ判断を返せるようにする。
+
+##### 7. Merge Execution and Result Verification
+
+UC-12 `Merge Approved Implementation`に従い、
+
+Final Approvalの有効性、
+対象Implementationの同一性、
+Merge Preconditions、
+およびRepository Safetyを確認できた場合にのみ、
+
+承認されたImplementation Branchを
+`developer`へMergeできるようにする。
+
+Merge対象は、
+
+HumanによるFinal Approvalを受け、
+Final Approval Validationによって
+現在も有効であることを確認した
+対象Implementationに限定する。
+
+Application LayerまたはMerge処理を担当するComponentは、
+
+Final Approvalの対象となっていないImplementation、
+Final Approval後に変更されたImplementation、
+または同一性を確認できないImplementationを、
+
+承認済みImplementationとして
+`developer`へMergeしてはならない。
+
+Merge実行後は、
+
+Merge処理そのものが正常に完了したことと、
+
+対象Implementationが
+`developer`へ正しく取り込まれたことを、
+
+別の確認事項として検証できるようにする。
+
+少なくとも、
+
+- Merge処理が正常に完了したこと
+- Merge対象となったImplementationを識別できること
+- Merge先が`developer`であること
+- 承認された対象Implementationが`developer`へ取り込まれたこと
+- Merge結果がFinal Approval Target Artifactで特定された
+  Implementationと対応していること
+
+を確認できるようにする。
+
+Merge処理そのものが成功していても、
+
+対象Implementationが`developer`へ
+正しく取り込まれたことを確認できない場合は、
+
+Merge完了として扱わず、
+`completed`へ遷移してはならない。
+
+Merge実行中またはMerge結果確認中に
+Technical Errorが発生した場合は、
+
+そのErrorをHuman Decisionまたは
+Final Approvalの否定として扱わず、
+
+Merge処理上のFailureとして
+後続のFailure Handlingへ渡せるようにする。
+
+Merge結果について、
+
+Application LayerまたはAI Runnerが
+実際のRepository状態を確認せずに
+成功したものと推測または補完してはならない。
+
+
+##### 8. Completion and Failure Handling
+
+Phase 6では、
+
+HumanによるFinal Approvalのみを理由として
+`completed`へ遷移せず、
+
+少なくとも、
+
+- Review Resultが`APPROVED`であること
+- Phase 5で解決すべき未解決事項が存在しないこと
+- Final Approval Recordが存在すること
+- Final Approvalが現在の対象Implementationに対して有効であること
+- Final Approval Target Artifactと対象Implementationの同一性を確認できること
+- Repositoryが安全にMerge可能な状態であること
+- Merge処理が正常に完了したこと
+- 承認された対象Implementationが`developer`へ
+  正しく取り込まれたこと
+
+を確認できた場合にのみ、
+`completed`へ遷移できるようにする。
+
+`completed`への遷移時には、
+
+State Transition Historyへ
+必要な遷移情報を記録し、
+
+対象Implementationについて
+Final ApprovalからMerge完了までの経路を
+後から追跡可能な状態で保持する。
+
+Final Approval Validationに失敗した場合は、
+
+Mergeを実行せず、
+`completed`へ遷移せず、
+`final_approval_pending`を維持して
+Humanへ判断を返す。
+
+Repositoryが安全にMerge可能な状態でない場合も、
+
+Mergeを実行せず、
+`completed`へ遷移せず、
+`final_approval_pending`を維持して
+Humanへ判断を返す。
+
+Merge処理が失敗した場合、
+またはMerge結果として対象Implementationが
+`developer`へ正しく取り込まれたことを
+確認できない場合は、
+
+`completed`へ遷移せず、
+`final_approval_pending`を維持して
+Humanへ判断を返す。
+
+Merge Failureが発生した場合でも、
+
+成果物または承認対象Artifactを変更せず、
+同一のGit操作を安全に再実行可能である場合は、
+
+Specificationで定義された条件に従って
+Technical Retryとして扱えるようにする。
+
+Technical Retryでは、
+
+承認されたImplementation、
+Final Approval Record、
+Final Approval Target Artifact、
+Human Approval Scope、
+その他の承認対象情報を変更してはならない。
+
+Mergeを成立させるために
+承認済みImplementationそのものの変更が必要な場合は、
+
+Technical Retryとして扱わず、
+
+変更内容に応じてCorrection、
+Critical Change、
+または上位Artifactの再検討へ
+処理を戻せるようにする。
+
+Merge FailureをFinal Approval Failureと混同せず、
+Technical RetryをImplementation Correctionと
+混同してはならない。
+
+Failure発生時に、
+
+Application LayerまたはAI Runnerが
+Humanの代わりに新しいFinal Approval Decisionを生成したり、
+
+以前のFinal Approvalの対象とは異なるImplementationを
+独自にMergeしたりしてはならない。
+
+HumanがFinal Approval後に
+Implementation Correction、
+Plan Revision、
+Specification Reconsideration、
+またはCancellationを選択した場合は、
+
+既存のFinal Approvalをその後の変更対象へ
+自動的に引き継がず、
+
+Specificationで定義された
+対応するState Transitionおよび工程へ
+処理を戻せるようにする。
+
+Phase 6が`completed`へ遷移したことは、
+
+対象Implementationについて
+Final ApprovalおよびMerge工程が
+正常に完了したことを示す。
+
+ただし、
+
+Application Layer全体のIntegration、
+End-to-End Validation、
+およびMVP全体のCompletion確認は、
+
+Phase 7 `Integration & MVP Completion`の責務とする。
+
+#### Tests
+
+Phase 6の実装では、
+
+追加または変更する振る舞いについて
+原則としてTDDを適用する。
+
+少なくとも以下をTest対象とする。
+
+
+##### 1. Final Approval Entry Validation Tests
+
+Phase 5から引き渡されたImplementationについて、
+UC-10 `Request Final Approval`を開始するための
+Preconditionsを正しく検証できることをTestする。
+
+少なくとも以下を確認する。
+
+- Review Resultが`APPROVED`である場合に、
+  Final Approval工程へ進行可能と判定できること
+
+- Review Resultが`REVISION_REQUIRED`である場合に、
+  Final Approval工程へ進まないこと
+
+- Review Resultが`HUMAN_REVIEW_REQUIRED`である場合に、
+  Final Approval工程へ進まないこと
+
+- Review Reportを参照できること
+
+- 対象Implementation Branchを識別できること
+
+- Base Commitを識別できること
+
+- 現在のHEAD Commitを識別できること
+
+- Implementation Evidenceを参照できること
+
+- Git Diffを参照できること
+
+- Final Approvalに必要なArtifactまたは
+  対象Implementationを識別する情報が不足している場合に、
+  Final Approval工程を開始しないこと
+
+- 不足しているArtifactまたはImplementation情報を、
+  Application LayerまたはAI Runnerが
+  推測または独自に補完しないこと
+
+- Preconditionsを満たした場合にのみ、
+  対象Implementationを`final_approval_pending`として扱い、
+  HumanへFinal Approvalを要求できること
+
+- Final Approval Entry Validationの結果と
+  Workflow Stateを混同しないこと
+
+
+##### 2. Final Approval Target Artifact Tests
+
+HumanへFinal Approvalを要求する前に、
+対象Implementationを一意に識別する
+Final Approval Target Artifactを
+構築できることをTestする。
+
+少なくとも以下を確認する。
+
+- Final Approval Target Artifactに
+  `implementation_branch`を保持できること
+
+- Final Approval Target Artifactに
+  `head_commit`を保持できること
+
+- Final Approval Target Artifactに
+  `base_commit`を保持できること
+
+- Final Approval Target Artifactに
+  `implementation_evidence_reference`を保持できること
+
+- Final Approval Target Artifactに
+  `git_diff_reference`を保持できること
+
+- Final Approval Target Artifactに
+  `review_report_reference`を保持できること
+
+- Final Approval Target Artifactによって、
+  Humanへ提示したImplementationと、
+  Final Approval Recordが参照するImplementationを
+  同一の承認対象として識別できること
+
+- Final Approval Target Artifactによって、
+  UC-12 `Merge Approved Implementation`で扱うImplementationを
+  同一の承認対象として識別できること
+
+- HumanへFinal Approvalを要求する前に
+  Final Approval Target Artifactが確定されること
+
+- Human Decision受領後に、
+  Application LayerまたはAI Runnerが
+  Final Approval Target Artifactの承認対象の意味または内容を
+  独自に変更しないこと
+
+- Final Approval Target Artifactについて、
+  Specificationで定義された算出規則に従って
+  Artifact Hashを算出できること
+
+- 同一のFinal Approval Target Artifactから
+  同一の算出規則によって
+  同一のArtifact Hashを再計算できること
+
+- Final Approval Target Artifactの内容が変更された場合に、
+  変更前のArtifactと同一の承認対象として
+  誤って扱わないこと
+
+##### 3. Human Final Approval Decision Tests
+
+Final Approval Target Artifactが確定した後、
+UC-10 `Request Final Approval`に従って、
+HumanからFinal Approval Decisionを
+正しく受領および識別できることをTestする。
+
+少なくとも以下を確認する。
+
+- 確定済みのFinal Approval Target Artifactを対象として、
+  HumanへFinal Approvalを要求できること
+
+- HumanへFinal Approvalを要求する際に、
+  Review Report、
+  Review Result、
+  Implementation Evidence、
+  Git Diff、
+  対象Implementation Branch、
+  Base Commit、
+  現在のHEAD Commitを
+  確認可能な形で扱えること
+
+- HumanがFinal Approvalを選択した場合に、
+  そのDecisionをFinal Approvalとして識別できること
+
+- HumanがImplementation Correctionを選択した場合に、
+  そのDecisionをFinal Approvalと誤認しないこと
+
+- HumanがPlan Revisionを選択した場合に、
+  そのDecisionをFinal Approvalと誤認しないこと
+
+- HumanがSpecification Reconsiderationを選択した場合に、
+  そのDecisionをFinal Approvalと誤認しないこと
+
+- HumanがCancellationを選択した場合に、
+  そのDecisionをFinal Approvalと誤認しないこと
+
+- Human Decisionを、
+  Application Layer、
+  ApprovalRecordService、
+  ApprovalRecordRepository、
+  AI Runner、
+  その他のComponentが
+  自動生成しないこと
+
+- Human Decisionが存在しない場合に、
+  Application LayerまたはAI Runnerが
+  Final Approvalを推測または補完しないこと
+
+- HumanがFinal Approvalを選択した場合に、
+  確定済みのFinal Approval Target Artifactに対する
+  Decisionとして記録工程へ渡せること
+
+- HumanがFinal Approval以外を選択した場合に、
+  Final Approval Recordを
+  誤って有効なFinal Approvalとして扱わないこと
+
+- Human Decisionを受領したことのみを理由として、
+  `completed`へ遷移しないこと
+
+
+##### 4. Final Approval Record and Validation Tests
+
+HumanがFinal Approvalを選択した場合に、
+
+Final Approval Recordを正しく構築、保存し、
+現在のFinal Approval Target Artifactおよび
+対象Implementationに対する有効性を
+検証できることをTestする。
+
+少なくとも以下を確認する。
+
+- ApprovalRecordServiceを利用して
+  Final Approval Recordを構築できること
+
+- ApprovalRecordRepositoryを利用して
+  Final Approval Recordを保存できること
+
+- Version 1のJsonApprovalRecordRepositoryで、
+  Final Approval Recordを`approvals/`配下へ
+  JSON形式で保存できること
+
+- Final Approval Recordに
+  `approval_id`を保持できること
+
+- Final Approval Recordに
+  `artifact_type`を保持できること
+
+- Final Approval Recordに
+  `artifact_path`を保持できること
+
+- Final Approval Recordに
+  `artifact_hash`を保持できること
+
+- Final Approval Recordに
+  `decision`を保持できること
+
+- Final Approval Recordに
+  `approved_at`を保持できること
+
+- Final Approval Recordに
+  `comment`を保持できること
+
+- Final Approvalの`artifact_path`が
+  対象Final Approval Target Artifactを
+  正しく参照していること
+
+- Final Approvalの`artifact_hash`が、
+  Final Approval Target Artifactから
+  Specificationで定義された算出規則に従って
+  算出されていること
+
+- ApprovalValidationServiceを利用して、
+  保存されたFinal Approval Recordを
+  検証できること
+
+- Final Approval Recordが存在しない場合に、
+  Validationが成功しないこと
+
+- `decision`がFinal Approvalを示していない場合に、
+  Validationが成功しないこと
+
+- 対象Implementation Branchが
+  承認時点と一致しない場合に、
+  Validationが成功しないこと
+
+- 現在のHEAD Commitが
+  承認時点と一致しない場合に、
+  Validationが成功しないこと
+
+- Final Approval Target Artifactが
+  承認時点のArtifactと一致しない場合に、
+  Validationが成功しないこと
+
+- Final Approval Recordの`artifact_hash`と、
+  現在のFinal Approval Target Artifactから
+  同一の算出規則で再計算したArtifact Hashが
+  一致しない場合に、
+  Validationが成功しないこと
+
+- Final Approval後に対象Implementationが変更された場合に、
+  以前のFinal Approval Recordを
+  変更後のImplementationに対する
+  有効なApprovalとして扱わないこと
+
+- Final Approval Validationに成功した場合にのみ、
+  UC-12 `Merge Approved Implementation`へ
+  進行可能となること
+
+- Final Approval Validationに失敗した場合に、
+  Mergeを実行しないこと
+
+- Final Approval Validationに失敗した場合に、
+  `completed`へ遷移しないこと
+
+- Final Approval Validationに失敗した場合に、
+  `final_approval_pending`を維持し、
+  Humanへ判断を返せること
+
+##### 5. Human Decision Routing Tests
+
+UC-10 `Request Final Approval`で受領した
+Human Decisionに基づいて、
+
+Application LayerがSpecificationで定義された
+適切な後続工程へRoutingできることをTestする。
+
+少なくとも以下を確認する。
+
+- HumanがFinal Approvalを選択し、
+  Final Approval Recordが正常に構築・保存され、
+  Approval Validationに成功した場合にのみ、
+  UC-12 `Merge Approved Implementation`へ進めること
+
+- HumanがImplementation Correctionを選択した場合に、
+  `correction_requested`へ遷移できること
+
+- Implementation Correction後のImplementationを、
+  修正前にFinal ApprovalされたImplementationと
+  自動的に同一とみなさないこと
+
+- Implementation Correction後に、
+  必要なImplementation、
+  Review、
+  Final Approval工程を再実行できること
+
+- HumanがPlan Revisionを選択した場合に、
+  Implementation Plan修正工程へ戻せること
+
+- Plan Revision後に、
+  変更前のPlanに対するApproval Recordを
+  変更後のPlanへ自動的に引き継がないこと
+
+- HumanがSpecification Reconsiderationを選択した場合に、
+  Specification策定・修正工程へ戻せること
+
+- Specification変更後に、
+  以前のApproval Recordを
+  変更後のArtifactへ自動的に引き継がないこと
+
+- HumanがCancellationを選択した場合に、
+  `cancelled`へ遷移できること
+
+- Cancellation後に、
+  Application LayerまたはAI Runnerが
+  Humanの中止判断を無視して
+  自動的に処理を再開しないこと
+
+- 変更内容が既存のHuman Approval Scopeを超える場合に、
+  通常のCorrectionとして独自に継続しないこと
+
+- Human Approval Scopeを超える変更が必要な場合に、
+  Specificationで定義された
+  Critical Changeまたは上位Artifactの再検討へ
+  Routingできること
+
+- Application LayerまたはAI Runnerが、
+  Human Decisionとは異なるRoutingを
+  独自に選択しないこと
+
+- Human Decisionが不明確または存在しない場合に、
+  Routing先を推測または補完しないこと
+
+
+##### 6. Merge Preconditions and Repository Safety Tests
+
+UC-12 `Merge Approved Implementation`を開始する前に、
+
+Final Approvalの有効性と、
+Repositoryが安全にMerge可能な状態であることを
+それぞれ独立して確認できることをTestする。
+
+少なくとも以下を確認する。
+
+- Review Resultが`APPROVED`であることを確認できること
+
+- Final Approval Recordが存在することを確認できること
+
+- Final Approval Target Artifactが存在することを確認できること
+
+- Final Approval Validationが成功していることを確認できること
+
+- 対象Implementation Branchを識別できること
+
+- 現在のHEAD Commitを識別できること
+
+- Base Commitを識別できること
+
+- Implementation Evidenceを参照できること
+
+- Review Reportを参照できること
+
+- 必要に応じてGit Statusを取得し、
+  Repository状態を確認できること
+
+- 必要に応じてGit Diffを取得し、
+  Merge対象およびRepository状態を確認できること
+
+- Merge開始直前に、
+  対象Implementation Branch、
+  現在のHEAD Commit、
+  Final Approval Target Artifact、
+  Final Approval Recordの対応関係を
+  再確認できること
+
+- HumanによるFinal Approval後に
+  HEAD Commitが変更された場合に、
+  Mergeを開始しないこと
+
+- HumanによるFinal Approval後に
+  対象Implementation Branchが変更された場合に、
+  Mergeを開始しないこと
+
+- HumanによるFinal Approval後に
+  Final Approval Target Artifactとの同一性を
+  確認できなくなった場合に、
+  Mergeを開始しないこと
+
+- 有効なFinal Approvalが存在していても、
+  Repositoryが安全にMerge可能な状態でない場合に、
+  Mergeを実行しないこと
+
+- RepositoryがMerge可能な状態であっても、
+  現在のImplementationに対する
+  有効なFinal Approvalを確認できない場合に、
+  Mergeを実行しないこと
+
+- Merge Preconditionsが不足している場合に、
+  Application LayerまたはAI Runnerが
+  不足情報を推測または補完して
+  Mergeを開始しないこと
+
+- Repository Safetyを確認できない場合に、
+  `completed`へ遷移しないこと
+
+- Repository Safetyを確認できない場合に、
+  `final_approval_pending`を維持し、
+  Humanへ判断を返せること
+
+- Final Approval Validationの結果と
+  Repository Safetyの確認結果を
+  同一の判定として扱わないこと
+
+##### 7. Merge Execution and Result Verification Tests
+
+UC-12 `Merge Approved Implementation`に従い、
+
+有効なFinal Approval、
+対象Implementationの同一性、
+Merge Preconditions、
+およびRepository Safetyを確認した場合にのみ、
+
+承認されたImplementation Branchを
+`developer`へMergeできることをTestする。
+
+少なくとも以下を確認する。
+
+- Final Approval Validationに成功し、
+  Merge PreconditionsおよびRepository Safetyを
+  確認できた場合にのみ、
+  Merge処理を開始できること
+
+- Merge対象が、
+  HumanによるFinal Approvalを受けた
+  Implementation Branchであること
+
+- Merge先が`developer`であること
+
+- Final Approvalの対象となっていないImplementationを
+  Mergeしないこと
+
+- Final Approval後に変更されたImplementationを、
+  以前のFinal Approvalに基づいてMergeしないこと
+
+- Final Approval Target Artifactとの同一性を
+  確認できないImplementationをMergeしないこと
+
+- Merge処理が正常に完了したことを
+  確認できること
+
+- Merge処理の成功と、
+  対象Implementationが`developer`へ
+  正しく取り込まれたことの確認を
+  別の判定として扱うこと
+
+- Merge後に、
+  承認された対象Implementationが
+  `developer`へ取り込まれたことを
+  Repository状態から確認できること
+
+- Merge結果が、
+  Final Approval Target Artifactで特定された
+  Implementationと対応していることを確認できること
+
+- Merge処理そのものが成功していても、
+  対象Implementationが`developer`へ
+  正しく取り込まれたことを確認できない場合に、
+  Merge完了として扱わないこと
+
+- Merge処理そのものが成功していても、
+  Merge結果が承認対象Implementationと
+  対応していない場合に、
+  `completed`へ遷移しないこと
+
+- Merge実行中またはMerge結果確認中の
+  Technical Errorを、
+  Human Final Approvalの否定として扱わないこと
+
+- Repositoryの実際の状態を確認せず、
+  Application LayerまたはAI Runnerが
+  Merge成功を推測または補完しないこと
+
+
+##### 8. Completion and Failure Handling Tests
+
+Final ApprovalからMerge完了までの結果に基づき、
+
+`completed`へのState Transitionおよび
+Failure時の安全な停止を
+正しく制御できることをTestする。
+
+少なくとも以下を確認する。
+
+- Review Resultが`APPROVED`であること
+
+- Phase 5で解決すべき未解決事項が
+  存在しないこと
+
+- Final Approval Recordが存在すること
+
+- Final Approvalが現在の対象Implementationに対して
+  有効であること
+
+- Final Approval Target Artifactと
+  対象Implementationの同一性を確認できること
+
+- Repositoryが安全にMerge可能な状態であること
+
+- Merge処理が正常に完了していること
+
+- 承認された対象Implementationが
+  `developer`へ正しく取り込まれていること
+
+- 上記の必要条件をすべて満たした場合にのみ、
+  `completed`へ遷移できること
+
+- HumanがFinal Approvalを行ったことのみを理由として、
+  `completed`へ遷移しないこと
+
+- Final Approval Validationに失敗した場合に、
+  Mergeを実行しないこと
+
+- Final Approval Validationに失敗した場合に、
+  `completed`へ遷移しないこと
+
+- Final Approval Validationに失敗した場合に、
+  `final_approval_pending`を維持して
+  Humanへ判断を返せること
+
+- Repositoryが安全にMerge可能でない場合に、
+  Mergeを実行しないこと
+
+- Repository Safetyを確認できない場合に、
+  `completed`へ遷移しないこと
+
+- Merge処理が失敗した場合に、
+  `completed`へ遷移しないこと
+
+- Merge処理が失敗した場合に、
+  `final_approval_pending`を維持して
+  Humanへ判断を返せること
+
+- Merge処理が成功しても、
+  対象Implementationが`developer`へ
+  正しく取り込まれたことを確認できない場合に、
+  `completed`へ遷移しないこと
+
+- Merge結果を正常に確認できない場合に、
+  `final_approval_pending`を維持して
+  Humanへ判断を返せること
+
+- 成果物または承認対象Artifactを変更せず、
+  同一のGit操作を安全に再実行可能な場合にのみ、
+  Technical Retryとして扱えること
+
+- Technical Retryによって、
+  承認されたImplementation、
+  Final Approval Target Artifact、
+  またはHuman Approval Scopeを変更しないこと
+
+- Mergeを成立させるために
+  承認済みImplementationそのものの変更が必要な場合に、
+  Technical Retryとして扱わないこと
+
+- 承認済みImplementationの変更が必要な場合に、
+  変更内容に応じてCorrection、
+  Critical Change、
+  または上位Artifactの再検討へ
+  処理を戻せること
+
+- Merge Failureを
+  Final Approval Failureと混同しないこと
+
+- Merge Failureに対するTechnical Retryを実行する場合に、
+  Final Approval RecordおよびFinal Approval Target Artifactの
+  有効性を失わせる変更を行わず、
+  同一の承認対象Implementationに対する
+  同一の技術操作として再実行されること
+
+- Technical Retryを
+  Implementation Correctionと混同しないこと
+
+- `completed`への遷移時に、
+  State Transition Historyへ
+  必要な遷移情報を記録できること
+
+- Final ApprovalからMerge完了までの経路を
+  後から追跡可能であること
+
+- HumanがCancellationを選択した場合に、
+  `cancelled`へ遷移し、
+  Application LayerまたはAI Runnerが
+  自動的に処理を再開しないこと
+
+- Phase 6の`completed`と、
+  Phase 7で実施するApplication Layer全体の
+  Integration、
+  End-to-End Validation、
+  MVP Completion確認を混同しないこと
+
+#### Completion Conditions
+
+Phase 6は、
+
+UC-10 `Request Final Approval`および
+UC-12 `Merge Approved Implementation`に対応する
+Final Approval & Merge基盤について、
+
+Implementation Targetsで定義した振る舞いが実装され、
+対応するTestsが成功し、
+
+Human Final Approval、
+Final Approval Validation、
+Merge Preconditions、
+Repository Safety、
+Merge Execution、
+Merge Result Verification、
+State TransitionおよびFailure Handlingが、
+
+SpecificationおよびApproved Implementation Planに従って
+一貫して機能することを確認できた場合に
+完了とする。
+
+少なくとも以下の条件を満たすこと。
+
+
+##### 1. Final Approval Entry Validation Completion
+
+Phase 5から引き渡されたImplementationについて、
+
+UC-10 `Request Final Approval`を開始するための
+Preconditionsを正しく検証できること。
+
+少なくとも以下を満たすこと。
+
+- Review Resultが`APPROVED`である場合にのみ、
+  Final Approval工程へ進行可能であること
+
+- Review Resultが`REVISION_REQUIRED`または
+  `HUMAN_REVIEW_REQUIRED`である場合に、
+  Final Approval工程へ進まないこと
+
+- Review Reportを参照できること
+
+- 対象Implementation Branchを識別できること
+
+- Base Commitを識別できること
+
+- 現在のHEAD Commitを識別できること
+
+- Implementation Evidenceを参照できること
+
+- Git Diffを参照できること
+
+- Final Approvalに必要なArtifactおよび
+  対象Implementationを識別するための情報が
+  揃っていることを確認できること
+
+- 必要なArtifactまたはImplementation情報が不足している場合に、
+  Final Approval工程を開始しないこと
+
+- 不足情報をApplication LayerまたはAI Runnerが
+  推測または独自に補完しないこと
+
+- Preconditionsを満たした場合にのみ、
+  対象Implementationを`final_approval_pending`として扱い、
+  HumanへFinal Approvalを要求できること
+
+- Final Approval Entry Validationの結果と
+  Workflow Stateを混同しないこと
+
+
+##### 2. Final Approval Target Artifact Completion
+
+HumanへFinal Approvalを要求する前に、
+
+最終Reviewを経た特定時点のImplementationを
+一意に識別するFinal Approval Target Artifactを
+構築および確定できること。
+
+少なくとも以下を満たすこと。
+
+- Final Approval Target Artifactに
+  `implementation_branch`を保持できること
+
+- Final Approval Target Artifactに
+  `head_commit`を保持できること
+
+- Final Approval Target Artifactに
+  `base_commit`を保持できること
+
+- Final Approval Target Artifactに
+  `implementation_evidence_reference`を保持できること
+
+- Final Approval Target Artifactに
+  `git_diff_reference`を保持できること
+
+- Final Approval Target Artifactに
+  `review_report_reference`を保持できること
+
+- Final Approval Target Artifactによって、
+  Humanへ提示したImplementation、
+  Final Approval Recordが参照するImplementation、
+  およびUC-12でMerge対象となるImplementationを、
+  同一の承認対象として識別できること
+
+- HumanへFinal Approvalを要求する前に、
+  Final Approval Target Artifactが確定されていること
+
+- Human Decision受領後に、
+  Application LayerまたはAI Runnerが
+  Final Approval Target Artifactの承認対象の
+  意味または内容を独自に変更しないこと
+
+- Specificationで定義された算出規則に従って、
+  Final Approval Target Artifactの
+  Artifact Hashを算出できること
+
+- 同一のFinal Approval Target Artifactについて、
+  同一の算出規則から
+  同一のArtifact Hashを再計算できること
+
+- Final Approval Target Artifactが変更された場合に、
+  変更前と同一の承認対象として扱わないこと
+
+##### 3. Human Final Approval Decision Completion
+
+Final Approval Target Artifactが確定した後、
+
+UC-10 `Request Final Approval`に従って、
+HumanからFinal Approval Decisionを
+正しく受領および識別できること。
+
+少なくとも以下を満たすこと。
+
+- 確定済みのFinal Approval Target Artifactを対象として、
+  HumanへFinal Approvalを要求できること
+
+- HumanへFinal Approvalを要求する際に、
+  Review Report、
+  Review Result、
+  Implementation Evidence、
+  Git Diff、
+  対象Implementation Branch、
+  Base Commit、
+  現在のHEAD Commitを
+  確認可能な形で扱えること
+
+- HumanがFinal Approvalを選択した場合に、
+  そのDecisionをFinal Approvalとして識別できること
+
+- HumanがImplementation Correction、
+  Plan Revision、
+  Specification Reconsideration、
+  またはCancellationを選択した場合に、
+  そのDecisionをFinal Approvalと誤認しないこと
+
+- Human Decisionを、
+  Application Layer、
+  ApprovalRecordService、
+  ApprovalRecordRepository、
+  AI Runner、
+  その他のComponentが
+  自動生成しないこと
+
+- Human Decisionが存在しない場合に、
+  Application LayerまたはAI Runnerが
+  Final Approvalを推測または補完しないこと
+
+- HumanがFinal Approvalを選択した場合に、
+  確定済みのFinal Approval Target Artifactに対する
+  Decisionとして記録工程へ渡せること
+
+- HumanがFinal Approval以外を選択した場合に、
+  Final Approval Recordを
+  有効なFinal Approvalとして扱わないこと
+
+- Human Decisionを受領したことのみを理由として、
+  `completed`へ遷移しないこと
+
+
+##### 4. Final Approval Record and Validation Completion
+
+HumanがFinal Approvalを選択した場合に、
+
+Final Approval Recordを正しく構築および保存し、
+現在のFinal Approval Target Artifactおよび
+対象Implementationに対する有効性を
+検証できること。
+
+少なくとも以下を満たすこと。
+
+- ApprovalRecordServiceを利用して
+  Final Approval Recordを構築できること
+
+- ApprovalRecordRepositoryを利用して
+  Final Approval Recordを保存できること
+
+- Version 1のJsonApprovalRecordRepositoryで、
+  Final Approval Recordを`approvals/`配下へ
+  JSON形式で保存できること
+
+- Final Approval Recordに少なくとも、
+  `approval_id`、
+  `artifact_type`、
+  `artifact_path`、
+  `artifact_hash`、
+  `decision`、
+  `approved_at`、
+  `comment`
+  を保持できること
+
+- Final Approval Recordの`artifact_path`が、
+  対象Final Approval Target Artifactを
+  正しく参照していること
+
+- Final Approval Recordの`artifact_hash`が、
+  Final Approval Target Artifactから
+  Specificationで定義された算出規則に従って
+  算出されていること
+
+- ApprovalValidationServiceを利用して、
+  保存されたFinal Approval Recordを
+  検証できること
+
+- Final Approval Recordが存在しない場合に、
+  Validationを成功させないこと
+
+- `decision`がFinal Approvalを示していない場合に、
+  Validationを成功させないこと
+
+- 対象Implementation Branchが
+  承認時点と一致しない場合に、
+  Validationを成功させないこと
+
+- 現在のHEAD Commitが
+  承認時点と一致しない場合に、
+  Validationを成功させないこと
+
+- Final Approval Target Artifactが
+  承認時点のArtifactと一致しない場合に、
+  Validationを成功させないこと
+
+- Final Approval Recordの`artifact_hash`と、
+  現在のFinal Approval Target Artifactから
+  同一の算出規則で再計算したArtifact Hashが
+  一致しない場合に、
+  Validationを成功させないこと
+
+- Final Approval後に対象Implementationが変更された場合に、
+  以前のFinal Approval Recordを
+  変更後のImplementationに対する
+  有効なApprovalとして扱わないこと
+
+- Final Approval Validationに成功した場合にのみ、
+  UC-12 `Merge Approved Implementation`へ
+  進行可能であること
+
+- Final Approval Validationに失敗した場合に、
+  Mergeを実行しないこと
+
+- Final Approval Validationに失敗した場合に、
+  `completed`へ遷移しないこと
+
+- Final Approval Validationに失敗した場合に、
+  `final_approval_pending`を維持し、
+  Humanへ判断を返せること
+
+##### 5. Human Decision Routing Completion
+
+UC-10 `Request Final Approval`で受領した
+Human Decisionに基づいて、
+
+Application LayerがSpecificationで定義された
+適切な後続工程へRoutingできること。
+
+少なくとも以下を満たすこと。
+
+- HumanがFinal Approvalを選択し、
+  Final Approval Recordが正常に構築・保存され、
+  Approval Validationに成功した場合にのみ、
+  UC-12 `Merge Approved Implementation`へ進行できること
+
+- HumanがImplementation Correctionを選択した場合に、
+  `correction_requested`へ遷移できること
+
+- Implementation Correction後のImplementationを、
+  修正前にFinal ApprovalされたImplementationと
+  自動的に同一とみなさないこと
+
+- Implementation Correction後に、
+  必要なImplementation、
+  Review、
+  Final Approval工程を再実行できること
+
+- HumanがPlan Revisionを選択した場合に、
+  Implementation Plan修正工程へ戻せること
+
+- Plan Revision後に、
+  変更前のPlanに対するApproval Recordを
+  変更後のPlanへ自動的に引き継がないこと
+
+- HumanがSpecification Reconsiderationを選択した場合に、
+  Specification策定・修正工程へ戻せること
+
+- Specification変更後に、
+  以前のApproval Recordを
+  変更後のArtifactへ自動的に引き継がないこと
+
+- HumanがCancellationを選択した場合に、
+  `cancelled`へ遷移できること
+
+- Cancellation後に、
+  Application LayerまたはAI Runnerが
+  Humanの中止判断を無視して
+  自動的に処理を再開しないこと
+
+- 変更内容が既存のHuman Approval Scopeを超える場合に、
+  通常のCorrectionとして独自に継続しないこと
+
+- Human Approval Scopeを超える変更が必要な場合に、
+  Specificationで定義された
+  Critical Changeまたは上位Artifactの再検討へ
+  Routingできること
+
+- Application LayerまたはAI Runnerが、
+  Human Decisionとは異なるRoutingを
+  独自に選択しないこと
+
+- Human Decisionが不明確または存在しない場合に、
+  Routing先を推測または補完しないこと
+
+
+##### 6. Merge Preconditions and Repository Safety Completion
+
+UC-12 `Merge Approved Implementation`を開始する前に、
+
+Final Approvalの有効性と、
+Repositoryが安全にMerge可能な状態であることを
+それぞれ独立して確認できること。
+
+少なくとも以下を満たすこと。
+
+- Review Resultが`APPROVED`であることを確認できること
+
+- Final Approval Recordが存在することを確認できること
+
+- Final Approval Target Artifactが存在することを確認できること
+
+- Final Approval Validationが成功していることを確認できること
+
+- 対象Implementation Branchを識別できること
+
+- 現在のHEAD Commitを識別できること
+
+- Base Commitを識別できること
+
+- Implementation Evidenceを参照できること
+
+- Review Reportを参照できること
+
+- 必要に応じてGit Statusを取得し、
+  Repository状態を確認できること
+
+- 必要に応じてGit Diffを取得し、
+  Merge対象およびRepository状態を確認できること
+
+- Merge開始直前に、
+  対象Implementation Branch、
+  現在のHEAD Commit、
+  Final Approval Target Artifact、
+  Final Approval Recordの対応関係を
+  再確認できること
+
+- HumanによるFinal Approval後に
+  HEAD Commitが変更された場合に、
+  Mergeを開始しないこと
+
+- HumanによるFinal Approval後に
+  対象Implementation Branchが変更された場合に、
+  Mergeを開始しないこと
+
+- HumanによるFinal Approval後に
+  Final Approval Target Artifactとの同一性を
+  確認できなくなった場合に、
+  Mergeを開始しないこと
+
+- 有効なFinal Approvalが存在していても、
+  Repositoryが安全にMerge可能な状態でない場合に、
+  Mergeを実行しないこと
+
+- RepositoryがMerge可能な状態であっても、
+  現在のImplementationに対する
+  有効なFinal Approvalを確認できない場合に、
+  Mergeを実行しないこと
+
+- Merge Preconditionsが不足している場合に、
+  Application LayerまたはAI Runnerが
+  不足情報を推測または補完して
+  Mergeを開始しないこと
+
+- Repository Safetyを確認できない場合に、
+  `completed`へ遷移しないこと
+
+- Repository Safetyを確認できない場合に、
+  `final_approval_pending`を維持し、
+  Humanへ判断を返せること
+
+- Final Approval Validationの結果と
+  Repository Safetyの確認結果を
+  同一の判定として扱わないこと
+
+##### 7. Merge Execution and Result Verification Completion
+
+UC-12 `Merge Approved Implementation`に従い、
+
+有効なFinal Approval、
+対象Implementationの同一性、
+Merge Preconditions、
+およびRepository Safetyを確認した場合にのみ、
+
+承認されたImplementation Branchを
+`developer`へMergeできること。
+
+少なくとも以下を満たすこと。
+
+- Final Approval Validationに成功し、
+  Merge PreconditionsおよびRepository Safetyを
+  確認できた場合にのみ、
+  Merge処理を開始できること
+
+- Merge対象が、
+  HumanによるFinal Approvalを受けた
+  Implementation Branchであること
+
+- Merge先が`developer`であること
+
+- Final Approvalの対象となっていないImplementationを
+  Mergeしないこと
+
+- Final Approval後に変更されたImplementationを、
+  以前のFinal Approvalに基づいてMergeしないこと
+
+- Final Approval Target Artifactとの同一性を
+  確認できないImplementationをMergeしないこと
+
+- Merge処理が正常に完了したことを
+  確認できること
+
+- Merge処理の成功と、
+  対象Implementationが`developer`へ
+  正しく取り込まれたことの確認を
+  別の判定として扱うこと
+
+- Merge後に、
+  承認された対象Implementationが
+  `developer`へ取り込まれたことを
+  Repository状態から確認できること
+
+- Merge結果が、
+  Final Approval Target Artifactで特定された
+  Implementationと対応していることを確認できること
+
+- Merge処理そのものが成功していても、
+  対象Implementationが`developer`へ
+  正しく取り込まれたことを確認できない場合に、
+  Merge完了として扱わないこと
+
+- Merge処理そのものが成功していても、
+  Merge結果が承認対象Implementationと
+  対応していない場合に、
+  `completed`へ遷移しないこと
+
+- Merge実行中またはMerge結果確認中の
+  Technical Errorを、
+  Human Final Approvalの否定として扱わないこと
+
+- Repositoryの実際の状態を確認せず、
+  Application LayerまたはAI Runnerが
+  Merge成功を推測または補完しないこと
+
+
+##### 8. Completion and Failure Handling Completion
+
+Final ApprovalからMerge完了までの結果に基づき、
+
+`completed`へのState Transitionおよび
+Failure時の安全な停止を
+Specificationに従って制御できること。
+
+少なくとも以下を満たすこと。
+
+- Review Resultが`APPROVED`であること
+
+- Phase 5で解決すべき未解決事項が
+  存在しないこと
+
+- Final Approval Recordが存在すること
+
+- Final Approvalが現在の対象Implementationに対して
+  有効であること
+
+- Final Approval Target Artifactと
+  対象Implementationの同一性を確認できること
+
+- Repositoryが安全にMerge可能な状態であること
+
+- Merge処理が正常に完了していること
+
+- 承認された対象Implementationが
+  `developer`へ正しく取り込まれていること
+
+- 上記の必要条件をすべて満たした場合にのみ、
+  `completed`へ遷移できること
+
+- HumanがFinal Approvalを行ったことのみを理由として、
+  `completed`へ遷移しないこと
+
+- Final Approval Validationに失敗した場合に、
+  Mergeを実行せず、
+  `completed`へ遷移せず、
+  `final_approval_pending`を維持して
+  Humanへ判断を返せること
+
+- Repositoryが安全にMerge可能でない場合に、
+  Mergeを実行せず、
+  `completed`へ遷移せず、
+  `final_approval_pending`を維持して
+  Humanへ判断を返せること
+
+- Merge処理が失敗した場合に、
+  `completed`へ遷移せず、
+  `final_approval_pending`を維持して
+  Humanへ判断を返せること
+
+- Merge処理が成功しても、
+  対象Implementationが`developer`へ
+  正しく取り込まれたことを確認できない場合に、
+  `completed`へ遷移せず、
+  `final_approval_pending`を維持して
+  Humanへ判断を返せること
+
+- 成果物または承認対象Artifactを変更せず、
+  同一のGit操作を安全に再実行可能な場合にのみ、
+  Technical Retryとして扱えること
+
+- Technical Retryによって、
+  承認されたImplementation、
+  Final Approval Target Artifact、
+  またはHuman Approval Scopeを変更しないこと
+
+- Merge Failureに対するTechnical Retryを実行する場合に、
+  Final Approval RecordおよびFinal Approval Target Artifactの
+  有効性を失わせる変更を行わず、
+  同一の承認対象Implementationに対する
+  同一の技術操作として再実行できること
+
+- Mergeを成立させるために
+  承認済みImplementationそのものの変更が必要な場合に、
+  Technical Retryとして扱わないこと
+
+- 承認済みImplementationの変更が必要な場合に、
+  変更内容に応じてCorrection、
+  Critical Change、
+  または上位Artifactの再検討へ
+  処理を戻せること
+
+- Merge Failureを
+  Final Approval Failureと混同しないこと
+
+- Technical Retryを
+  Implementation Correctionと混同しないこと
+
+- `completed`への遷移時に、
+  State Transition Historyへ
+  必要な遷移情報を記録できること
+
+- Final ApprovalからMerge完了までの経路を
+  後から追跡可能であること
+
+- HumanがCancellationを選択した場合に、
+  `cancelled`へ遷移できること
+
+- Cancellation後に、
+  Application LayerまたはAI Runnerが
+  Humanの中止判断を無視して
+  自動的に処理を再開しないこと
+
+- Phase 6の`completed`と、
+  Phase 7で実施するApplication Layer全体の
+  Integration、
+  End-to-End Validation、
+  MVP Completion確認を混同しないこと
+
 ### Phase 7 Integration & MVP Completion
