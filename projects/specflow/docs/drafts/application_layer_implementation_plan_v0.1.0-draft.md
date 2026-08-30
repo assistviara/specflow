@@ -5349,3 +5349,6190 @@ Specificationに従って制御できること。
   MVP Completion確認を混同しないこと
 
 ### Phase 7 Integration & MVP Completion
+
+#### Purpose
+
+Phase 7では、
+
+Phase 1からPhase 6までに実装した
+Application Layerの各Foundation、UseCase、Service、
+State Management、Human Approval、
+Implementation Evidence、Review、Correction、
+Final ApprovalおよびMergeに関する責務を統合し、
+
+Specificationで定義された
+SpecFlow Version 1 MVPの一本の開発フローが、
+
+開始から完了まで一貫して実行可能であることを
+End-to-Endで検証する。
+
+Version 1 MVPでは、
+
+Humanが作成または選択したSpecificationについて
+有効なHuman Approvalを確認し、
+
+Implementation Plan Draftの生成、
+HumanによるPlan Approvalまたは差し戻し、
+承認済みImplementation PlanからのCodex用Prompt生成、
+Implementation Branchの準備、
+Codex Runnerによる承認範囲内でのImplementationおよびTest、
+Implementation Evidenceの構築・保存、
+Reviewに必要なArtifactの収集・受け渡し、
+ChatGPT RunnerによるReview、
+必要に応じたCorrectionおよびRe-Review、
+HumanによるFinal Approvalまたは差し戻し、
+承認されたImplementation Branchの`developer`へのMerge、
+および正常なMerge完了後の`completed`へのState Transitionまでを、
+
+Application Layerの制御によって
+一連のWorkflowとして実行できることを確認する。
+
+Phase 7では、
+
+各Phaseの機能が個別に動作することだけではなく、
+
+前工程のOutputおよび正式Artifactが
+後続工程のInputとして正しく引き渡されること、
+
+Current StateおよびState Transition Historyが
+Workflow全体を通じて一貫して管理されること、
+
+Human Approval RecordおよびImplementation Evidenceが
+それぞれの責務を維持したまま追跡可能であること、
+
+Human Approvalを必要とする工程では
+有効なHuman Approvalなしに後続工程へ進行しないこと、
+
+Correction、Technical Retry、Human Handoff、
+Early Stopおよびその他の停止条件が、
+Specificationで定義された境界に従って機能することを確認する。
+
+また、
+
+Human Approval、
+Current State、
+State Transition History、
+Implementation Evidence、
+Review Result、
+Git Operation Result等の異なる責務を混同せず、
+
+Application Layerが
+Human、Core、AI Runner、Codex Runner、
+RepositoryおよびInfrastructureの責務を代替しないことを
+統合されたWorkflow上でも確認する。
+
+Phase 7の完了は、
+
+Phase 1からPhase 6までの各Completion Conditionsを
+単に個別に満たしていることだけではなく、
+
+Specificationで定義されたVersion 1 MVPの
+End-to-End WorkflowおよびMVP Completion Conditionsを満たし、
+
+SpecFlow Version 1 MVPとして
+Application Layer全体が一貫して動作可能であることを
+確認できた状態とする。
+
+Phase 7では、
+
+Version 1 MVPのBoundaryを超える新機能、
+複数AI Runnerの動的選択、
+複数ユーザー管理、
+並列Implementation、
+高度なGit運用、
+その他Specificationで将来拡張とされた機能を
+新たに追加しない。
+
+#### Scope
+
+Phase 7では、
+
+Phase 1からPhase 6までに実装した
+Application Layerの各責務を統合し、
+
+Specificationで定義された
+SpecFlow Version 1 MVPのMain Flow、
+Human Approval Boundary、
+State Transition、
+Artifact Handoff、
+CorrectionおよびStop Conditionsを含む
+End-to-End Workflowの成立を実装・検証対象とする。
+
+対象範囲には、少なくとも以下を含む。
+
+- UIまたは呼び出し元から
+  Specificationを指定してWorkflowを開始できることの確認
+
+- Specificationに対する
+  有効なHuman Approvalを確認した場合にのみ、
+  Implementation Plan Draft生成工程へ進行できることの確認
+
+- ChatGPT Runnerによる
+  Implementation Plan Draft生成との統合
+
+- HumanによるImplementation Planの
+  Approval、Revision RequestおよびCancellationとの統合
+
+- Implementation Plan Approval Recordの
+  構築、保存およびValidationとの統合
+
+- 有効なApproved Implementation Planからの
+  Codex用Implementation Prompt生成との統合
+
+- Implementation Branchの準備および
+  Base Commit特定との統合
+
+- Codex Runnerによる、
+  Human Approval Scope内での
+  ImplementationおよびTest実行との統合
+
+- 振る舞いを変更するImplementationについて、
+  原則としてTDDを適用するWorkflowとの統合
+
+- Source Code、
+  Git Status、
+  Git Diff、
+  Test Code、
+  Test Result等の取得との統合
+
+- Implementation Evidenceの
+  構築、保存および後続工程へのHandoffとの統合
+
+- Specification、
+  Approved Implementation Plan、
+  Codex Prompt、
+  Implementation Evidence、
+  Source Code、
+  Git Diff、
+  Test CodeおよびTest Resultを、
+  Review工程へ一貫して引き渡せることの確認
+
+- ChatGPT Runnerによる
+  Review Report生成との統合
+
+- Review Resultに基づく、
+  Approval、
+  Correction、
+  Human Review、
+  Early Stopおよびその他の
+  後続Routingとの統合
+
+- Correction実行後の
+  Test、
+  新しいImplementation Evidence生成、
+  Re-Reviewとの統合
+
+- Correction Loopにおける
+  Correction Count、
+  Early Stop Condition、
+  Correction Limitおよび
+  Human Handoffとの統合
+
+- Critical Change発生時の
+  Human Approval Boundaryとの統合
+
+- Review Resultが`APPROVED`となり、
+  Phase 5で解決すべき未解決事項が存在しない場合の
+  Final Approval工程へのHandoffとの統合
+
+- HumanによるFinal Approvalまたは
+  差し戻しとの統合
+
+- Final Approval Target Artifact、
+  Final Approval Recordおよび
+  Approval Validationとの統合
+
+- Merge Preconditions、
+  Repository Safety、
+  Merge Executionおよび
+  Merge Result Verificationとの統合
+
+- HumanによってFinal Approvalされた
+  対象Implementation Branchを
+  `developer`へ安全にMergeできることの確認
+
+- Mergeが正常に完了し、
+  承認された対象Implementationが
+  `developer`へ正しく取り込まれたことを
+  確認した場合にのみ、
+  `completed`へ遷移できることの確認
+
+- Workflow全体を通じた
+  Current Stateの一貫した管理
+
+- Workflow全体を通じた
+  State Transition Historyの記録および追跡
+
+- Workflow全体を通じた
+  Human Approval Recordの記録、
+  Validationおよび追跡
+
+- Workflow全体を通じた
+  Implementation Evidenceの記録および追跡
+
+- 必要な正式Artifact、
+  Human Approval、
+  EvidenceまたはReview Inputが不足している場合に、
+  安全に処理を停止できることの確認
+
+- Human判断が必要な場合に、
+  Application LayerまたはAI Runnerが
+  Human Decisionを推測、補完または代替せず、
+  Humanへ処理を返せることの確認
+
+- 停止時に、
+  停止理由、
+  現在の状態、
+  影響範囲、
+  次に必要なHuman操作、
+  再開可能な工程を
+  識別可能な形で扱えることの確認
+
+- Phase 1からPhase 6までで追加・変更された
+  Application Layerの機能を統合した
+  End-to-End Test
+
+- 既存Testを含むFull Test Suiteによる
+  Regressionの確認
+
+- Specificationで定義された
+  MVP Completion Conditionsを
+  Application Layer全体として満たしていることの確認
+
+Phase 7では、
+
+個別Phaseで既に定義・実装された責務を
+独自の別実装として重複させず、
+
+既存のUseCase、Service、Repository契約、
+AI Runner、Codex Runner、
+State Management、Approval Validation、
+EvidenceおよびInfrastructureとの
+責務境界を維持したまま統合する。
+
+また、
+
+Application Layerは
+Human Approvalを生成、推測、補完または代替せず、
+
+Specification、
+Implementation Plan、
+Review Result、
+Correction内容その他の
+Humanまたは他Componentの責務に属する内容を
+独自に決定しない。
+
+Phase 7の対象外とするものは、以下とする。
+
+- Version 1 MVP Boundaryを超える新しいUseCaseの追加
+- 複数AI Runnerの動的選択
+- AI Runnerの自動Fallback
+- 複数ユーザー管理
+- 複数Implementation Branchの並列制御
+- 複雑なBranch Strategy
+- 自動Conflict Resolution
+- 高度なRebase制御
+- 複数Repositoryの統合管理
+- Specificationで将来拡張とされた機能
+- Phase 1からPhase 6までの責務を
+  Phase 7独自の別実装として再構築すること
+
+#### Implementation Targets
+
+##### 1. End-to-End Workflow Entry and Specification Approval Integration
+
+Phase 1からPhase 6までに実装した
+Application Layerの各責務を利用し、
+
+UIまたは呼び出し元から指定されたSpecificationを起点として、
+SpecFlow Version 1 MVPの
+End-to-End Workflowを開始できるようにする。
+
+Workflow開始時には、
+
+対象Specificationを識別し、
+Specificationに対応するApproval Recordを取得し、
+
+Approval Validationによって
+現在のSpecificationに対する
+有効なHuman Approvalが存在することを確認する。
+
+Specification ApprovalのValidationでは、
+
+Approval Recordが現在のSpecificationに対応していること、
+Humanによる承認Decisionを示していること、
+およびApproval RecordのArtifact Hashと
+現在のSpecificationから同一の算出規則で計算した
+Artifact Hashが一致することを確認する。
+
+有効なSpecification Approvalを確認できた場合にのみ、
+Implementation Plan Draft生成工程へ
+Workflowを進行できるようにする。
+
+Specification Approvalが存在しない場合、
+現在のSpecificationに対して無効である場合、
+または現在のSpecificationとApproval Recordとの
+整合性を確認できない場合は、
+
+Implementation Plan Draft生成工程へ進行せず、
+Specificationで定義されたStop Conditionおよび
+Human Approval Boundaryに従って
+処理を停止またはHumanへ返せるようにする。
+
+Application LayerまたはAI Runnerが、
+
+不足しているSpecification Approvalを推測、補完、生成したり、
+過去の別Artifactに対するApproval Recordを
+現在のSpecificationに対する有効な承認として
+扱ったりしてはならない。
+
+この統合では、
+
+Phase 1で構築したState Management、
+Approval Record、
+Approval Record Repository、
+Approval Validation等の共通基盤と、
+
+後続Phaseで実装したUseCaseを再利用し、
+
+Phase 7独自のSpecification Approval機構を
+重複実装してはならない。
+
+Workflow開始および
+Implementation Plan Draft生成工程への進行に伴う
+State Transitionは、
+
+Specificationで定義されたState Modelに従って実行し、
+必要なState Transition Historyを記録できるようにする。
+
+##### 2. Plan Generation, Plan Approval and Implementation Prompt Integration
+
+有効なSpecification Approvalが確認された
+Specificationについて、
+
+Implementation Plan Draft生成、
+HumanによるPlan Approvalまたは差し戻し、
+Approval Validation、
+および承認済みImplementation Planからの
+Codex用Implementation Prompt生成までを、
+
+一連のWorkflowとして統合する。
+
+Implementation Plan Draft生成では、
+
+Phase 2で実装したPlan生成UseCaseを利用し、
+
+承認済みSpecificationを入力として
+ChatGPT RunnerへPlan生成を要求し、
+
+生成されたImplementation Plan Draftを
+Humanによる確認対象として扱えるようにする。
+
+Implementation Plan Draft生成後は、
+
+Current Stateを
+Specificationで定義された
+Plan Approval待ちのStateへ遷移させ、
+
+HumanによるApproval、
+Revision Request、
+またはCancellationを
+受け取れるようにする。
+
+HumanがPlanを承認した場合は、
+
+そのHuman Decisionから
+Implementation Planに対するApproval Recordを構築・保存し、
+
+Approval Validationによって、
+
+Approval Recordが
+現在のImplementation Planに対応していること、
+
+Humanによる承認Decisionを示していること、
+
+およびApproval RecordのArtifact Hashと
+現在のImplementation Planから
+同一の算出規則で計算したArtifact Hashが
+一致することを確認する。
+
+有効なImplementation Plan Approvalを
+確認できた場合にのみ、
+
+Approved Implementation Planを入力として、
+Codex Runnerへ渡す
+Implementation Prompt生成工程へ
+進行できるようにする。
+
+HumanがRevision Requestを選択した場合は、
+
+Specificationで定義された
+Plan Revision工程へ処理を戻し、
+
+修正版Implementation Plan Draftについて
+再度Human Approvalを要求できるようにする。
+
+修正版Implementation Plan Draftを、
+
+以前のApproval Recordまたは
+Application Layer、ChatGPT Runnerその他の
+自動判断によって、
+
+Human Approvalなしに
+Approved Implementation Planとして
+扱ってはならない。
+
+HumanがCancellationを選択した場合は、
+
+Specificationで定義されたState Transitionに従って
+`cancelled`へ遷移し、
+
+Application LayerまたはAI Runnerが
+Humanの中止判断を無視して
+後続工程を自動的に再開してはならない。
+
+Implementation Prompt生成では、
+
+有効なApprovalが確認された
+Approved Implementation Planのみを使用し、
+
+Phase 3で実装したPrompt生成に関する責務を利用して、
+Codex Runnerが実行可能な
+Implementation Promptを生成できるようにする。
+
+Prompt生成に失敗した場合、
+または生成結果がAI実行可能な状態でない場合は、
+
+Implementation工程へ進行せず、
+
+Specificationで定義された
+Error and Stop Conditionsに従って
+処理を停止またはHumanへ返せるようにする。
+
+この統合では、
+
+Phase 2およびPhase 3で実装した
+Plan Generation、
+Plan Approval、
+Approval Validation、
+Plan Revision、
+Implementation Prompt Generation等の責務を再利用し、
+
+Phase 7独自のPlan生成、
+Plan ApprovalまたはPrompt生成機構を
+重複実装してはならない。
+
+各工程に伴うState Transitionおよび
+State Transition Historyは、
+
+Specificationで定義されたState Modelに従って
+一貫して管理できるようにする。
+
+##### 3. Implementation Execution and TDD Integration
+
+有効なApproved Implementation Planから生成された
+Implementation Promptについて、
+
+Implementation Branchの準備、
+Base Commitの特定、
+Codex RunnerによるImplementation、
+Test実行、
+およびImplementation Resultの受け取りまでを、
+
+一連のWorkflowとして統合する。
+
+Implementation開始前には、
+
+対象Implementation Promptが
+有効なApproved Implementation Planに基づいて生成され、
+Codex Runnerが実行可能な状態であることを確認する。
+
+Implementation実行では、
+
+Phase 3で実装した
+Implementation Executionに関する責務を利用し、
+
+Implementation Branchを準備し、
+Base Commitを識別した上で、
+
+承認されたImplementation Planおよび
+Implementation Promptによって定められた範囲内でのみ、
+
+Codex RunnerへImplementationを要求できるようにする。
+
+Codex Runnerは、
+
+承認された範囲内で
+必要なSource CodeおよびTest Codeを変更し、
+
+振る舞いを変更するImplementationについては、
+原則としてTDDを適用できるようにする。
+
+TDD対象のImplementationでは、
+
+期待される振る舞いを表現するTestを
+Implementation前に作成または変更し、
+
+そのTestがImplementation前に
+意図した理由によって失敗することを確認した上で、
+
+必要最小限のImplementationを行い、
+
+対象Testが成功することを確認する。
+
+その後、
+
+必要な対象TestおよびFull Test Suiteを実行し、
+
+Test ResultをImplementation Resultの一部として
+Application Layerへ返せるようにする。
+
+Implementation前に期待されるTestが
+意図した理由によって失敗することは、
+
+TDDの正常な工程として扱い、
+
+それ自体をImplementation Failureまたは
+Stop Conditionとして扱ってはならない。
+
+Codex RunnerによるImplementation中に、
+
+現在のHuman Approval Scopeを超える
+Critical Changeが必要であることが判明した場合は、
+
+承認範囲を独自に拡張して
+Implementationを継続せず、
+
+Specificationで定義された
+Critical ChangeのHuman Approval工程へ
+処理を移行できるようにする。
+
+Critical Changeに対する
+有効なHuman Approvalを確認できない限り、
+
+そのCritical ChangeをImplementationへ
+反映してはならない。
+
+ImplementationまたはTest実行において
+Technical Errorが発生した場合は、
+
+Specificationで定義された条件を満たす場合に限り、
+Technical Retryとして扱えるようにする。
+
+Technical Retryでは、
+
+Specification、
+Approved Implementation Plan、
+Implementation Prompt、
+Source Code、
+Test Code、
+Human Approval Scope、
+その他のTechnical Retryの前提となるArtifactまたは
+対象範囲を変更せず、
+
+新しい設計判断を導入せずに、
+同一の技術操作を安全に再実行する。
+
+これらの条件を満たさず、
+Implementationそのものの変更が必要となる場合は、
+
+Technical Retryとして扱わず、
+
+Specificationで定義された
+Correction、
+Critical Change、
+Human Handoff、
+またはその他の適切な工程へ
+処理を移行できるようにする。
+
+Implementation完了後は、
+
+Codex Runnerから返された
+Implementation Resultを受け取り、
+
+後続するImplementation Evidence構築工程が
+Source Code、
+Git Status、
+Git Diff、
+Test Code、
+Test Resultその他の必要情報を
+収集可能な状態へ引き渡す。
+
+Phase 3では
+Implementation Evidenceそのものを構築せず、
+
+Implementation Executionと
+Implementation Evidence構築の責務境界を
+Phase 7の統合Workflowにおいても維持する。
+
+この統合では、
+
+Phase 3で実装した
+Implementation Prompt、
+Implementation Branch、
+Base Commit、
+Codex Runner Execution、
+Implementation Result等の責務を再利用し、
+
+Phase 7独自のImplementation Execution機構を
+重複実装してはならない。
+
+各工程に伴うState Transitionおよび
+State Transition Historyは、
+
+Specificationで定義されたState Modelに従って
+一貫して管理できるようにする。
+
+##### 4. Implementation Evidence and Review Handoff Integration
+
+Codex Runnerから返された
+Implementation Resultについて、
+
+Phase 4で実装した
+Implementation Evidenceに関する責務を利用し、
+
+実際のRepositoryおよびTest実行結果に基づいて
+Implementation Evidenceを構築・保存し、
+
+Phase 5のReview工程へ
+必要なArtifactを一貫して
+引き渡せるようにする。
+
+Implementation Evidenceの構築では、
+
+Codex Runnerによる自己申告のみを
+実装結果の根拠とせず、
+
+少なくとも、
+
+- Source Code
+- Git Status
+- Git Diff
+- Base Commit
+- Implementation Branch
+- Test Code
+- Test Result
+
+その他Specificationで定義された
+必要な情報を、
+
+実際のRepositoryおよび
+Test実行結果から取得・確認できるようにする。
+
+Git Diffは、
+
+Base Commitと
+Implementation Branchの現在状態との
+差分として取得し、
+
+対象Implementationによって
+実際に行われた変更を
+確認可能な状態にする。
+
+Implementation Evidenceは、
+
+Specificationで定義された構造に従って
+JSON形式で構築・保存し、
+
+Evidenceと対応するGit Diffその他のArtifactを
+後続工程から参照可能な状態にする。
+
+TDD対象のImplementationについては、
+
+少なくとも、
+
+- `tests_created_or_modified`
+- `test_commands`
+- `initial_test_result`
+- `target_test_result`
+- `full_test_result`
+
+を確認可能なEvidenceとして保持し、
+
+Implementation前の期待されたTest Failure、
+Implementation後の対象Test Result、
+およびFull Test SuiteのResultを
+区別して追跡できるようにする。
+
+Implementation Evidence構築時に、
+
+必要な情報の不足、
+Repository状態との不整合、
+Test Resultとの不整合、
+Git Diffとの不整合、
+その他Evidenceとしての不完全性を
+検出した場合は、
+
+不足または不整合を
+正常なEvidenceとして推測、補完または隠蔽せず、
+
+その事実を識別可能な状態で
+保持できるようにする。
+
+Implementation Evidenceは、
+
+一度保存されたEvidenceを
+後続のCorrectionによって上書きせず、
+
+対象Implementationの時点を示す
+追跡可能な正式情報として扱う。
+
+Correctionによって
+Source Code、Test Code、
+Git Diff、Test Resultその他の
+Implementation結果が変更された場合は、
+
+以前のImplementation Evidenceを
+変更後のImplementationに対するEvidenceとして
+再利用せず、
+
+Specificationで定義された工程に従って
+新しいImplementation Evidenceを
+構築・保存できるようにする。
+
+Implementation Evidence構築後は、
+
+Phase 5 Reviewが必要とする、
+
+- Specification
+- Approved Implementation Plan
+- Codex Prompt
+- Implementation Evidence
+- Source Code
+- Git Diff
+- Test Code
+- Test Result
+
+を相互に対応付けた状態で
+Review Inputとして構築し、
+
+ChatGPT RunnerによるReviewへ
+引き渡せるようにする。
+
+ReviewへのHandoffでは、
+
+Implementation Evidenceが
+Review Inputとして成立するために必要な
+必須情報を保持していることを確認する。
+
+必須情報が不足し、
+Implementation EvidenceまたはReview Inputとして
+成立しない場合は、
+
+不足情報を推測、補完または正常化して
+Review工程へ進行せず、
+
+Specificationで定義された
+Error and Stop Conditionsに従って
+処理を停止またはHumanへ返せるようにする。
+
+一方、
+
+Review Inputとして必要なArtifactが存在し、
+Implementation Evidenceとして参照可能であるものの、
+
+Repository状態、
+Test Result、
+Git Diffその他との不整合が
+Evidence上で識別されている場合は、
+
+Application Layerがその不整合を
+独自に修正または正常化せず、
+
+不整合を識別可能な状態のまま
+Review工程へ引き渡せるようにする。
+
+Phase 4およびPhase 7は、
+
+ImplementationがSpecificationへ
+適合しているかという
+最終的なReview Resultを独自に決定せず、
+
+`APPROVED`、
+`REVISION_REQUIRED`、
+`HUMAN_REVIEW_REQUIRED`
+その他Specificationで定義された
+Review判断を生成する責務を
+Review工程から奪ってはならない。
+
+また、
+
+Implementation Evidenceと
+Current State、
+State Transition History、
+Human Approval Record、
+Review Resultを
+単一の情報として統合せず、
+
+それぞれ異なる責務を持つ
+正式情報として維持する。
+
+この統合では、
+
+Phase 4で実装した
+Evidence Collection、
+Repository and Test State Verification、
+Evidence Structure and Serialization、
+Evidence Persistence、
+Git Diff、
+TDD Evidence、
+Evidence Inconsistency Handling、
+Evidence Immutability and Traceability、
+Review Handoff等の責務を再利用し、
+
+Phase 7独自のImplementation Evidence機構を
+重複実装してはならない。
+
+Implementation Evidenceの構築・保存および
+Review工程へのHandoffに伴う
+State TransitionとState Transition Historyは、
+
+Specificationで定義されたState Modelおよび
+責務境界に従って
+一貫して管理できるようにする。
+
+##### 5. Review, Correction and Human Handoff Integration
+
+Phase 4から引き渡されたReview Inputについて、
+
+Phase 5で実装した
+ReviewおよびCorrectionに関する責務を利用し、
+
+ChatGPT RunnerによるReview、
+Review Resultに基づくRouting、
+必要に応じたCorrection、
+新しいImplementation Evidenceの生成、
+Re-Review、
+Early Stop、
+Correction Limit、
+およびHuman Handoffまでを、
+
+一連のWorkflowとして統合する。
+
+Reviewでは、
+
+少なくとも、
+
+- Specification
+- Approved Implementation Plan
+- Codex Prompt
+- Implementation Evidence
+- Source Code
+- Git Diff
+- Test Code
+- Test Result
+
+を相互に比較可能な状態で
+ChatGPT Runnerへ提供し、
+
+Implementationが
+Specification、
+Approved Implementation Plan、
+およびHuman Approval Scopeに
+適合しているかを確認できるようにする。
+
+Review Resultは、
+
+Specificationで定義された
+
+- `APPROVED`
+- `REVISION_REQUIRED`
+- `HUMAN_REVIEW_REQUIRED`
+
+を区別して扱い、
+
+Application Layerが
+Review Resultそのものを
+独自に生成、推測、補完または変更してはならない。
+
+Review Resultが`APPROVED`であり、
+
+Phase 5で解決すべき
+未解決事項が存在しない場合にのみ、
+
+Final Approval工程へ
+Handoffできるようにする。
+
+Review Resultが`REVISION_REQUIRED`であり、
+
+必要なCorrectionが
+現在のHuman Approval Scope内で
+安全に実行可能である場合は、
+
+SpecificationおよびPhase 5で定義された
+Correction工程へ処理を移行できるようにする。
+
+Correctionでは、
+
+Reviewによって特定された
+修正対象および修正理由に基づき、
+
+現在のHuman Approval Scopeを超えない範囲でのみ
+Implementationを修正できるようにする。
+
+Correction実行後は、
+
+必要なTestを再実行し、
+
+変更後のImplementationについて
+新しいImplementation Evidenceを構築・保存した上で、
+
+その新しいEvidenceを使用して
+Re-Reviewを実行できるようにする。
+
+Correction後に、
+
+以前のImplementation Evidenceを
+変更後のImplementationに対する
+現在のEvidenceとして再利用したり、
+
+新しいImplementation Evidenceを生成せずに
+直接Re-Reviewへ進んだりしてはならない。
+
+Correction Loopでは、
+
+初回ImplementationをCorrection Countへ含めず、
+
+Artifactを変更するCorrectionのみを
+Correction Countとして扱う。
+
+同一の技術操作を、
+Artifact、
+Source Code、
+Test Code、
+Specification、
+Approved Implementation Plan、
+Human Approval Scope等を変更せずに
+安全に再実行するTechnical Retryは、
+
+Correctionとして扱わず、
+Correction Countを増加させてはならない。
+
+Correctionによって
+Human Approval Scopeを超える変更が必要となった場合、
+
+またはCritical Change、
+Specificationの不足・矛盾・不明確さ、
+その他Human判断を必要とする事項が
+確認された場合は、
+
+Application LayerまたはAI Runnerが
+独自に変更範囲を拡張して
+Correctionを継続せず、
+
+Specificationで定義された
+Human Handoffまたは
+適切な上位工程へ
+処理を返せるようにする。
+
+Review Resultが
+`HUMAN_REVIEW_REQUIRED`である場合は、
+
+Application Layerが
+自動的にCorrectionを開始したり、
+
+`APPROVED`として扱ったりせず、
+
+現在のReview状態および
+必要な情報を保持したまま
+Humanへ判断を返せるようにする。
+
+HumanがCorrectionを要求した場合にのみ、
+
+Specificationで定義された
+適切なState Transitionに従って
+Correction工程へ移行できるようにする。
+
+Correction Loopにおいて、
+
+Early Stop Conditionを検出した場合、
+または自動Correctionの最大回数へ
+到達した場合は、
+
+自動Correctionを停止し、
+
+Humanへ判断を返せるようにする。
+
+Human Handoffでは、
+
+少なくとも、
+
+- 停止またはHandoffの理由
+- 現在のState
+- Review Result
+- 対象Implementation
+- 最新のImplementation Evidence
+- Review Report
+- Correction履歴
+- Correction Count
+- 影響範囲
+- 次に必要なHuman操作
+- 再開可能な工程
+
+を必要に応じて識別可能な状態で扱い、
+
+Humanが後続処理を判断できるようにする。
+
+Correctionによって
+Human Approvalの対象Artifactが変更された場合は、
+
+変更前のApproval Recordを
+変更後のArtifactに対する
+有効なApprovalとして
+自動的に引き継いではならない。
+
+必要なHuman Approvalを再取得せずに
+後続工程へ進行してはならない。
+
+この統合では、
+
+Phase 5で実装した
+Review Input Validation、
+Artifact Consistency Review、
+Semantic Staged Review、
+Review Report、
+Review Result Routing、
+Correction Instruction、
+Correction Loop、
+Evidence Regeneration、
+Correction Limit、
+Early Stop、
+Human Escalation等の責務を再利用し、
+
+Phase 7独自のReviewまたは
+Correction機構を重複実装してはならない。
+
+Review、
+Correction、
+Re-Review、
+Human Handoff、
+およびFinal Approval工程へのHandoffに伴う
+State TransitionとState Transition Historyは、
+
+Specificationで定義されたState Modelおよび
+Human Approval Boundaryに従って
+一貫して管理できるようにする。
+
+##### 6. Final Approval and Merge Integration
+
+Phase 5 Reviewの結果が`APPROVED`であり、
+
+Phase 5で解決すべき未解決事項が
+存在しないImplementationについて、
+
+Phase 6で実装した
+Final ApprovalおよびMergeに関する責務を利用し、
+
+HumanによるFinal Approval、
+Final Approval Validation、
+Merge Readiness Check、
+Merge Execution、
+Merge Result Verification、
+および`completed`へのState Transitionまでを、
+
+一連のWorkflowとして統合する。
+
+Final Approval工程へ進む前に、
+
+Review Resultが`APPROVED`であること、
+
+対象Implementation Branch、
+Base Commit、
+現在のHEAD Commit、
+Implementation Evidence、
+Git Diff、
+Review Reportその他の
+Final Approvalに必要な情報を
+識別・参照できることを確認する。
+
+Final ApprovalをHumanへ要求する前に、
+
+Phase 6で定義した
+Final Approval Target Artifactを構築し、
+
+少なくとも、
+
+- `implementation_branch`
+- `head_commit`
+- `base_commit`
+- `implementation_evidence_reference`
+- `git_diff_reference`
+- `review_report_reference`
+
+によって、
+
+Humanが最終判断する
+特定時点のImplementationを
+一意に識別可能な状態にする。
+
+HumanによるFinal Approval Decisionを受け取った場合は、
+
+そのDecisionから
+Final Approval Recordを構築・保存し、
+
+Final Approval Target Artifactと
+対応付けられるようにする。
+
+Application Layer、
+AI Runner、
+Repository、
+その他のComponentまたはServiceが、
+
+Humanの代わりに
+Final Approval Decisionを
+生成、推測、補完または変更してはならない。
+
+HumanがFinal Approvalを行った場合でも、
+
+そのDecisionのみを根拠として
+対象Implementationを`developer`へMergeしたり、
+
+Current Stateを`completed`へ
+遷移させたりしてはならない。
+
+Merge開始前に、
+
+Approval Validationによって、
+
+Final Approval Recordが存在すること、
+
+Final Approval RecordのDecisionが
+HumanによるApprovalを示していること、
+
+Final Approval Recordが
+現在のFinal Approval Target Artifactに
+対応していること、
+
+Final Approval RecordのArtifact Hashと
+現在のFinal Approval Target Artifactから
+同一の算出規則で計算したArtifact Hashが
+一致すること、
+
+Implementation Branch、
+HEAD Commit、
+Base Commit、
+
+Implementation Evidence、
+Git Diff、
+Review Report等の参照関係が、
+
+HumanがFinal Approvalした
+対象Implementationと
+一致していることを確認する。
+
+Final Approval Validationに失敗した場合は、
+
+そのFinal Approvalを
+現在のImplementationに対する
+有効なApprovalとして使用せず、
+
+Mergeを開始せず、
+
+`completed`へ遷移せず、
+
+Specificationで定義された
+StateおよびHuman Approval Boundaryに従って
+Humanへ判断を返せるようにする。
+
+有効なFinal Approvalを確認した後も、
+
+Final Approvalが有効であることと
+RepositoryがMerge可能であることを
+同一の判定として扱わず、
+
+独立したMerge Readiness Checkを実行する。
+
+Merge Readiness Checkでは、
+
+現在のRepository状態、
+対象Implementation Branch、
+Base Commit、
+HEAD Commit、
+必要なGit StatusおよびGit Diff等を確認し、
+
+HumanがFinal Approvalした
+対象Implementationを変更せずに、
+
+安全に`developer`へ
+Merge可能であることを確認する。
+
+Repositoryが安全にMerge可能であることを
+確認できた場合にのみ、
+
+Git操作を担当する
+ComponentまたはServiceを利用して、
+
+Final Approvalされた
+Implementation Branchを
+`developer`へMergeする。
+
+Application Layerは、
+
+Git操作そのものを
+独自に直接実装せず、
+
+Git操作を担当する
+既存の責務境界を維持する。
+
+Merge操作が成功を返した場合でも、
+
+その結果だけを根拠として
+`completed`へ遷移してはならない。
+
+Merge Execution後には、
+
+Merge Result Verificationによって、
+
+HumanがFinal Approvalした
+対象Implementationが、
+
+実際に`developer`へ
+正しく取り込まれたことを確認する。
+
+以下のすべてを確認できた場合にのみ、
+
+- Final Approvalが現在も有効である
+- Repositoryが安全にMerge可能な状態であった
+- Merge処理そのものが正常に実行された
+- Merge結果として対象Implementationが
+  `developer`へ正しく取り込まれた
+
+Current Stateを`completed`へ
+遷移できるようにする。
+
+Merge処理が失敗した場合、
+
+またはMerge Result Verificationによって
+対象Implementationが
+`developer`へ正しく取り込まれたことを
+確認できない場合は、
+
+`completed`へ遷移せず、
+
+Specificationで定義された
+`final_approval_pending`を維持し、
+
+Humanへ判断を返せるようにする。
+
+Merge Failureが発生した場合でも、
+
+Artifact、
+承認対象Implementation、
+Final Approval Target Artifact、
+Human Approval Scope等を変更せず、
+
+同一のGit操作を
+安全に再実行可能である場合は、
+
+Specificationで定義された条件に従って
+Technical Retryとして扱えるようにする。
+
+Technical Retryでは、
+
+Final Approval Recordおよび
+Final Approval Target Artifactの
+有効性を失わせる変更を行ってはならない。
+
+Mergeを成立させるために
+Final ApprovalされたImplementationそのものの
+変更が必要となる場合は、
+
+Technical Retryとして扱わず、
+
+変更内容に応じて、
+
+Correction、
+Critical Change、
+Plan Revision、
+Specification Reconsideration、
+その他Specificationで定義された
+適切な工程へ処理を戻せるようにする。
+
+Merge Failureを
+Final Approval Failureと混同せず、
+
+Technical Retryを
+Implementation Correctionと
+混同してはならない。
+
+HumanがFinal Approval工程において、
+
+Implementation Correction、
+Plan Revision、
+Specification Reconsideration、
+またはCancellationを選択した場合は、
+
+既存のFinal Approvalを
+変更後のArtifactまたはImplementationへ
+自動的に引き継がず、
+
+Humanが選択したDecisionに対応する
+State Transitionおよび工程へ
+処理を戻せるようにする。
+
+この統合では、
+
+Phase 6で実装した
+Final Approval Entry Validation、
+Final Approval Target Artifact、
+Human Final Approval Decision、
+Final Approval Record、
+Approval Validation、
+Human Decision Routing、
+Merge Preconditions、
+Repository Safety、
+Merge Execution、
+Merge Result Verification、
+CompletionおよびFailure Handling等の
+責務を再利用し、
+
+Phase 7独自のFinal Approvalまたは
+Merge機構を重複実装してはならない。
+
+Final Approval、
+Approval Validation、
+Merge Readiness Check、
+Merge Execution、
+Merge Result Verification、
+Failure Handling、
+および`completed`への遷移に伴う
+State TransitionとState Transition Historyは、
+
+Specificationで定義されたState Model、
+Human Approval Boundary、
+および責務境界に従って
+一貫して管理できるようにする。
+
+##### 7. Workflow State, Traceability and Stop / Human Handoff Integration
+
+Phase 1からPhase 6までの
+End-to-End Workflow全体について、
+
+Current State、
+State Transition History、
+Human Approval Record、
+Implementation Evidence、
+Review Result、
+Correction履歴、
+Git Operation Result、
+その他の正式Artifactを、
+
+それぞれの責務を維持したまま
+一貫して追跡できるようにする。
+
+Application Layerは、
+
+Workflowの各時点における
+Current Stateを確認し、
+
+現在のStateにおいて
+実行可能なUseCaseおよび
+次に進行可能な工程を制御できるようにする。
+
+現在のStateでは
+実行を許可されていないUseCaseについて、
+
+Application Layer、
+AI Runner、
+Codex Runner、
+その他のComponentが、
+
+必要な前工程、
+Human Approval、
+Artifact Validation、
+Review、
+その他のGateを迂回して
+実行してはならない。
+
+State Transitionが発生した場合は、
+
+Current Stateを更新するとともに、
+
+Specificationで定義された情報を含む
+State Transition Historyを記録し、
+
+Workflow開始から
+`completed`、
+`cancelled`、
+またはHuman Handoffに至るまでの経路を
+後から追跡できるようにする。
+
+Current Stateと
+State Transition Historyを混同せず、
+
+Current Stateは
+現在のWorkflow状態を表す情報として、
+
+State Transition Historyは
+過去に発生したState Transitionを保持する
+追記型の履歴として扱う。
+
+State Transition Historyを、
+
+Current State更新のために
+過去の履歴を書き換える形式で
+管理してはならない。
+
+Workflow全体を通じて、
+
+Human Approval Recordについて、
+
+対象Artifact、
+Human Decision、
+Artifact Hash、
+Approval時点その他の
+必要な情報との対応関係を維持し、
+
+現在のArtifactに対して
+有効なHuman Approvalであるかを
+必要なGateでValidationできるようにする。
+
+Human Approval後に
+承認対象Artifactが変更された場合は、
+
+変更前のApproval Recordを
+変更後のArtifactに対する
+有効なApprovalとして
+自動的に引き継いではならない。
+
+Implementation Evidenceについても、
+
+対象Implementation、
+Source Code、
+Git Diff、
+Test Code、
+Test Result等との対応関係を維持し、
+
+Correctionその他の変更によって
+新しいImplementation状態が生じた場合は、
+
+以前のEvidenceを上書きまたは
+現在のEvidenceとして再利用せず、
+
+新しいImplementation Evidenceとの
+履歴関係を追跡できるようにする。
+
+Human Approval Record、
+Implementation Evidence、
+Current State、
+State Transition History、
+Review Result、
+Git Operation Resultは、
+
+相互に関連付けて追跡可能としつつ、
+
+一方の情報を
+他方の情報そのものとして
+代用してはならない。
+
+例えば、
+
+Human Approvalが存在することを
+Implementation Evidenceの代わりとしたり、
+
+Review Resultが`APPROVED`であることを
+Human Final Approvalの代わりとしたり、
+
+Git Mergeの成功結果を
+Human Approvalの代わりとして
+扱ってはならない。
+
+Workflowのいずれかの工程で、
+
+必要な正式Document、
+有効なHuman Approval、
+Implementation Prompt、
+Implementation Evidence、
+Review Input、
+Review Report、
+その他の必須Artifactが不足している場合は、
+
+不足情報を
+Application LayerまたはAI Runnerが
+推測、補完または生成して
+後続工程へ進行せず、
+
+Specificationで定義された
+Error and Stop Conditionsに従って
+安全に処理を停止できるようにする。
+
+また、
+
+Specification、
+Approved Implementation Plan、
+Human Approval Scope、
+Implementation、
+Evidence、
+Review Resultその他の間に、
+
+現在のWorkflow内で
+安全に解消できない
+不足、矛盾、不整合または曖昧さを
+検出した場合も、
+
+Application Layerが
+独自の設計判断またはHuman Decisionによって
+問題を解消したものとして扱わず、
+
+必要に応じてHumanへ
+処理を返せるようにする。
+
+StopまたはHuman Handoffが発生した場合は、
+
+少なくとも、
+
+- 停止またはHandoffの理由
+- 現在のState
+- 影響範囲
+- 次に必要なHuman操作
+- 再開可能な工程
+
+を識別可能な形で扱い、
+
+Humanが状況を確認して
+適切な工程からWorkflowを
+再開できるようにする。
+
+StopまたはHuman Handoffは、
+
+それまでに正常に生成・保存された
+State Transition History、
+Approval Record、
+Implementation Evidence、
+Review Report、
+その他の正式Artifactを
+失わせてはならない。
+
+Technical Retryが実行される場合は、
+
+対象Artifact、
+Source Code、
+Test Code、
+Specification、
+Approved Implementation Plan、
+Human Approval Scope等を変更せず、
+
+同一の技術操作を
+安全に再実行する場合に限定する。
+
+Technical Retryによって、
+
+新しいHuman Approvalが行われたこと、
+新しいCorrectionが行われたこと、
+または新しいImplementationが
+生成されたこととして
+履歴を誤って扱ってはならない。
+
+Technical Retryの条件を満たさず、
+
+Artifactの変更、
+新しい設計判断、
+Human Approval Scopeの変更、
+その他の実質的変更が必要となる場合は、
+
+Technical Retryとして継続せず、
+
+Correction、
+Critical Change、
+Plan Revision、
+Specification Reconsideration、
+Human Handoffその他の
+Specificationで定義された
+適切な工程へRoutingする。
+
+Application Layerは、
+
+Workflow全体を通じて、
+
+HumanまたはUIからのUseCase要求を受け取り、
+Current Stateを確認し、
+次に実行可能なUseCaseを制御し、
+必要なComponentへ処理を委譲し、
+Artifactを後続工程へ引き渡し、
+結果に応じたState Transitionまたは
+Human Handoffを返す責務を維持する。
+
+この統合では、
+
+Phase 1からPhase 6までに実装した
+State Management、
+State Transition History、
+Approval Record、
+Approval Validation、
+Implementation Evidence、
+Review、
+Correction、
+Final Approval、
+Git Operation等の責務を再利用し、
+
+Phase 7独自のState、
+Approval、
+Evidence、
+StopまたはHuman Handoff機構を
+重複実装してはならない。
+
+End-to-End Workflow全体について、
+
+正常系だけでなく、
+
+Approval不足、
+Artifact不足、
+Evidence不足、
+Review Input不足、
+Critical Change、
+Correction Limit、
+Early Stop、
+Technical Error、
+Merge Failure、
+その他Specificationで定義された
+停止またはHuman判断を必要とする経路においても、
+
+Current State、
+State Transition History、
+正式Artifact、
+Human Approval Boundaryが
+一貫して維持されるようにする。
+
+##### 8. End-to-End MVP Validation and Completion
+
+Phase 1からPhase 6までに実装し、
+Phase 7 Target 1からTarget 7までで統合した
+Application Layer全体について、
+
+Specificationで定義された
+SpecFlow Version 1 MVPのMain Flowを
+End-to-Endで実行・検証し、
+
+MVP Completion Conditionsを
+Application Layer全体として
+満たしていることを確認できるようにする。
+
+End-to-End Validationでは、
+
+少なくとも以下のMain Flowを
+一連のWorkflowとして検証する。
+
+1. UIまたは呼び出し元から
+   Specificationを指定する
+
+2. Specificationに対する
+   有効なHuman Approvalを確認する
+
+3. ChatGPT Runnerによって
+   Implementation Plan Draftを生成する
+
+4. HumanがImplementation Planを
+   Approvalまたは差し戻す
+
+5. 有効なApproved Implementation Planから
+   Codex用Implementation Promptを生成する
+
+6. Implementation Branchを準備し、
+   Base Commitを識別する
+
+7. Codex Runnerによって、
+   Human Approval Scope内で
+   ImplementationおよびTestを実行する
+
+8. 振る舞いを変更するImplementationについて、
+   原則としてTDDを適用する
+
+9. Source Code、
+   Git Status、
+   Git Diff、
+   Test Code、
+   Test Result等を取得する
+
+10. Implementation Evidenceを
+    構築・保存する
+
+11. Specification、
+    Approved Implementation Plan、
+    Codex Prompt、
+    Implementation Evidence、
+    Source Code、
+    Git Diff、
+    Test Code、
+    Test Resultを
+    Review Inputとして引き渡す
+
+12. ChatGPT Runnerによって
+    Reviewを実行し、
+    Review ReportおよびReview Resultを取得する
+
+13. Review Resultに応じて、
+    Approval、
+    Correction、
+    Human Review、
+    Early Stopその他の
+    適切な工程へRoutingする
+
+14. Correctionが必要な場合は、
+    Correction、
+    Test、
+    新しいImplementation Evidence生成、
+    Re-Reviewを実行する
+
+15. Review Resultが`APPROVED`となり、
+    Phase 5で解決すべき
+    未解決事項が存在しない場合にのみ、
+    Final Approval工程へ進む
+
+16. HumanによるFinal Approvalまたは
+    差し戻しを受け取る
+
+17. Final Approval Target Artifact、
+    Final Approval Recordおよび
+    Approval Validationによって、
+    Humanが承認した特定のImplementationを確認する
+
+18. Merge Readinessを確認した上で、
+    Final Approvalされた
+    Implementation Branchを
+    `developer`へMergeする
+
+19. Merge Result Verificationによって、
+    HumanがFinal Approvalした
+    対象Implementationが
+    `developer`へ正しく取り込まれたことを確認する
+
+20. すべての必要条件を満たした場合にのみ、
+    Current Stateを`completed`へ遷移する
+
+End-to-End Validationでは、
+
+正常系Main Flowだけではなく、
+
+Human Approvalが得られない場合、
+HumanがRevisionまたはCancellationを選択した場合、
+Critical Changeが発生した場合、
+Review Resultが`REVISION_REQUIRED`となった場合、
+Review Resultが`HUMAN_REVIEW_REQUIRED`となった場合、
+Correctionが必要となった場合、
+Early Stop Conditionを検出した場合、
+Correction Limitへ到達した場合、
+Technical Errorが発生した場合、
+必要なArtifactまたはEvidenceが不足した場合、
+Final Approval Validationに失敗した場合、
+Merge Readinessを確認できない場合、
+Merge Executionが失敗した場合、
+Merge Result Verificationに失敗した場合等についても、
+
+Specificationで定義された
+State Transition、
+Stop Condition、
+Human Approval Boundary、
+Technical Retry、
+Correction、
+Human Handoffが
+維持されることを確認する。
+
+Human Approvalを必要とする工程では、
+
+有効なHuman Approvalなしに
+次のApproval-required Stageへ
+進行できないことを
+End-to-Endで確認する。
+
+また、
+
+Human Approval後に
+対象Artifactまたは対象Implementationが変更された場合に、
+
+以前のApproval Recordが
+変更後の対象へ
+自動的に適用されないことを確認する。
+
+Workflow全体を通じて、
+
+Current State、
+State Transition History、
+Human Approval Record、
+Implementation Evidence、
+Review Report、
+Review Result、
+Correction履歴、
+Git Operation Resultその他の
+必要な正式情報を追跡可能であることを確認する。
+
+State Transition Historyについては、
+
+Workflow開始から
+`completed`、
+`cancelled`、
+またはHuman Handoffに至るまで、
+
+発生したState Transitionを
+後から確認できることを検証する。
+
+Implementation Evidenceについては、
+
+対象Implementation、
+Source Code、
+Git Diff、
+Test Code、
+Test Result等との
+対応関係を確認できること、
+
+Correction後には
+新しいImplementation Evidenceが生成され、
+
+以前のEvidenceが
+変更後のImplementationに対するEvidenceとして
+上書きまたは再利用されないことを確認する。
+
+End-to-End Validationでは、
+
+Phase 1からPhase 7までに
+追加または変更された振る舞いについて
+必要なIntegration Testおよび
+End-to-End Testを実行する。
+
+さらに、
+
+既存Testを含む
+Full Test Suiteを実行し、
+
+Phase 7の統合によって
+既存のApplication Layer、
+Core、
+Infrastructureその他の
+既存機能にRegressionが
+発生していないことを確認する。
+
+Test Failure、
+Artifact不整合、
+State不整合、
+Approval不整合、
+Evidence不整合その他の問題を検出した場合は、
+
+Testを通過させることのみを目的として
+SpecificationまたはHuman Approval Boundaryを
+緩和してはならない。
+
+問題の内容に応じて、
+
+Implementation Correction、
+Critical Change、
+Plan Revision、
+Specification Reconsideration、
+Human Handoff、
+またはその他Specificationで定義された
+適切な工程へRoutingする。
+
+Phase 7およびVersion 1 MVPの完了は、
+
+単にEnd-to-End Testが成功したことだけではなく、
+
+Specificationで定義された
+MVP Completion Conditionsの各項目を
+満たしていることを確認できた場合にのみ
+成立する。
+
+少なくとも、
+
+- Specificationを指定できる
+- Specificationに対する
+  有効なHuman Approvalを確認できる
+- Implementation Plan Draftを生成できる
+- HumanがPlanをApprovalまたは差し戻せる
+- Approved Implementation Planから
+  Codex用Implementation Promptを生成できる
+- Codex Runnerが承認範囲内で
+  ImplementationおよびTestを実行できる
+- 振る舞いを変更するImplementationについて
+  原則としてTDDを適用できる
+- Implementation Evidenceを
+  JSON形式で構築・保存できる
+- Source CodeおよびGit Diffを取得できる
+- Reviewに必要なArtifactを
+  一貫して提供できる
+- ChatGPT Runnerが
+  Review Reportを生成できる
+- 定義されたCorrectionおよび
+  Re-Reviewを実行できる
+- Early StopおよびCorrection Limitで
+  Humanへ処理を返せる
+- HumanがFinal Approvalまたは
+  差し戻しを行える
+- Final Approval後、
+  Application Layerの制御によって
+  承認されたImplementation Branchを
+  `developer`へMergeできる
+- Mergeが正常に完了し、
+  対象Implementationが正しく取り込まれた場合にのみ
+  `completed`へ遷移できる
+- Human Approvalを必要とする工程を、
+  有効なHuman Approvalなしに
+  通過できない
+- Current State、
+  State Transition History、
+  Human Approval Record、
+  Implementation Evidenceを
+  Workflow全体で追跡できる
+
+ことを確認する。
+
+Phase 7では、
+
+End-to-End Validationを成立させるために、
+
+Specificationで定義されていない
+新しいUseCase、
+新しいHuman Decision、
+新しいApproval Rule、
+新しいState、
+新しいReview Result、
+新しいCorrection Rule、
+またはVersion 1 MVP Boundaryを超える機能を
+追加してはならない。
+
+End-to-End Validationによって
+Specificationの不足、
+矛盾、
+曖昧さ、
+またはVersion 1 MVPの範囲内では
+安全に解決できない問題が判明した場合は、
+
+Application LayerまたはAI Runnerが
+独自の解釈によって補完せず、
+
+Humanへ問題を返し、
+
+必要に応じて
+Specification Reconsiderationへ
+Routingできるようにする。
+
+Phase 7のCompletionは、
+
+Phase 1からPhase 6までの
+各Completion Conditions、
+
+Phase 7で定義する
+IntegrationおよびEnd-to-End Validation、
+
+およびSpecificationの
+MVP Completion Conditionsを
+すべて確認できた状態とする。
+
+#### Tests
+
+##### 1. End-to-End Workflow Entry and Specification Approval Integration Tests
+
+Phase 7の実装では、
+
+UIまたは呼び出し元から指定されたSpecificationを起点として、
+SpecFlow Version 1 MVPのEnd-to-End Workflowを開始し、
+
+有効なSpecification Approvalが確認された場合にのみ
+Implementation Plan Draft生成工程へ進行できることをTestする。
+
+少なくとも以下をTest対象とする。
+
+- UIまたは呼び出し元から指定されたSpecificationを
+  Workflow開始対象として識別できること
+
+- Workflow開始時に、
+  対象Specificationに対応するApproval Recordを
+  取得できること
+
+- Approval Validationによって、
+  Approval Recordが現在のSpecificationに
+  対応していることを確認できること
+
+- Approval RecordのDecisionが、
+  Humanによる承認を示していることを確認できること
+
+- Approval RecordのArtifact Hashと、
+  現在のSpecificationから
+  同一の算出規則で計算したArtifact Hashが
+  一致することを確認できること
+
+- 有効なSpecification Approvalが確認された場合にのみ、
+  Implementation Plan Draft生成工程へ
+  Workflowを進行できること
+
+- Specification Approvalが存在しない場合、
+  Implementation Plan Draft生成工程へ
+  進行しないこと
+
+- Approval Recordが
+  現在のSpecificationに対して無効である場合、
+  Implementation Plan Draft生成工程へ
+  進行しないこと
+
+- Approval Recordと
+  現在のSpecificationとの整合性を
+  確認できない場合、
+  Implementation Plan Draft生成工程へ
+  進行しないこと
+
+- Specificationが
+  Approval後に変更され、
+  現在のArtifact Hashと
+  Approval RecordのArtifact Hashが一致しない場合、
+  過去のApproval Recordを
+  現在のSpecificationに対する
+  有効なApprovalとして扱わないこと
+
+- 過去の別Artifactに対するApproval Recordを、
+  現在のSpecificationに対する
+  有効なApprovalとして扱わないこと
+
+- Specification Approvalが不足または無効である場合に、
+  Application LayerまたはAI Runnerが
+  Human Approvalを推測、補完または生成しないこと
+
+- Specification Approvalが不足または無効である場合に、
+  Specificationで定義された
+  Stop ConditionおよびHuman Approval Boundaryに従って、
+  処理を停止またはHumanへ返せること
+
+- Workflow開始および
+  Implementation Plan Draft生成工程への進行に伴う
+  Current Stateが、
+  Specificationで定義されたState Modelに従って
+  更新されること
+
+- State Transitionが発生した場合に、
+  必要なState Transition Historyが
+  記録されること
+
+- Phase 1で実装した
+  State Management、
+  Approval Record、
+  Approval Record Repository、
+  Approval Validation等の既存責務を利用し、
+  Phase 7独自のSpecification Approval機構を
+  重複実装しないこと
+
+- Specification Approval Validationを迂回して、
+  Implementation Plan Draft生成工程へ
+  直接進行できないこと
+
+##### 2. Plan Generation, Plan Approval and Implementation Prompt Integration Tests
+
+有効なSpecification Approvalが確認された
+Specificationについて、
+
+Implementation Plan Draft生成、
+HumanによるPlan Approvalまたは差し戻し、
+Approval Recordの構築・保存、
+Approval Validation、
+およびApproved Implementation Planからの
+Codex用Implementation Prompt生成までが、
+
+一連のWorkflowとして
+正しく統合されていることをTestする。
+
+少なくとも以下をTest対象とする。
+
+- 有効なSpecification Approvalが確認された場合に、
+  承認済みSpecificationを入力として
+  Implementation Plan Draft生成を
+  ChatGPT Runnerへ要求できること
+
+- Implementation Plan Draft生成結果を
+  Humanによる確認対象として扱えること
+
+- Implementation Plan Draft生成後に、
+  Current Stateが
+  Specificationで定義された
+  Plan Approval待ちのStateへ遷移すること
+
+- Plan Approval待ちのStateにおいて、
+  HumanによるApproval、
+  Revision Request、
+  Cancellationを受け取れること
+
+- HumanがPlanをApprovalした場合に、
+  Human Decisionから
+  Implementation Planに対する
+  Approval Recordを構築できること
+
+- 構築したImplementation Plan Approval Recordを
+  Approval Record Repositoryへ保存できること
+
+- Approval Validationによって、
+  Approval Recordが
+  現在のImplementation Planに
+  対応していることを確認できること
+
+- Approval RecordのDecisionが、
+  HumanによるApprovalを
+  示していることを確認できること
+
+- Approval RecordのArtifact Hashと、
+  現在のImplementation Planから
+  同一の算出規則で計算したArtifact Hashが
+  一致することを確認できること
+
+- 有効なImplementation Plan Approvalが
+  確認された場合にのみ、
+  Current Stateを
+  Specificationで定義された
+  Plan Approval後のStateへ遷移できること
+
+- 有効なImplementation Plan Approvalが
+  確認された場合にのみ、
+  Approved Implementation Planを入力として
+  Codex用Implementation Prompt生成工程へ
+  進行できること
+
+- Approved Implementation Planから、
+  Codex Runnerが実行可能な
+  Implementation Promptを生成できること
+
+- Implementation Plan Approvalが存在しない場合、
+  Implementation Prompt生成工程へ
+  進行しないこと
+
+- Implementation Plan Approvalが無効である場合、
+  Implementation Prompt生成工程へ
+  進行しないこと
+
+- Approval RecordのArtifact Hashと
+  現在のImplementation PlanのArtifact Hashが
+  一致しない場合、
+  そのApproval Recordを
+  有効なPlan Approvalとして扱わないこと
+
+- Human Approval後に
+  Implementation Planが変更された場合、
+  変更前のApproval Recordを
+  変更後のImplementation Planに対する
+  有効なApprovalとして再利用しないこと
+
+- 過去の別Implementation Planに対する
+  Approval Recordを、
+  現在のImplementation Planに対する
+  有効なApprovalとして扱わないこと
+
+- Application Layer、
+  ChatGPT Runner、
+  その他のComponentが、
+  不足しているPlan Approvalを
+  推測、補完または生成しないこと
+
+- HumanがRevision Requestを選択した場合、
+  Specificationで定義された
+  Plan Revision工程へRoutingできること
+
+- Revision後のImplementation Plan Draftについて、
+  以前のApproval Recordを自動的に引き継がず、
+  再度Human Approvalを要求すること
+
+- Revision後のImplementation Plan Draftについて、
+  有効なHuman Approvalを確認する前に
+  Implementation Prompt生成工程へ
+  進行しないこと
+
+- HumanがCancellationを選択した場合、
+  Current Stateが
+  Specificationで定義された
+  `cancelled`へ遷移すること
+
+- Cancellation後に、
+  Application LayerまたはAI Runnerが
+  Human Decisionを無視して
+  Implementation Prompt生成その他の
+  後続工程を自動的に開始しないこと
+
+- Implementation Prompt生成に失敗した場合、
+  Implementation工程へ進行しないこと
+
+- 生成されたPrompt Resultが
+  AI実行可能な状態でない場合、
+  Implementation工程へ進行しないこと
+
+- Implementation Prompt生成失敗または
+  AI実行不能なPrompt Resultについて、
+  Specificationで定義された
+  Error and Stop Conditionsに従って
+  処理を停止またはHumanへ返せること
+
+- Plan Generation、
+  Plan Approval、
+  Approval Validation、
+  Plan Revision、
+  Implementation Prompt Generationに伴う
+  State Transitionが、
+  Specificationで定義されたState Modelに
+  従って実行されること
+
+- 各State Transitionについて、
+  必要なState Transition Historyが
+  記録されること
+
+- Phase 2およびPhase 3で実装した
+  Plan Generation、
+  Plan Approval、
+  Approval Validation、
+  Plan Revision、
+  Implementation Prompt Generation等の
+  既存責務を再利用し、
+  Phase 7独自の同等機構を
+  重複実装しないこと
+
+- Plan Approval Validationを迂回して、
+  未承認または無効なImplementation Planから
+  Implementation Promptを生成し、
+  Implementation工程へ進行できないこと
+
+##### 3. Implementation Execution and TDD Integration Tests
+
+有効なApproved Implementation Planから生成された
+Implementation Promptについて、
+
+Implementation Branchの準備、
+Base Commitの特定、
+Codex RunnerによるImplementation、
+Test実行、
+TDD、
+Critical Change、
+Technical Retry、
+およびImplementation Resultの受け取りまでが、
+
+Specificationで定義された責務境界および
+Human Approval Boundaryに従って
+正しく統合されていることをTestする。
+
+少なくとも以下をTest対象とする。
+
+- 有効なApproved Implementation Planから生成された
+  Implementation Promptを
+  Implementation実行対象として使用できること
+
+- Implementation開始前に、
+  Implementation Promptが
+  有効なApproved Implementation Planに基づいて
+  生成されたものであることを確認できること
+
+- Codex Runnerが実行可能な
+  Implementation Promptであることを確認した上で、
+  Implementation工程へ進行できること
+
+- Implementation開始時に、
+  対象Implementation Branchを
+  準備できること
+
+- Implementation開始時に、
+  Base Commitを識別できること
+
+- Implementation BranchとBase Commitを
+  後続するImplementation Result、
+  Implementation Evidence、
+  ReviewおよびFinal Approvalから
+  識別可能な状態で扱えること
+
+- Codex Runnerへ、
+  Approved Implementation Planおよび
+  Implementation Promptによって定められた
+  Human Approval Scope内のImplementationのみを
+  要求できること
+
+- Codex Runnerが、
+  Human Approval Scopeを独自に拡張して
+  Source CodeまたはTest Codeを
+  変更しないこと
+
+- 振る舞いを変更するImplementationについて、
+  原則としてTDDを適用できること
+
+- TDD対象のImplementationについて、
+  期待される振る舞いを表現するTestを
+  Implementation前に作成または変更できること
+
+- Implementation前に、
+  対象Testが意図した理由によって
+  Failureとなることを確認できること
+
+- Implementation前の
+  意図されたTest Failureを、
+  Implementation Failureまたは
+  Stop Conditionとして扱わないこと
+
+- Implementation前のTest Failure確認後に、
+  対象Testを成功させるための
+  必要最小限のImplementationを
+  実行できること
+
+- Implementation後に、
+  対象Testを実行し、
+  Target Test Resultを取得できること
+
+- 必要なFull Test Suiteを実行し、
+  Full Test Resultを取得できること
+
+- Test Resultを、
+  後続するImplementation Resultおよび
+  Implementation Evidenceから
+  利用可能な状態で扱えること
+
+- TDD対象について、
+  Test作成または変更、
+  Initial Test Result、
+  Target Test Result、
+  Full Test Resultを
+  後続工程で識別可能な状態にできること
+
+- Codex RunnerによるImplementation中に、
+  Human Approval Scopeを超える変更が
+  必要であることを検出できること
+
+- Human Approval Scopeを超える変更を
+  Critical Changeとして扱い、
+  承認範囲を自動的に拡張して
+  Implementationを継続しないこと
+
+- Critical Changeが発生した場合、
+  Specificationで定義された
+  `critical_approval_pending`その他の
+  適切なHuman Approval工程へ
+  Routingできること
+
+- Critical Changeに対する
+  有効なHuman Approvalを確認する前に、
+  Critical ChangeをImplementationへ
+  反映しないこと
+
+- Critical Changeに対するHuman Decisionを、
+  Application Layer、
+  Codex Runner、
+  AI Runnerその他のComponentが
+  推測、補完または生成しないこと
+
+- ImplementationまたはTest実行時に
+  Technical Errorが発生した場合、
+  Specificationで定義された条件を満たす場合に限り、
+  Technical Retryを実行できること
+
+- Technical Retryでは、
+
+  Specification、
+
+  Approved Implementation Plan、
+
+  Implementation Prompt、
+
+  Source Code、
+
+  Test Code、
+
+  Human Approval Scopeその他の
+
+  Technical Retryの前提となるArtifactまたは
+  対象範囲を変更しないこと
+
+- Technical Retryでは、
+  新しい設計判断を導入せず、
+  同一の技術操作のみを
+  安全に再実行すること
+
+- Technical Retryを、
+  Implementation Correctionとして
+  扱わないこと
+
+- Technical Retryによって、
+  Correction Countを増加させないこと
+
+- Technical Retryの条件を満たさず、
+  Source Code、
+  Test Code、
+  Approval Scopeその他の
+  実質的変更が必要となる場合は、
+  Technical Retryとして
+  自動継続しないこと
+
+- Technical Retryでは解決できない場合に、
+  問題の内容に応じて、
+  Correction、
+  Critical Change、
+  Human Handoffその他の
+  Specificationで定義された適切な工程へ
+  Routingできること
+
+- Implementationが正常に完了した場合、
+  Codex Runnerから
+  Implementation Resultを
+  Application Layerへ返せること
+
+- Implementation Resultから、
+  後続するImplementation Evidence構築に必要な
+  Implementation Branch、
+  Base Commit、
+  Source Code、
+  Git Status、
+  Git Diff、
+  Test Code、
+  Test Resultその他の情報を
+  取得または参照可能な状態へ
+  引き渡せること
+
+- Phase 3のImplementation Executionでは、
+  Implementation Evidenceそのものを
+  構築・保存しないこと
+
+- Implementation Resultと
+  Implementation Evidenceを
+  同一の責務または同一のArtifactとして
+  扱わないこと
+
+- Implementation Execution完了後に、
+  Phase 4のImplementation Evidence構築工程へ
+  正しくHandoffできること
+
+- Implementation開始、
+  Implementation実行、
+  Implementation完了、
+  Implementation Failure、
+  Critical Changeその他に伴う
+  State Transitionが、
+  Specificationで定義されたState Modelに
+  従って実行されること
+
+- 各State Transitionについて、
+  必要なState Transition Historyが
+  記録されること
+
+- Phase 3で実装した
+  Implementation Prompt、
+  Implementation Branch、
+  Base Commit、
+  Codex Runner Execution、
+  Implementation Result等の既存責務を再利用し、
+  Phase 7独自のImplementation Execution機構を
+  重複実装しないこと
+
+- Human Approval Boundary、
+  Critical Change Approval、
+  Technical Retryその他のGateを迂回して、
+  未承認の変更を含むImplementationを
+  後続するImplementation Evidence工程へ
+  正常なImplementation Resultとして
+  引き渡せないこと
+
+
+##### 4. Implementation Evidence and Review Handoff Integration Tests
+
+Phase 3から受け取ったImplementation Resultについて、
+
+実際のRepository状態およびTest実行結果に基づく
+Implementation Evidenceの構築・保存、
+
+EvidenceとImplementationとの対応関係の維持、
+
+およびPhase 5 Reviewが必要とする
+Review Inputの構築・Handoffまでが、
+
+Specificationで定義された責務境界に従って
+正しく統合されていることをTestする。
+
+少なくとも以下をTest対象とする。
+
+- Phase 3から受け取ったImplementation Resultを起点として、
+  Phase 4のImplementation Evidence構築工程へ
+  Handoffできること
+
+- Implementation Evidenceを、
+  Codex Runnerの自己申告だけではなく、
+  実際のRepository状態およびTest状態に基づいて
+  構築できること
+
+- 対象Implementationについて、
+  Implementation Branchを識別できること
+
+- 対象Implementationについて、
+  Base Commitを識別できること
+
+- 対象Implementationについて、
+  Source Codeを取得または参照できること
+
+- 対象Implementationについて、
+  Git Statusを取得できること
+
+- Base Commitと
+  現在のImplementation Branchとの差分として
+  Git Diffを取得できること
+
+- 対象Implementationについて、
+  Test Codeを取得または参照できること
+
+- 対象Implementationについて、
+  Test Resultを取得または参照できること
+
+- Implementation Evidenceが、
+  対象Implementation、
+  Implementation Branch、
+  Base Commit、
+  Source Code、
+  Git Diff、
+  Test Code、
+  Test Resultその他の
+  必要な情報との対応関係を
+  維持できること
+
+- TDD対象のImplementationについて、
+  少なくとも以下の事実を
+  Implementation Evidenceから
+  識別できること
+
+  - `tests_created_or_modified`
+  - `test_commands`
+  - `initial_test_result`
+  - `target_test_result`
+  - `full_test_result`
+
+- 意図されたTDD Initial Test Failureと、
+  Implementation後のTarget Test Resultおよび
+  Full Test Resultを
+  区別してEvidenceとして扱えること
+
+- Implementation Evidenceを
+  Specificationで定義された形式に従って
+  JSONとして構築できること
+
+- 構築したImplementation Evidenceを
+  保存できること
+
+- 保存したImplementation Evidenceを
+  後続工程から参照できること
+
+- 保存済みImplementation Evidenceが、
+  対象Implementationの特定時点を示す
+  追跡可能な正式情報として扱われること
+
+- Implementation Evidence構築時に、
+  Repository状態、
+  Git Diff、
+  Test Resultその他との
+  不整合を検出できること
+
+- Evidence上で検出された不整合を、
+  Application Layerが
+  独自に修正、正常化、推測または隠蔽しないこと
+
+- Review Inputとして成立するために必要な
+  必須Artifactおよび必須情報が
+  存在することを確認できること
+
+- 必須Artifactまたは必須情報が不足し、
+  Implementation EvidenceまたはReview Inputとして
+  成立しない場合、
+  不足情報を推測または補完して
+  Review工程へ進行しないこと
+
+- 必須Artifactまたは必須情報の不足によって
+  Review Inputが成立しない場合、
+  Specificationで定義された
+  Error and Stop Conditionsに従って
+  処理を停止またはHumanへ返せること
+
+- Review Inputとして必要なArtifactが存在し、
+  Implementation Evidenceとして参照可能である一方、
+  Repository状態、
+  Git Diff、
+  Test Resultその他との
+  不整合がEvidence上で識別されている場合、
+  その不整合を識別可能な状態のまま
+  Review工程へ引き渡せること
+
+- Phase 5 Reviewに対して、
+  少なくとも以下を
+  相互に対応付けたReview Inputとして
+  引き渡せること
+
+  - Specification
+  - Approved Implementation Plan
+  - Codex Prompt
+  - Implementation Evidence
+  - Source Code
+  - Git Diff
+  - Test Code
+  - Test Result
+
+- Review Inputに含まれる
+  Specification、
+  Approved Implementation Plan、
+  Codex Prompt、
+  Implementation Evidence、
+  Source Code、
+  Git Diff、
+  Test Code、
+  Test Resultが、
+  同一の対象Implementationおよび
+  承認されたWorkflowに対応していることを
+  識別できること
+
+- Phase 4またはPhase 7が、
+  Implementation Evidenceの内容のみを根拠として
+  `APPROVED`、
+  `REVISION_REQUIRED`、
+  `HUMAN_REVIEW_REQUIRED`
+  その他のReview Resultを
+  独自に生成または決定しないこと
+
+- Implementation Evidenceと、
+  Current State、
+  State Transition History、
+  Human Approval Record、
+  Review Resultを
+  単一の情報または同一の責務として
+  扱わないこと
+
+- Correctionその他によって、
+  Source Code、
+  Test Code、
+  Git Diff、
+  Test Resultその他の
+  Implementation状態が変更された場合、
+  以前のImplementation Evidenceを
+  変更後のImplementationに対する
+  Evidenceとして再利用しないこと
+
+- Correction後のImplementationについて、
+  新しいRepository状態およびTest状態に基づいて
+  新しいImplementation Evidenceを
+  構築・保存できること
+
+- Correction後に生成された
+  新しいImplementation Evidenceによって、
+  以前のImplementation Evidenceを
+  上書きしないこと
+
+- Correction前後のImplementation Evidenceを、
+  それぞれ異なるImplementation時点を示す
+  正式情報として追跡できること
+
+- Implementation Evidence構築および
+  Review Handoffに伴うState Transitionが、
+  Specificationで定義されたState Modelに
+  従って実行されること
+
+- State Transitionが発生した場合に、
+  必要なState Transition Historyが
+  記録されること
+
+- Phase 4で実装した
+  Evidence Collection、
+  Repository and Test State Verification、
+  Evidence Structure and Serialization、
+  Evidence Persistence、
+  Git Diff、
+  TDD Evidence、
+  Evidence Inconsistency Handling、
+  Evidence Immutability and Traceability、
+  Review Handoff等の既存責務を再利用し、
+  Phase 7独自のImplementation Evidence機構を
+  重複実装しないこと
+
+##### 5. Review, Correction and Human Handoff Integration Tests
+
+Phase 4から引き渡されたReview Inputについて、
+
+ChatGPT RunnerによるReview、
+Review Resultに基づくRouting、
+Correction、
+Test、
+新しいImplementation Evidence生成、
+Re-Review、
+Correction Limit、
+Early Stop、
+Human Handoff、
+およびFinal Approval工程へのHandoffまでが、
+
+Specificationで定義された責務境界、
+Human Approval Boundaryおよび
+Correction Ruleに従って
+正しく統合されていることをTestする。
+
+少なくとも以下をTest対象とする。
+
+- Phase 4から引き渡されたReview Inputを、
+  ChatGPT RunnerによるReviewへ
+  渡せること
+
+- Review Inputとして、
+  少なくとも以下を
+  相互に対応付けて利用できること
+
+  - Specification
+  - Approved Implementation Plan
+  - Codex Prompt
+  - Implementation Evidence
+  - Source Code
+  - Git Diff
+  - Test Code
+  - Test Result
+
+- Review開始前に、
+  必要なReview Inputが
+  存在することを確認できること
+
+- 必須Review Inputが不足し、
+  Reviewを成立させられない場合、
+  不足情報を推測または補完して
+  Reviewを実行しないこと
+
+- Review Inputが成立しない場合、
+  Specificationで定義された
+  Error and Stop Conditionsに従って
+  処理を停止またはHumanへ返せること
+
+- ChatGPT Runnerが、
+  Specification、
+  Approved Implementation Plan、
+  Codex Prompt、
+  Implementation Evidence、
+  Source Code、
+  Git Diff、
+  Test Code、
+  Test ResultをReviewし、
+  Review ReportおよびReview Resultを
+  返せること
+
+- Application Layerが、
+  ChatGPT Runnerから返された
+  Review Resultを独自に変更、
+  補完または置換しないこと
+
+- Review Resultとして、
+  `APPROVED`、
+  `REVISION_REQUIRED`、
+  `HUMAN_REVIEW_REQUIRED`
+  を区別して扱えること
+
+- Review Resultが`APPROVED`であり、
+  Phase 5で解決すべき未解決事項が
+  存在しない場合にのみ、
+  Final Approval工程へ
+  Handoffできること
+
+- Review Resultが`APPROVED`であっても、
+  Phase 5で解決すべき未解決事項が
+  存在する場合は、
+  Final Approval工程へ
+  進行しないこと
+
+- Review Resultが`REVISION_REQUIRED`の場合、
+  Review ReportおよびReview Findingsに基づいて、
+  Correctionが必要であることを
+  識別できること
+
+- `REVISION_REQUIRED`で指摘された変更が、
+  現在のHuman Approval Scope内で
+  安全に実行可能であることを
+  確認できること
+
+- Human Approval Scope内で
+  安全に実行可能なCorrectionのみを、
+  Correction工程へ
+  Routingできること
+
+- Correction内容を、
+  Application Layerが
+  Review Resultとは無関係に
+  独自に拡張しないこと
+
+- Correctionによって
+  Human Approval Scopeを超える変更が
+  必要となる場合、
+  自動Correctionとして継続しないこと
+
+- Human Approval Scopeを超える変更が
+  必要となる場合、
+  Critical Change、
+  Plan Revision、
+  Specification Reconsideration、
+  Human Handoffその他の
+  Specificationで定義された
+  適切な工程へRoutingできること
+
+- Correction実行後に、
+  必要なTestを実行できること
+
+- Correction実行後の
+  Source Code、
+  Test Code、
+  Git Diff、
+  Test Resultその他の
+  実際のImplementation状態に基づいて、
+  新しいImplementation Evidenceを
+  構築・保存できること
+
+- Correction前のImplementation Evidenceを、
+  Correction後のImplementationに対する
+  Evidenceとして再利用しないこと
+
+- Correction後のImplementation Evidenceによって、
+  Correction前のImplementation Evidenceを
+  上書きしないこと
+
+- Correction後に、
+  新しく生成されたImplementation Evidenceを含む
+  新しいReview Inputを構築できること
+
+- Correction後のRe-Reviewでは、
+  新しいImplementation Evidenceを含む
+  Review Inputを使用すること
+
+- Correction後に
+  新しいImplementation Evidenceを生成せず、
+  以前のEvidenceを使用したまま
+  Re-Reviewへ直接進行できないこと
+
+- Re-Reviewによって返された
+  新しいReview Resultに基づいて、
+  再度適切なRoutingを実行できること
+
+- Initial Implementationを、
+  Correction Countに含めないこと
+
+- Artifactを変更する
+  実質的なCorrectionが実行された場合に、
+  Correction Countを増加させること
+
+- Technical Retryを、
+  Correctionとして扱わないこと
+
+- Technical Retryによって、
+  Correction Countを増加させないこと
+
+- Technical Retryが、
+  対象Artifact、
+  Source Code、
+  Test Code、
+  Specification、
+  Approved Implementation Plan、
+  Human Approval Scopeを変更しない
+  同一の技術操作の安全な再実行に
+  限定されること
+
+- Technical Retryの条件を満たさず、
+  実質的なArtifact変更または
+  新しい設計判断が必要となる場合、
+  Technical Retryとして継続しないこと
+
+- Correction Loop中に
+  Early Stop Conditionを検出した場合、
+  自動Correctionを停止すること
+
+- Correction Countが
+  Specificationで定義された
+  最大自動Correction回数へ到達した場合、
+  それ以上の自動Correctionを
+  実行しないこと
+
+- Early Stopまたは
+  Correction Limit到達時に、
+  Humanへ処理を返せること
+
+- Review Resultが
+  `HUMAN_REVIEW_REQUIRED`の場合、
+  Application LayerまたはAI Runnerが
+  自動Correctionを開始しないこと
+
+- `HUMAN_REVIEW_REQUIRED`の場合、
+  Application LayerまたはAI Runnerが
+  Humanの判断を推測、補完または
+  代替しないこと
+
+- `HUMAN_REVIEW_REQUIRED`の場合、
+  HumanへReview Report、
+  Review Result、
+  対象Implementationその他の
+  判断に必要な情報を
+  引き渡せること
+
+- `HUMAN_REVIEW_REQUIRED`から
+  Correction工程へ進む場合、
+  HumanによるCorrection Requestが
+  存在することを確認できること
+
+- HumanによるCorrection Requestなしに、
+  `HUMAN_REVIEW_REQUIRED`から
+  `correction_requested`へ
+  自動遷移しないこと
+
+- Human Handoff時に、
+  必要に応じて少なくとも以下を
+  識別可能な状態で扱えること
+
+  - 停止またはHandoffの理由
+  - 現在のState
+  - Review Result
+  - 対象Implementation
+  - 最新のImplementation Evidence
+  - Review Report
+  - Correction履歴
+  - Correction Count
+  - 影響範囲
+  - 次に必要なHuman操作
+  - 再開可能な工程
+
+- Human Handoffによって、
+  それまでに正常に保存された
+  Implementation Evidence、
+  Review Report、
+  State Transition Historyその他の
+  正式Artifactを失わないこと
+
+- Correctionによって
+  Human Approval対象Artifactが変更された場合、
+  変更前のApproval Recordを
+  変更後のArtifactに対する
+  有効なApprovalとして
+  自動的に引き継がないこと
+
+- Approval対象Artifactが変更された場合、
+  必要なHuman Approvalを再取得する前に
+  Approval-required Stageへ
+  進行しないこと
+
+- Review、
+  Correction、
+  Re-Review、
+  Human Handoff、
+  Final Approval工程へのHandoffに伴う
+  State Transitionが、
+  Specificationで定義されたState Modelに
+  従って実行されること
+
+- 各State Transitionについて、
+  必要なState Transition Historyが
+  記録されること
+
+- Phase 5で実装した
+  Review Input Validation、
+  Artifact Consistency Review、
+  Semantic Staged Review、
+  Review Report、
+  Review Result Routing、
+  Correction Instruction、
+  Correction Loop、
+  Evidence Regeneration、
+  Correction Limit、
+  Early Stop、
+  Human Escalation等の既存責務を再利用し、
+  Phase 7独自のReviewまたは
+  Correction機構を重複実装しないこと
+
+##### 6. Final Approval and Merge Integration Tests
+
+Phase 5 Reviewの結果が`APPROVED`であり、
+Phase 5で解決すべき未解決事項が
+存在しないImplementationについて、
+
+Final Approval Entry Validation、
+Final Approval Target Artifactの構築、
+HumanによるFinal Approval Decision、
+Final Approval Recordの構築・保存、
+Approval Validation、
+Human Decision Routing、
+Merge Preconditions、
+Repository Safety、
+Merge Execution、
+Merge Result Verification、
+および`completed`へのState Transitionまでが、
+
+Specificationで定義された
+Human Approval Boundary、
+State Modelおよび責務境界に従って
+正しく統合されていることをTestする。
+
+少なくとも以下をTest対象とする。
+
+- Review Resultが`APPROVED`であることを
+  Final Approval工程への進行前に
+  確認できること
+
+- Phase 5で解決すべき未解決事項が
+  存在しないことを確認した場合にのみ、
+  Final Approval工程へ進行できること
+
+- Review Resultが`REVISION_REQUIRED`の場合、
+  Final Approval工程へ進行しないこと
+
+- Review Resultが`HUMAN_REVIEW_REQUIRED`の場合、
+  Final Approval工程へ進行しないこと
+
+- Final Approval工程へ進む前に、
+  少なくとも以下を
+  識別または参照できること
+
+  - Implementation Branch
+  - Base Commit
+  - current HEAD Commit
+  - Implementation Evidence
+  - Git Diff
+  - Review Report
+  - Review Result
+
+- Final Approvalに必要な情報が不足している場合、
+  不足情報を推測または補完して
+  HumanへFinal Approvalを要求しないこと
+
+- HumanへFinal Approvalを要求する前に、
+  Final Approval Target Artifactを
+  構築できること
+
+- Final Approval Target Artifactが、
+  少なくとも以下を保持または参照できること
+
+  - `implementation_branch`
+  - `head_commit`
+  - `base_commit`
+  - `implementation_evidence_reference`
+  - `git_diff_reference`
+  - `review_report_reference`
+
+- Final Approval Target Artifactによって、
+  Humanが判断対象とする
+  特定時点のImplementationを
+  一意に識別できること
+
+- Humanへ提示したFinal Approval対象と、
+  後続するApproval Recordおよび
+  Approval Validationの対象が
+  同一のFinal Approval Target Artifactであること
+
+- HumanによるFinal Approval Decisionを
+  受け取れること
+
+- Application Layer、
+  AI Runner、
+  Repository、
+  Git Componentその他のComponentが、
+  Humanの代わりにFinal Approval Decisionを
+  生成、推測、補完または変更しないこと
+
+- HumanによるFinal Approval Decisionから、
+  Final Approval Recordを
+  構築できること
+
+- Final Approval Recordを
+  Approval Record Repositoryへ
+  保存できること
+
+- Final Approval Recordが、
+  Final Approval Target Artifactを
+  Approval対象として参照できること
+
+- Final Approval Recordについて、
+  少なくともSpecificationで定義された
+  Approval Record情報を保持できること
+
+- Approval Validationによって、
+  Final Approval Recordが
+  存在することを確認できること
+
+- Approval Validationによって、
+  Final Approval RecordのDecisionが
+  HumanによるApprovalを
+  示していることを確認できること
+
+- Approval Validationによって、
+  Final Approval Recordが
+  現在のFinal Approval Target Artifactに
+  対応していることを確認できること
+
+- Final Approval RecordのArtifact Hashと、
+  現在のFinal Approval Target Artifactから
+  同一の算出規則で計算したArtifact Hashが
+  一致することを確認できること
+
+- Final Approval時点の
+  Implementation Branchと
+  現在のImplementation Branchが
+  一致することを確認できること
+
+- Final Approval時点のHEAD Commitと
+  現在のHEAD Commitが
+  一致することを確認できること
+
+- Final Approval対象となった
+  Implementation Evidence、
+  Git Diff、
+  Review Report等が、
+  現在Mergeしようとしている
+  Implementationと対応していることを
+  確認できること
+
+- Final Approval後に
+  Final Approval Target Artifactまたは
+  対象Implementationが変更された場合、
+  変更前のFinal Approval Recordを
+  変更後のImplementationに対する
+  有効なFinal Approvalとして扱わないこと
+
+- Final Approval Validationに失敗した場合、
+  Mergeを実行しないこと
+
+- Final Approval Validationに失敗した場合、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- HumanによるFinal Approval Decisionのみを根拠として、
+  Mergeを実行しないこと
+
+- HumanによるFinal Approval Decisionのみを根拠として、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- 有効なFinal Approvalを確認した後に、
+  Approval Validationとは独立して
+  Merge Readinessを確認できること
+
+- Approval Validationが成功したことだけを根拠として、
+  Repositoryが安全にMerge可能であると
+  判断しないこと
+
+- Merge開始前に、
+  Repository Safetyおよび
+  Merge Preconditionsを確認できること
+
+- Repositoryが安全にMergeできない場合、
+  Mergeを実行しないこと
+
+- Repositoryが安全にMergeできない場合、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- 有効なFinal Approvalと
+  Merge Readinessの双方を確認した場合にのみ、
+  Final ApprovalされたImplementation Branchを
+  `developer`へMergeする
+  Git Operationを要求できること
+
+- Application Layerが
+  Git操作そのものを独自実装せず、
+  Phase 6で利用するGit ComponentまたはServiceへ
+  Merge Operationを委譲できること
+
+- Merge Operationの結果を
+  Application Layerが受け取れること
+
+- Git Merge Operationが成功したことだけを根拠として、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- Merge Operation成功後に、
+  Merge Result Verificationを
+  実行できること
+
+- Merge Result Verificationによって、
+  HumanがFinal Approvalした
+  対象Implementationが
+  `developer`へ正しく取り込まれたことを
+  確認できること
+
+- 少なくとも以下のすべてを
+  確認した場合にのみ、
+  Current Stateを`completed`へ
+  遷移できること
+
+  1. Final Approvalが現在も有効である
+  2. Repositoryが安全にMerge可能である
+  3. Merge Operationが正常に成功した
+  4. Final Approvalされた対象Implementationが
+     `developer`へ正しく取り込まれた
+
+- Merge Operationが失敗した場合、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- Merge Result Verificationに失敗した場合、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- Merge Failureを、
+  Final Approval Failureとして
+  扱わないこと
+
+- Merge Failureまたは
+  Merge Result Verification Failure時に、
+  Specificationで定義された状態を維持し、
+  Humanへ処理を返せること
+
+- Merge Failureについて、
+  対象Artifact、
+  Source Code、
+  Test Code、
+  Specification、
+  Approved Implementation Plan、
+  Final Approval Target Artifact、
+  Human Approval Scope等を変更せず、
+  同一のGit Operationを
+  安全に再実行できる場合に限り、
+  Technical Retryを実行できること
+
+- Mergeに対するTechnical Retryによって、
+  Final Approval Target Artifactを
+  変更しないこと
+
+- Mergeに対するTechnical Retryによって、
+  Final Approval Recordの有効性を
+  失わせる変更を行わないこと
+
+- Mergeに対するTechnical Retryを、
+  Implementation Correctionとして
+  扱わないこと
+
+- Mergeに対するTechnical Retryによって、
+  Correction Countを増加させないこと
+
+- Merge Failureを解消するために
+  Final ApprovalされたImplementation自体の
+  変更が必要となる場合、
+  Technical Retryとして継続しないこと
+
+- Final ApprovalされたImplementation自体の
+  変更が必要となる場合、
+  Correction、
+  Critical Change、
+  Plan Revision、
+  Specification Reconsideration、
+  Human Handoffその他の
+  Specificationで定義された
+  適切な工程へRoutingできること
+
+- HumanがFinal Approvalではなく
+  Implementation Correctionを選択した場合、
+  Specificationで定義された
+  Correction工程へRoutingできること
+
+- HumanがPlan Revisionを選択した場合、
+  Plan Revision工程へRoutingできること
+
+- HumanがSpecification Reconsiderationを選択した場合、
+  Specification工程へRoutingできること
+
+- HumanがCancellationを選択した場合、
+  Current Stateを`cancelled`へ
+  遷移できること
+
+- Humanの差し戻しによって
+  Implementationまたは承認対象Artifactが変更された場合、
+  以前のFinal Approval Recordを
+  変更後の対象に自動的に引き継がないこと
+
+- Final Approval、
+  Approval Validation、
+  Merge Readiness、
+  Merge Execution、
+  Merge Result Verification、
+  Failure Handling、
+  `completed`または`cancelled`への遷移に伴う
+  State Transitionが、
+  Specificationで定義されたState Modelに
+  従って実行されること
+
+- 各State Transitionについて、
+  必要なState Transition Historyが
+  記録されること
+
+- Phase 6で実装した
+  Final Approval Entry Validation、
+  Final Approval Target Artifact、
+  Human Final Approval Decision、
+  Final Approval Record、
+  Approval Validation、
+  Human Decision Routing、
+  Merge Preconditions、
+  Repository Safety、
+  Merge Execution、
+  Merge Result Verification、
+  CompletionおよびFailure Handling等の
+  既存責務を再利用し、
+  Phase 7独自のFinal Approvalまたは
+  Merge機構を重複実装しないこと
+
+##### 7. Workflow State, Traceability and Stop / Human Handoff Integration Tests
+
+Phase 1からPhase 6までの責務を統合した
+End-to-End Workflow全体について、
+
+Current State、
+State Transition History、
+Human Approval Record、
+Implementation Evidence、
+Review Result、
+Correction履歴、
+Git Operation Result、
+その他の正式Artifactが、
+
+それぞれの責務を維持したまま
+一貫して管理・追跡され、
+
+Stop Condition、
+Technical Retry、
+Human Handoffその他の異常系においても、
+
+Specificationで定義された
+State Model、
+Human Approval Boundary、
+責務境界が維持されることをTestする。
+
+少なくとも以下をTest対象とする。
+
+- Workflowの各時点において、
+  Current Stateを取得・確認できること
+
+- Current Stateに基づいて、
+  現在実行可能なUseCaseを
+  識別・制御できること
+
+- 現在のStateで実行を許可されていないUseCaseを、
+  Application Layer、
+  AI Runner、
+  Codex Runner、
+  その他のComponentが
+  実行できないこと
+
+- 必要な前工程、
+  Human Approval、
+  Artifact Validation、
+  Reviewその他のGateを迂回して、
+  後続UseCaseへ進行できないこと
+
+- State Transitionが発生した場合、
+  Current Stateが
+  Specificationで定義された
+  次のStateへ更新されること
+
+- State Transitionが発生した場合、
+  必要なState Transition Historyが
+  記録されること
+
+- Current Stateと
+  State Transition Historyを
+  異なる責務として扱えること
+
+- State Transition Historyが、
+  過去のState Transitionを保持する
+  追記型の履歴として扱われること
+
+- Current Stateの更新によって、
+  過去のState Transition Historyを
+  上書きまたは改変しないこと
+
+- Workflow開始から
+  `completed`、
+  `cancelled`、
+  またはHuman Handoffに至るまでの
+  State Transitionを
+  後から追跡できること
+
+- Human Approval Recordについて、
+  対象Artifact、
+  Human Decision、
+  Artifact Hash、
+  Approval時点その他の
+  必要な情報との対応関係を
+  追跡できること
+
+- Human Approval Recordが、
+  現在の対象Artifactに対して
+  有効であるかを
+  Approval Validationによって
+  確認できること
+
+- Human Approval後に
+  承認対象Artifactが変更された場合、
+  変更前のApproval Recordを
+  変更後のArtifactに対する
+  有効なApprovalとして
+  自動的に引き継がないこと
+
+- Implementation Evidenceについて、
+  対象Implementation、
+  Source Code、
+  Git Diff、
+  Test Code、
+  Test Resultその他の
+  必要な情報との対応関係を
+  追跡できること
+
+- Correctionその他によって
+  Implementation状態が変更された場合、
+  以前のImplementation Evidenceを
+  変更後のImplementationに対する
+  Evidenceとして再利用しないこと
+
+- Correction後に、
+  新しいImplementation Evidenceを
+  構築・保存できること
+
+- Correction前後のImplementation Evidenceを
+  上書きせず、
+  それぞれ異なるImplementation時点を示す
+  正式情報として追跡できること
+
+- Human Approval Record、
+  Implementation Evidence、
+  Current State、
+  State Transition History、
+  Review Result、
+  Git Operation Resultを、
+  相互に関連付けて
+  追跡できること
+
+- Human Approval Record、
+  Implementation Evidence、
+  Current State、
+  State Transition History、
+  Review Result、
+  Git Operation Resultを、
+  同一の情報または
+  同一の責務として扱わないこと
+
+- Human Approvalが存在することを、
+  Implementation Evidenceが存在することの
+  代わりとして扱わないこと
+
+- Implementation Evidenceが存在することを、
+  Human Approvalが存在することの
+  代わりとして扱わないこと
+
+- Review Resultが`APPROVED`であることを、
+  Human Final Approvalの代わりとして
+  扱わないこと
+
+- Git Merge Operationが成功したことを、
+  Human Final Approvalの代わりとして
+  扱わないこと
+
+- Git Merge Operationが成功したことだけを根拠として、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- Workflowのいずれかの工程で、
+  必要な正式Documentが不足している場合、
+  不足情報を推測または補完して
+  後続工程へ進行しないこと
+
+- Workflowのいずれかの工程で、
+  必要な有効なHuman Approvalが不足している場合、
+  Human Decisionを推測、補完または生成して
+  後続工程へ進行しないこと
+
+- 必要なImplementation Prompt、
+  Implementation Evidence、
+  Review Input、
+  Review Reportその他の
+  必須Artifactが不足している場合、
+  不足情報を推測または補完して
+  後続工程へ進行しないこと
+
+- Specification、
+  Approved Implementation Plan、
+  Human Approval Scope、
+  Implementation、
+  Evidence、
+  Review Resultその他の間に、
+  現在のWorkflow内で
+  安全に解消できない
+  不足、矛盾、不整合または曖昧さが存在する場合、
+  Application Layerが
+  独自の設計判断またはHuman Decisionによって
+  解消したものとして扱わないこと
+
+- Specificationで定義された
+  Error and Stop Conditionsを検出した場合、
+  安全にWorkflowを停止できること
+
+- StopまたはHuman Handoffが発生した場合、
+  少なくとも以下を
+  識別可能な状態で扱えること
+
+  - 停止またはHandoffの理由
+  - 現在のState
+  - 影響範囲
+  - 次に必要なHuman操作
+  - 再開可能な工程
+
+- ReviewまたはCorrectionに関連する
+  Human Handoffでは、
+  必要に応じて以下についても
+  識別可能な状態で扱えること
+
+  - Review Result
+  - 対象Implementation
+  - 最新のImplementation Evidence
+  - Review Report
+  - Correction履歴
+  - Correction Count
+
+- StopまたはHuman Handoffによって、
+  それまでに正常に生成・保存された
+  State Transition History、
+  Human Approval Record、
+  Implementation Evidence、
+  Review Report、
+  その他の正式Artifactを
+  失わないこと
+
+- Human Handoff後に、
+  Humanが状況を確認した上で、
+  識別された再開可能な工程から
+  Workflowを再開できること
+
+- Technical Errorが発生した場合、
+  Specificationで定義された条件を満たす場合に限り、
+  Technical Retryを実行できること
+
+- Technical Retryが、
+  対象Artifact、
+  Source Code、
+  Test Code、
+  Specification、
+  Approved Implementation Plan、
+  Human Approval Scopeその他を変更せず、
+  同一の技術操作を
+  安全に再実行する場合に
+  限定されること
+
+- Technical Retryによって、
+  新しいHuman Approvalが
+  行われたものとして扱わないこと
+
+- Technical Retryによって、
+  新しいCorrectionが
+  行われたものとして扱わないこと
+
+- Technical Retryによって、
+  新しいImplementationが
+  生成されたものとして扱わないこと
+
+- Technical Retryによって、
+  Correction Countを増加させないこと
+
+- Technical Retryに伴う履歴を、
+  Human Approval、
+  Correction、
+  Implementationその他の履歴と
+  誤って混同しないこと
+
+- Technical Retryの条件を満たさず、
+  Artifact変更、
+  Source Code変更、
+  Test Code変更、
+  新しい設計判断、
+  Human Approval Scope変更その他の
+  実質的変更が必要となる場合、
+  Technical Retryとして継続しないこと
+
+- Technical Retryでは継続できない場合、
+  問題の内容に応じて、
+  Correction、
+  Critical Change、
+  Plan Revision、
+  Specification Reconsideration、
+  Human Handoffその他の
+  Specificationで定義された
+  適切な工程へRoutingできること
+
+- Approval不足、
+  Artifact不足、
+  Evidence不足、
+  Review Input不足、
+  Critical Change、
+  Correction Limit、
+  Early Stop、
+  Technical Error、
+  Merge Failureその他の
+  異常系においても、
+  Current Stateが
+  Specificationで定義された範囲を
+  逸脱しないこと
+
+- 異常系においても、
+  必要なState Transition Historyが
+  記録されること
+
+- 異常系においても、
+  Human Approval Boundaryを
+  迂回しないこと
+
+- Application Layerが、
+  HumanまたはUIからのUseCase要求を受け取り、
+  Current Stateを確認し、
+  次に実行可能なUseCaseを制御し、
+  必要なComponentへ処理を委譲し、
+  Artifactを後続工程へ引き渡し、
+  結果に応じたState Transitionまたは
+  Human Handoffを返せること
+
+- Application Layerが、
+  Human、
+  Core、
+  AI Runner、
+  Codex Runner、
+  Repository、
+  Infrastructureその他のComponentの
+  責務を代替しないこと
+
+- Phase 1からPhase 6までに実装した
+  State Management、
+  State Transition History、
+  Approval Record、
+  Approval Validation、
+  Implementation Evidence、
+  Review、
+  Correction、
+  Final Approval、
+  Git Operation、
+  StopおよびHuman Handoff等の
+  既存責務を再利用し、
+  Phase 7独自の同等機構を
+  重複実装しないこと
+
+##### 8. End-to-End MVP Validation and Completion Tests
+
+Phase 1からPhase 6までに実装し、
+Phase 7 Target 1からTarget 7までで統合した
+Application Layer全体について、
+
+Specificationで定義された
+SpecFlow Version 1 MVPのMain Flowを
+End-to-Endで実行し、
+
+Version 1 MVPのWorkflowおよび
+MVP Completion Conditionsを
+Application Layer全体として
+満たしていることをTestする。
+
+End-to-End Testでは、
+
+個別UseCaseまたはServiceが
+単独で動作することだけではなく、
+
+前工程のOutputおよび正式Artifactが
+後続工程のInputとして正しく引き渡され、
+
+Human Approval Boundary、
+State Transition、
+Artifact Traceability、
+Correction、
+Technical Retry、
+Stop Condition、
+Human Handoff、
+Final ApprovalおよびMergeに関する
+Specification上の制約を維持したまま、
+
+Workflow開始から完了まで
+一貫して実行できることを確認する。
+
+少なくとも以下をTest対象とする。
+
+- UIまたは呼び出し元から
+  Specificationを指定して
+  End-to-End Workflowを開始できること
+
+- 指定されたSpecificationについて、
+  有効なHuman Approvalを確認できること
+
+- 有効なSpecification Approvalが
+  存在する場合にのみ、
+  Implementation Plan Draft生成工程へ
+  進行できること
+
+- ChatGPT Runnerによって、
+  承認済みSpecificationから
+  Implementation Plan Draftを
+  生成できること
+
+- HumanがImplementation Planについて、
+  Approval、
+  Revision Request、
+  Cancellationを
+  選択できること
+
+- HumanがImplementation Planを
+  Approvalした場合、
+  Approval Recordを構築・保存し、
+  現在のImplementation Planとの
+  整合性をValidationできること
+
+- 有効なApproved Implementation Planから、
+  Codex Runnerが実行可能な
+  Implementation Promptを
+  生成できること
+
+- Implementation Branchを準備し、
+  Base Commitを識別できること
+
+- Codex Runnerが、
+  Human Approval Scope内で
+  ImplementationおよびTestを
+  実行できること
+
+- 振る舞いを変更するImplementationについて、
+  原則としてTDDを適用できること
+
+- TDD対象について、
+  Implementation前の
+  意図されたInitial Test Failure、
+  Implementation後のTarget Test Result、
+  Full Test Resultを
+  一連のWorkflow内で確認できること
+
+- Implementation完了後に、
+  実際のRepository状態およびTest状態から、
+  Source Code、
+  Git Status、
+  Git Diff、
+  Test Code、
+  Test Resultその他の
+  必要な情報を取得できること
+
+- Implementation Resultから、
+  Implementation Evidenceを
+  JSON形式で構築・保存できること
+
+- Implementation Evidenceと、
+  対象Implementation、
+  Source Code、
+  Git Diff、
+  Test Code、
+  Test Resultとの対応関係を
+  追跡できること
+
+- Phase 5 Reviewへ、
+  少なくとも以下を
+  相互に対応付けたReview Inputとして
+  引き渡せること
+
+  - Specification
+  - Approved Implementation Plan
+  - Codex Prompt
+  - Implementation Evidence
+  - Source Code
+  - Git Diff
+  - Test Code
+  - Test Result
+
+- ChatGPT Runnerによって
+  Reviewを実行し、
+  Review ReportおよびReview Resultを
+  取得できること
+
+- Review Resultに応じて、
+  `APPROVED`、
+  `REVISION_REQUIRED`、
+  `HUMAN_REVIEW_REQUIRED`
+  を区別して
+  適切な後続工程へRoutingできること
+
+- `REVISION_REQUIRED`となり、
+  Human Approval Scope内で
+  安全にCorrection可能な場合、
+  Correctionを実行できること
+
+- Correction後に
+  必要なTestを実行できること
+
+- Correction後の実際の
+  Repository状態およびTest状態から、
+  新しいImplementation Evidenceを
+  構築・保存できること
+
+- Correction後に、
+  新しいImplementation Evidenceを含む
+  Review Inputによって
+  Re-Reviewを実行できること
+
+- Correction前のImplementation Evidenceを
+  Correction後のImplementationに対する
+  Evidenceとして再利用しないこと
+
+- Correction Loopにおいて、
+  Correction Countを
+  Specificationで定義されたRuleに従って
+  管理できること
+
+- Technical Retryを
+  Correctionとして扱わず、
+  Correction Countを増加させないこと
+
+- Early Stop Conditionを検出した場合、
+  自動処理を停止して
+  Humanへ処理を返せること
+
+- Correction Limitへ到達した場合、
+  それ以上の自動Correctionを停止し、
+  Humanへ処理を返せること
+
+- Review Resultが
+  `HUMAN_REVIEW_REQUIRED`の場合、
+  Human Decisionを推測または代替せず、
+  Humanへ処理を返せること
+
+- Review Resultが`APPROVED`であり、
+  Phase 5で解決すべき未解決事項が
+  存在しない場合にのみ、
+  Final Approval工程へ進行できること
+
+- HumanへFinal Approvalを要求する前に、
+  Final Approval Target Artifactを
+  構築できること
+
+- HumanがFinal Approvalまたは
+  Specificationで定義された
+  差し戻しを選択できること
+
+- HumanがFinal Approvalした場合、
+  Final Approval Recordを
+  構築・保存できること
+
+- Final Approval Recordと
+  現在のFinal Approval Target Artifactとの
+  整合性をValidationできること
+
+- Human Final Approvalだけを根拠として、
+  `developer`へのMergeまたは
+  `completed`へのState Transitionを
+  実行しないこと
+
+- 有効なFinal Approvalを確認した後に、
+  Merge Readinessを
+  独立して確認できること
+
+- Repositoryが安全にMerge可能な場合にのみ、
+  Final ApprovalされたImplementation Branchを
+  `developer`へMergeできること
+
+- Merge Operation成功後に、
+  Merge Result Verificationを
+  実行できること
+
+- HumanがFinal Approvalした
+  対象Implementationが
+  `developer`へ正しく取り込まれたことを
+  確認できること
+
+- Final Approval Validation、
+  Merge Readiness、
+  Merge Execution、
+  Merge Result Verificationの
+  すべてが成功した場合にのみ、
+  Current Stateを`completed`へ
+  遷移できること
+
+- Workflow開始から`completed`まで、
+  Current Stateを
+  Specificationで定義されたState Modelに従って
+  管理できること
+
+- Workflow開始から`completed`までに発生した
+  State Transitionを、
+  State Transition Historyとして
+  後から追跡できること
+
+- Workflow全体について、
+  Human Approval Record、
+  Implementation Evidence、
+  Review Report、
+  Review Result、
+  Correction履歴、
+  Git Operation Resultその他の
+  必要な正式情報を
+  追跡できること
+
+正常系Main Flowに加えて、
+少なくとも以下の異常系または分岐について
+End-to-EndでTestする。
+
+- Specification Approvalが
+  存在しない場合
+
+- Specification Approvalが
+  現在のSpecificationに対して
+  無効である場合
+
+- HumanがImplementation Planに対して
+  Revision Requestを行った場合
+
+- HumanがCancellationを選択した場合
+
+- Implementation Prompt生成に
+  失敗した場合
+
+- 生成されたPrompt Resultが
+  AI実行可能でない場合
+
+- ImplementationまたはTest実行時に
+  Technical Errorが発生した場合
+
+- Implementation中に
+  Critical Changeが必要となった場合
+
+- Implementation Evidenceまたは
+  Review Inputとして必要な
+  必須Artifactが不足した場合
+
+- Review Resultが
+  `REVISION_REQUIRED`となった場合
+
+- Review Resultが
+  `HUMAN_REVIEW_REQUIRED`となった場合
+
+- Correction後に
+  Re-Reviewが必要となった場合
+
+- Early Stop Conditionを
+  検出した場合
+
+- Correction Limitへ
+  到達した場合
+
+- Human Approval後に
+  Approval対象Artifactが
+  変更された場合
+
+- Final Approval Validationに
+  失敗した場合
+
+- Merge Readinessを
+  確認できない場合
+
+- Merge Executionが
+  失敗した場合
+
+- Merge Result Verificationに
+  失敗した場合
+
+- Technical Retryの条件を
+  満たすTechnical Errorが
+  発生した場合
+
+- Technical Retryの条件を満たさず、
+  Artifact変更、
+  Source Code変更、
+  Test Code変更、
+  新しい設計判断、
+  Human Approval Scope変更その他の
+  実質的変更が必要となった場合
+
+これらの異常系または分岐では、
+
+Specificationで定義された
+State Transition、
+Stop Condition、
+Human Approval Boundary、
+Correction、
+Technical Retry、
+Human Handoffが
+維持されることを確認する。
+
+Human Approvalを必要とする工程について、
+
+有効なHuman Approvalなしに
+次のApproval-required Stageへ
+進行できないことを
+End-to-EndでTestする。
+
+Human Approval後に
+対象Artifactまたは対象Implementationが
+変更された場合、
+
+変更前のApproval Recordを
+変更後の対象に対する
+有効なApprovalとして
+自動的に適用しないことをTestする。
+
+StopまたはHuman Handoffが発生した場合、
+
+少なくとも、
+
+- 停止またはHandoffの理由
+- 現在のState
+- 影響範囲
+- 次に必要なHuman操作
+- 再開可能な工程
+
+を識別可能であり、
+
+それまでに正常に生成・保存された
+State Transition History、
+Human Approval Record、
+Implementation Evidence、
+Review Reportその他の
+正式Artifactが失われないことをTestする。
+
+Phase 1からPhase 7までに
+追加または変更された振る舞いについて、
+
+必要なIntegration Testおよび
+End-to-End Testを実行する。
+
+さらに、
+
+既存Testを含む
+Full Test Suiteを実行し、
+
+Phase 7の統合によって、
+既存のApplication Layer、
+Core、
+Infrastructureその他の
+既存機能にRegressionが
+発生していないことを確認する。
+
+Test Failure、
+Artifact不整合、
+State不整合、
+Approval不整合、
+Evidence不整合その他の問題を
+検出した場合、
+
+Testを通過させることのみを目的として、
+Specification、
+Human Approval Boundary、
+State Model、
+Correction Ruleその他の
+既存Ruleを緩和しないことをTestする。
+
+問題がVersion 1 MVPの範囲内で
+安全に解決できない場合、
+
+Application LayerまたはAI Runnerが
+独自の解釈によって補完せず、
+
+Human Handoff、
+Specification Reconsiderationその他の
+Specificationで定義された
+適切な工程へRoutingできることをTestする。
+
+最後に、
+
+Specificationで定義された
+MVP Completion Conditionsについて、
+
+少なくとも以下のすべてを
+Application Layer全体として
+満たしていることを確認する。
+
+- Specificationを指定できること
+
+- Specificationに対する
+  有効なHuman Approvalを確認できること
+
+- ChatGPT Runnerによって
+  Implementation Plan Draftを生成できること
+
+- HumanがImplementation Planを
+  Approvalまたは差し戻せること
+
+- Approved Implementation Planから
+  Codex用Implementation Promptを生成できること
+
+- Codex Runnerが
+  Human Approval Scope内で
+  ImplementationおよびTestを実行できること
+
+- 振る舞いを変更するImplementationについて、
+  原則としてTDDを適用できること
+
+- Implementation Evidenceを
+  JSON形式で構築・保存できること
+
+- Source CodeおよびGit Diffを
+  取得できること
+
+- Reviewに必要なArtifactを
+  一貫して提供できること
+
+- ChatGPT Runnerが
+  Review Reportを生成できること
+
+- 定義されたCorrectionおよび
+  Re-Reviewを実行できること
+
+- Early StopおよびCorrection Limitで
+  Humanへ処理を返せること
+
+- HumanがFinal Approvalまたは
+  差し戻しを行えること
+
+- Final Approval後、
+  Application Layerの制御によって
+  承認されたImplementation Branchを
+  `developer`へMergeできること
+
+- Mergeが正常に完了し、
+  Humanが承認した対象Implementationが
+  `developer`へ正しく取り込まれたことを
+  確認した場合にのみ、
+  Current Stateを`completed`へ
+  遷移できること
+
+- Human Approvalを必要とする工程を、
+  有効なHuman Approvalなしに
+  通過できないこと
+
+- Current State、
+  State Transition History、
+  Human Approval Record、
+  Implementation Evidenceを
+  Workflow全体で追跡できること
+
+Phase 7のEnd-to-End Testが成功したことだけを根拠として、
+Version 1 MVPが完成したものとして扱わず、
+
+Specificationで定義された
+MVP Completion Conditionsの各項目を
+満たしていることを確認した場合にのみ、
+
+Phase 7およびVersion 1 MVPの
+Completion Conditionsを満たしたものとして扱う。
+
+Phase 7のTestを成立させるために、
+
+Specificationで定義されていない
+新しいUseCase、
+新しいHuman Decision、
+新しいApproval Rule、
+新しいState、
+新しいReview Result、
+新しいCorrection Ruleその他の
+Version 1 MVP Boundaryを超える機能を
+追加しないこと。
+
+#### Completion Conditions
+
+##### 1. End-to-End Workflow Entry and Specification Approval Integration
+
+以下をすべて満たした場合、
+End-to-End Workflow Entry and
+Specification Approval Integrationを
+完了とする。
+
+- UIまたは呼び出し元から指定されたSpecificationを、
+  SpecFlow Version 1 MVPの
+  End-to-End Workflow開始対象として
+  識別できること
+
+- 対象Specificationに対応する
+  Approval Recordを取得できること
+
+- Approval Validationによって、
+  Approval Recordが
+  現在のSpecificationに対応していることを
+  確認できること
+
+- Approval RecordのDecisionが、
+  HumanによるApprovalを
+  示していることを確認できること
+
+- Approval RecordのArtifact Hashと、
+  現在のSpecificationから
+  同一の算出規則で計算したArtifact Hashが
+  一致することを確認できること
+
+- 有効なSpecification Approvalが
+  確認された場合にのみ、
+  Implementation Plan Draft生成工程へ
+  Workflowを進行できること
+
+- Specification Approvalが
+  存在しない、
+  無効である、
+  または現在のSpecificationとの
+  整合性を確認できない場合、
+  Implementation Plan Draft生成工程へ
+  進行しないこと
+
+- SpecificationがApproval後に変更された場合、
+  変更前のApproval Recordを
+  現在のSpecificationに対する
+  有効なApprovalとして扱わないこと
+
+- 別Artifactに対するApproval Recordを、
+  現在のSpecificationに対する
+  有効なApprovalとして扱わないこと
+
+- Specification Approvalが
+  不足または無効である場合、
+  Application LayerまたはAI Runnerが
+  Human Approvalを
+  推測、補完または生成しないこと
+
+- Specification Approvalが
+  不足または無効である場合、
+  Specificationで定義された
+  Stop Conditionおよび
+  Human Approval Boundaryに従って、
+  処理を停止またはHumanへ返せること
+
+- Workflow開始および
+  Implementation Plan Draft生成工程への
+  進行に伴うState Transitionが、
+  Specificationで定義された
+  State Modelに従って実行されること
+
+- 必要なState Transition Historyが
+  記録されること
+
+- Phase 1で実装した
+  State Management、
+  Approval Record Repository、
+  Approval Validationその他の
+  既存責務を再利用し、
+  Phase 7独自の同等機構を
+  重複実装していないこと
+
+- Specification Approval Validationを
+  迂回して、
+  未承認または無効なSpecificationから
+  Implementation Plan Draft生成工程へ
+  進行できないこと
+
+- `1. End-to-End Workflow Entry and
+  Specification Approval Integration Tests`
+  が成功すること
+
+##### 2. Plan Generation, Plan Approval and Implementation Prompt Integration
+
+以下をすべて満たした場合、
+Plan Generation、
+Plan Approvalおよび
+Implementation Prompt Integrationを
+完了とする。
+
+- 有効なSpecification Approvalが
+  確認された場合に、
+  ChatGPT Runnerへ
+  Implementation Plan Draft生成を
+  要求できること
+
+- ChatGPT Runnerによって生成された
+  Implementation Plan Draftを、
+  HumanによるReviewおよび
+  Approval対象として扱えること
+
+- Implementation Plan Draft生成後、
+  Specificationで定義された
+  Plan Approval工程へ
+  Workflowを進行できること
+
+- HumanがImplementation Planについて、
+  Approval、
+  Revision Request、
+  Cancellationを
+  選択できること
+
+- HumanがImplementation Planを
+  Approvalした場合、
+  対象Implementation Planに対応する
+  Approval Recordを
+  構築・保存できること
+
+- Approval Validationによって、
+  Approval Recordが
+  現在のImplementation Planに
+  対応していることを確認できること
+
+- Approval RecordのDecisionが、
+  HumanによるApprovalを
+  示していることを確認できること
+
+- Approval RecordのArtifact Hashと、
+  現在のImplementation Planから
+  同一の算出規則で計算したArtifact Hashが
+  一致することを確認できること
+
+- 有効なPlan Approvalが
+  確認された場合にのみ、
+  Approved Implementation Planとして扱い、
+  Implementation Prompt生成工程へ
+  進行できること
+
+- Approved Implementation Planから、
+  Codex Runnerが実行可能な
+  Implementation Promptを
+  生成できること
+
+- Plan Approvalが
+  存在しない、
+  無効である、
+  または現在のImplementation Planとの
+  整合性を確認できない場合、
+  Implementation Prompt生成工程へ
+  進行しないこと
+
+- Implementation Planが
+  Approval後に変更された場合、
+  変更前のApproval Recordを
+  変更後のImplementation Planに対する
+  有効なApprovalとして扱わないこと
+
+- 別のImplementation Planに対する
+  Approval Recordを、
+  現在のImplementation Planに対する
+  有効なApprovalとして扱わないこと
+
+- Plan Approvalが
+  不足または無効である場合、
+  Application LayerまたはAI Runnerが
+  Human Approvalを
+  推測、補完または生成しないこと
+
+- HumanがRevision Requestを選択した場合、
+  Specificationで定義された
+  Plan Revision工程へ
+  Routingできること
+
+- Revisionによって
+  Implementation Planが変更された場合、
+  変更後のImplementation Planについて
+  新しいHuman Approvalを
+  必要とすること
+
+- Revision前のApproval Recordを、
+  Revision後のImplementation Planに
+  自動的に引き継がないこと
+
+- HumanがCancellationを選択した場合、
+  Current Stateを
+  Specificationで定義された
+  `cancelled`へ遷移できること
+
+- Cancellation後に、
+  Human Decisionを無視して
+  Implementation Prompt生成その他の
+  後続工程を自動的に開始しないこと
+
+- Implementation Prompt生成に
+  失敗した場合、
+  Implementation工程へ
+  進行しないこと
+
+- 生成されたPrompt Resultが
+  Codex Runnerによって
+  実行可能な状態でない場合、
+  Implementation工程へ
+  進行しないこと
+
+- Implementation Prompt生成失敗または
+  実行不能なPrompt Resultについて、
+  Specificationで定義された
+  Error and Stop Conditionsに従って、
+  処理を停止またはHumanへ返せること
+
+- Plan Generation、
+  Plan Approval、
+  Approval Validation、
+  Plan Revision、
+  Implementation Prompt Generationに伴う
+  State Transitionが、
+  Specificationで定義された
+  State Modelに従って実行されること
+
+- 必要なState Transition Historyが
+  記録されること
+
+- Phase 2およびPhase 3で実装した
+  Plan Generation、
+  Plan Approval、
+  Approval Validation、
+  Plan Revision、
+  Implementation Prompt Generationその他の
+  既存責務を再利用し、
+  Phase 7独自の同等機構を
+  重複実装していないこと
+
+- Plan Approval Validationを
+  迂回して、
+  未承認または無効なImplementation Planから
+  Implementation Promptを生成し、
+  Implementation工程へ
+  進行できないこと
+
+- `2. Plan Generation, Plan Approval and
+  Implementation Prompt Integration Tests`
+  が成功すること
+
+##### 3. Implementation Execution and TDD Integration
+
+以下をすべて満たした場合、
+Implementation Executionおよび
+TDD Integrationを
+完了とする。
+
+- 有効なApproved Implementation Planから生成された
+  Implementation Promptを、
+  Implementation実行対象として
+  使用できること
+
+- Implementation開始前に、
+  Implementation Promptが
+  有効なApproved Implementation Planに基づいて
+  生成されたものであることを
+  確認できること
+
+- Codex Runnerが実行可能な
+  Implementation Promptであることを確認した上で、
+  Implementation工程へ
+  進行できること
+
+- Implementation開始時に、
+  対象Implementation Branchを
+  準備できること
+
+- Implementation開始時に、
+  Base Commitを
+  識別できること
+
+- Implementation BranchおよびBase Commitを、
+  後続するImplementation Result、
+  Implementation Evidence、
+  ReviewおよびFinal Approvalから
+  識別可能な状態で扱えること
+
+- Codex Runnerへ、
+  Approved Implementation Planおよび
+  Implementation Promptによって定められた
+  Human Approval Scope内のImplementationのみを
+  要求できること
+
+- Codex Runnerが、
+  Human Approval Scopeを独自に拡張して
+  Source CodeまたはTest Codeを
+  変更しないこと
+
+- 振る舞いを変更するImplementationについて、
+  原則としてTDDを
+  適用できること
+
+- TDD対象のImplementationについて、
+  期待される振る舞いを表現するTestを
+  Implementation前に
+  作成または変更できること
+
+- Implementation前に、
+  対象Testが意図した理由によって
+  Failureとなることを
+  確認できること
+
+- Implementation前の
+  意図されたTest Failureを、
+  Implementation Failureまたは
+  Stop Conditionとして
+  扱わないこと
+
+- Implementation前のTest Failure確認後に、
+  対象Testを成功させるための
+  必要最小限のImplementationを
+  実行できること
+
+- Implementation後に
+  Target Testを実行し、
+  Target Test Resultを
+  取得できること
+
+- 必要なFull Test Suiteを実行し、
+  Full Test Resultを
+  取得できること
+
+- Test Resultを、
+  後続するImplementation Resultおよび
+  Implementation Evidenceから
+  利用可能な状態で扱えること
+
+- TDD対象について、
+  Test作成または変更、
+  Initial Test Result、
+  Target Test Result、
+  Full Test Resultを
+  後続工程から
+  識別可能な状態で扱えること
+
+- Codex RunnerによるImplementation中に、
+  Human Approval Scopeを超える変更が
+  必要であることを
+  検出できること
+
+- Human Approval Scopeを超える変更を
+  Critical Changeとして扱い、
+  承認範囲を自動的に拡張して
+  Implementationを継続しないこと
+
+- Critical Changeが発生した場合、
+  Specificationで定義された
+  `critical_approval_pending`その他の
+  適切なHuman Approval工程へ
+  Routingできること
+
+- Critical Changeに対する
+  有効なHuman Approvalを確認する前に、
+  Critical Changeを
+  Implementationへ反映しないこと
+
+- Critical Changeに対するHuman Decisionを、
+  Application Layer、
+  Codex Runner、
+  AI Runnerその他のComponentが
+  推測、補完または生成しないこと
+
+- ImplementationまたはTest実行時に
+  Technical Errorが発生した場合、
+  Specificationで定義された条件を
+  満たす場合に限り、
+  Technical Retryを
+  実行できること
+
+- Technical Retryでは、
+  Specification、
+  Approved Implementation Plan、
+  Implementation Prompt、
+  Source Code、
+  Test Code、
+  Human Approval Scopeその他の
+  Technical Retryの前提となるArtifactまたは
+  対象範囲を変更しないこと
+
+- Technical Retryでは、
+  新しい設計判断を導入せず、
+  同一の技術操作のみを
+  安全に再実行すること
+
+- Technical Retryを
+  Implementation Correctionとして
+  扱わないこと
+
+- Technical Retryによって
+  Correction Countを
+  増加させないこと
+
+- Technical Retryの条件を満たさず、
+  Source Code、
+  Test Code、
+  Approval Scopeその他の
+  実質的変更が必要となる場合、
+  Technical Retryとして
+  自動継続しないこと
+
+- Technical Retryでは解決できない場合、
+  問題の内容に応じて、
+  Correction、
+  Critical Change、
+  Human Handoffその他の
+  Specificationで定義された
+  適切な工程へRoutingできること
+
+- Implementationが正常に完了した場合、
+  Codex Runnerから
+  Implementation Resultを
+  Application Layerへ
+  返せること
+
+- Implementation Resultから、
+  後続するImplementation Evidence構築に必要な
+  Implementation Branch、
+  Base Commit、
+  Source Code、
+  Git Status、
+  Git Diff、
+  Test Code、
+  Test Resultその他の情報を
+  取得または参照可能な状態へ
+  引き渡せること
+
+- Implementation Executionでは、
+  Implementation Evidenceそのものを
+  構築・保存しないこと
+
+- Implementation Resultと
+  Implementation Evidenceを、
+  同一の責務または
+  同一のArtifactとして
+  扱わないこと
+
+- Implementation Execution完了後に、
+  Phase 4のImplementation Evidence構築工程へ
+  正しくHandoffできること
+
+- Implementation開始、
+  Implementation実行、
+  Implementation完了、
+  Implementation Failure、
+  Critical Changeその他に伴う
+  State Transitionが、
+  Specificationで定義された
+  State Modelに従って
+  実行されること
+
+- 必要なState Transition Historyが
+  記録されること
+
+- Phase 3で実装した
+  Implementation Prompt、
+  Implementation Branch、
+  Base Commit、
+  Codex Runner Execution、
+  Implementation Resultその他の
+  既存責務を再利用し、
+  Phase 7独自のImplementation Execution機構を
+  重複実装していないこと
+
+- Human Approval Boundary、
+  Critical Change Approval、
+  Technical Retryその他のGateを迂回して、
+  未承認の変更を含むImplementationを
+  後続するImplementation Evidence工程へ
+  正常なImplementation Resultとして
+  引き渡せないこと
+
+- `3. Implementation Execution and
+  TDD Integration Tests`
+  が成功すること
+
+##### 4. Implementation Evidence and Review Handoff Integration
+
+以下をすべて満たした場合、
+Implementation Evidenceおよび
+Review Handoff Integrationを
+完了とする。
+
+- Phase 3から引き渡された
+  Implementation Resultを、
+  Implementation Evidence構築の
+  入力として使用できること
+
+- Implementation Evidenceを、
+  Codex Runnerの自己申告だけではなく、
+  実際のRepository状態および
+  Test状態に基づいて
+  構築できること
+
+- Implementation Evidence構築時に、
+  少なくとも以下を
+  取得または参照できること
+
+  - Source Code
+  - Git Status
+  - Git Diff
+  - Base Commit
+  - Implementation Branch
+  - Test Code
+  - Test Result
+
+- Git Diffを、
+  Base Commitと
+  現在のImplementation Branch上の
+  Implementation状態との差分として
+  取得または識別できること
+
+- Implementation Evidenceが、
+  対象Implementation Branch、
+  Base Commit、
+  Source Code、
+  Git Diff、
+  Test Code、
+  Test Resultその他の
+  実際のImplementation状態と
+  対応していることを確認できること
+
+- TDD対象のImplementationについて、
+  少なくとも以下を
+  Implementation Evidenceから
+  識別できること
+
+  - `tests_created_or_modified`
+  - `test_commands`
+  - `initial_test_result`
+  - `target_test_result`
+  - `full_test_result`
+
+- Implementation Evidenceを、
+  Specificationで定義された形式に従って
+  JSONとして構築・保存できること
+
+- 保存されたImplementation Evidenceを、
+  後続するReviewその他の工程から
+  参照可能な状態で扱えること
+
+- Implementation Evidenceと、
+  Repository状態、
+  Git Diff、
+  Test Resultその他の
+  対応関係に不整合が存在する場合、
+  その不整合を
+  検出・識別できること
+
+- Implementation Evidence上の
+  不足または不整合について、
+  Application Layerが
+  独自に推測、補完、隠蔽または
+  正常化しないこと
+
+- Implementation Evidenceまたは
+  Review Inputとして成立するために必要な
+  必須Artifactまたは必須情報が不足している場合、
+  不足情報を推測または補完して
+  Review工程へ進行しないこと
+
+- 必須Artifactまたは必須情報の不足によって、
+  Implementation Evidenceまたは
+  Review Inputが成立しない場合、
+  Specificationで定義された
+  Error and Stop Conditionsに従って、
+  処理を停止またはHumanへ返せること
+
+- Review Inputとして必要なArtifactが存在し、
+  Implementation Evidenceとして
+  参照可能である一方で、
+  Repository状態、
+  Git Diff、
+  Test Resultその他との不整合が
+  Evidence上で識別されている場合、
+  Application Layerが
+  その不整合を独自に修正または正常化せず、
+  不整合を識別可能な状態のまま
+  Review工程へ引き渡せること
+
+- Review工程へ、
+  少なくとも以下を
+  相互に対応付けたReview Inputとして
+  引き渡せること
+
+  - Specification
+  - Approved Implementation Plan
+  - Codex Prompt
+  - Implementation Evidence
+  - Source Code
+  - Git Diff
+  - Test Code
+  - Test Result
+
+- Review Inputに含まれるArtifactが、
+  同一Workflowおよび
+  同一Implementation状態に
+  対応していることを
+  確認できること
+
+- Phase 4およびPhase 7の
+  Implementation Evidence工程では、
+  Review Resultそのものを
+  生成しないこと
+
+- Implementation Evidenceを、
+  Current State、
+  State Transition History、
+  Human Approval Record、
+  Review Resultと
+  同一の責務または
+  同一のArtifactとして
+  扱わないこと
+
+- Correctionその他によって
+  Implementation状態が変更された場合、
+  変更後の実際のRepository状態および
+  Test状態に基づいて、
+  新しいImplementation Evidenceを
+  構築・保存できること
+
+- Correction前のImplementation Evidenceを、
+  Correction後のImplementationに対する
+  Evidenceとして
+  再利用しないこと
+
+- Correction後のImplementation Evidenceによって、
+  Correction前のImplementation Evidenceを
+  上書きしないこと
+
+- Correction前後のImplementation Evidenceを、
+  それぞれ異なるImplementation状態に対応する
+  正式Artifactとして
+  追跡できること
+
+- Implementation Evidence構築、
+  保存、
+  Review Handoff、
+  StopまたはHuman Handoffに伴う
+  State Transitionが、
+  Specificationで定義された
+  State Modelに従って
+  実行されること
+
+- 必要なState Transition Historyが
+  記録されること
+
+- Phase 4で実装した
+  Repository State Collection、
+  Git Diff取得、
+  Test Result取得、
+  Implementation Evidence構築・保存、
+  Review Input構築その他の
+  既存責務を再利用し、
+  Phase 7独自のImplementation Evidence機構を
+  重複実装していないこと
+
+- Implementation Evidenceまたは
+  Review Inputとして成立するために必要な
+  必須情報が不足しているにもかかわらず、
+  正常なEvidenceまたはReview Inputとして
+  後続工程へ引き渡せないこと
+
+- `4. Implementation Evidence and
+  Review Handoff Integration Tests`
+  が成功すること
+
+##### 5. Review, Correction and Human Handoff Integration
+
+以下をすべて満たした場合、
+Review、
+Correctionおよび
+Human Handoff Integrationを
+完了とする。
+
+- Phase 4から引き渡された
+  Review Inputを、
+  ChatGPT RunnerによるReviewへ
+  引き渡せること
+
+- Review開始前に、
+  Review Inputとして必要な
+  Artifactが存在することを
+  確認できること
+
+- Review Inputとして、
+  少なくとも以下を
+  相互に対応付けて利用できること
+
+  - Specification
+  - Approved Implementation Plan
+  - Codex Prompt
+  - Implementation Evidence
+  - Source Code
+  - Git Diff
+  - Test Code
+  - Test Result
+
+- 必須Review Inputが不足し、
+  Reviewを成立させられない場合、
+  不足情報を推測または補完して
+  Reviewを実行しないこと
+
+- Review Inputが成立しない場合、
+  Specificationで定義された
+  Error and Stop Conditionsに従って、
+  処理を停止またはHumanへ返せること
+
+- ChatGPT Runnerによって、
+  Review InputをReviewし、
+  Review ReportおよびReview Resultを
+  取得できること
+
+- Application Layerが、
+  ChatGPT Runnerから返された
+  Review Resultを独自に変更、
+  補完または置換しないこと
+
+- Review Resultとして、
+  `APPROVED`、
+  `REVISION_REQUIRED`、
+  `HUMAN_REVIEW_REQUIRED`
+  を区別して扱えること
+
+- Review Resultが`APPROVED`であり、
+  Phase 5で解決すべき未解決事項が
+  存在しない場合にのみ、
+  Final Approval工程へ
+  Handoffできること
+
+- Review Resultが`APPROVED`であっても、
+  Phase 5で解決すべき未解決事項が
+  存在する場合、
+  Final Approval工程へ
+  進行しないこと
+
+- Review Resultが`REVISION_REQUIRED`の場合、
+  Review ReportおよびReview Findingsから
+  Correctionが必要であることを
+  識別できること
+
+- `REVISION_REQUIRED`で要求された変更が、
+  現在のHuman Approval Scope内で
+  安全に実行可能である場合にのみ、
+  自動Correction工程へ
+  Routingできること
+
+- Correction内容を、
+  Application Layerが
+  Review ResultおよびReview Findingsを超えて
+  独自に拡張しないこと
+
+- Correctionによって
+  Human Approval Scopeを超える変更が
+  必要となる場合、
+  自動Correctionとして
+  継続しないこと
+
+- Human Approval Scopeを超える変更、
+  SpecificationまたはPlanの再検討、
+  その他Human Decisionが必要となる場合、
+  Critical Change、
+  Plan Revision、
+  Specification Reconsideration、
+  Human Handoffその他の
+  Specificationで定義された
+  適切な工程へRoutingできること
+
+- Correction実行後に、
+  必要なTestを実行できること
+
+- Correction後の
+  Source Code、
+  Test Code、
+  Git Diff、
+  Test Resultその他の
+  実際のImplementation状態に基づいて、
+  新しいImplementation Evidenceを
+  構築・保存できること
+
+- Correction前のImplementation Evidenceを、
+  Correction後のImplementationに対する
+  Evidenceとして
+  再利用しないこと
+
+- Correction後のImplementation Evidenceによって、
+  Correction前のImplementation Evidenceを
+  上書きしないこと
+
+- Correction後に、
+  新しく生成されたImplementation Evidenceを含む
+  新しいReview Inputを
+  構築できること
+
+- Re-Reviewでは、
+  Correction後に生成された
+  新しいImplementation Evidenceを含む
+  Review Inputを使用すること
+
+- Correction後に
+  新しいImplementation Evidenceを生成せず、
+  以前のEvidenceを使用したまま
+  Re-Reviewへ直接進行しないこと
+
+- Re-Reviewによって返された
+  新しいReview Resultに基づいて、
+  再度適切なRoutingを
+  実行できること
+
+- Initial Implementationを
+  Correction Countに
+  含めないこと
+
+- Artifactを変更する
+  実質的なCorrectionが実行された場合に、
+  Correction Countを
+  増加させること
+
+- Technical Retryを
+  Correctionとして
+  扱わないこと
+
+- Technical Retryによって
+  Correction Countを
+  増加させないこと
+
+- Technical Retryが、
+  Technical Retryの前提となるArtifactまたは
+  対象範囲を変更せず、
+  新しい設計判断を伴わない
+  同一の技術操作の安全な再実行に
+  限定されること
+
+- Technical Retryの条件を満たさず、
+  実質的なArtifact変更または
+  新しい設計判断が必要となる場合、
+  Technical Retryとして
+  継続しないこと
+
+- Correction Loop中に
+  Early Stop Conditionを検出した場合、
+  自動Correctionを
+  停止できること
+
+- Correction Countが
+  Specificationで定義された
+  最大自動Correction回数へ到達した場合、
+  それ以上の自動Correctionを
+  実行しないこと
+
+- Early Stopまたは
+  Correction Limit到達時に、
+  Humanへ処理を
+  返せること
+
+- Review Resultが
+  `HUMAN_REVIEW_REQUIRED`の場合、
+  Application LayerまたはAI Runnerが
+  自動Correctionを
+  開始しないこと
+
+- `HUMAN_REVIEW_REQUIRED`の場合、
+  Application LayerまたはAI Runnerが
+  Human Decisionを
+  推測、補完または代替しないこと
+
+- `HUMAN_REVIEW_REQUIRED`の場合、
+  Humanへ判断に必要な
+  Review Report、
+  Review Result、
+  対象Implementationその他の情報を
+  引き渡せること
+
+- `HUMAN_REVIEW_REQUIRED`から
+  Correction工程へ進む場合、
+  HumanによるCorrection Requestが
+  存在することを
+  確認できること
+
+- HumanによるCorrection Requestなしに、
+  `HUMAN_REVIEW_REQUIRED`から
+  `correction_requested`へ
+  自動遷移しないこと
+
+- Human Handoff時に、
+  必要に応じて少なくとも以下を
+  識別可能な状態で扱えること
+
+  - 停止またはHandoffの理由
+  - 現在のState
+  - Review Result
+  - 対象Implementation
+  - 最新のImplementation Evidence
+  - Review Report
+  - Correction履歴
+  - Correction Count
+  - 影響範囲
+  - 次に必要なHuman操作
+  - 再開可能な工程
+
+- Human Handoffによって、
+  それまでに正常に保存された
+  Implementation Evidence、
+  Review Report、
+  State Transition Historyその他の
+  正式Artifactを
+  失わないこと
+
+- Correctionによって
+  Human Approval対象Artifactが変更された場合、
+  変更前のApproval Recordを
+  変更後のArtifactに対する
+  有効なApprovalとして
+  自動的に引き継がないこと
+
+- Approval対象Artifactが変更された場合、
+  必要なHuman Approvalを再取得する前に
+  Approval-required Stageへ
+  進行しないこと
+
+- Review、
+  Correction、
+  Re-Review、
+  Human Handoff、
+  Final Approval工程へのHandoffに伴う
+  State Transitionが、
+  Specificationで定義された
+  State Modelに従って
+  実行されること
+
+- 必要なState Transition Historyが
+  記録されること
+
+- Phase 5で実装した
+  Review Input Validation、
+  Artifact Consistency Review、
+  Semantic Staged Review、
+  Review Report、
+  Review Result Routing、
+  Correction Instruction、
+  Correction Loop、
+  Evidence Regeneration、
+  Correction Limit、
+  Early Stop、
+  Human Escalationその他の
+  既存責務を再利用し、
+  Phase 7独自のReviewまたは
+  Correction機構を
+  重複実装していないこと
+
+- `5. Review, Correction and
+  Human Handoff Integration Tests`
+  が成功すること
+
+##### 6. Final Approval and Merge Integration
+
+以下をすべて満たした場合、
+Final Approvalおよび
+Merge Integrationを
+完了とする。
+
+- Phase 5 Reviewの結果が
+  `APPROVED`であることを
+  Final Approval工程への進行前に
+  確認できること
+
+- Phase 5で解決すべき未解決事項が
+  存在しない場合にのみ、
+  Final Approval工程へ
+  進行できること
+
+- Review Resultが
+  `REVISION_REQUIRED`または
+  `HUMAN_REVIEW_REQUIRED`である場合、
+  Final Approval工程へ
+  進行しないこと
+
+- Final Approval工程へ進む前に、
+  少なくとも以下を
+  識別または参照できること
+
+  - Implementation Branch
+  - Base Commit
+  - current HEAD Commit
+  - Implementation Evidence
+  - Git Diff
+  - Review Report
+  - Review Result
+
+- Final Approvalに必要な情報が不足している場合、
+  不足情報を推測または補完して
+  HumanへFinal Approvalを
+  要求しないこと
+
+- HumanへFinal Approvalを要求する前に、
+  Final Approval Target Artifactを
+  構築できること
+
+- Final Approval Target Artifactが、
+  少なくとも以下を
+  保持または参照できること
+
+  - `implementation_branch`
+  - `head_commit`
+  - `base_commit`
+  - `implementation_evidence_reference`
+  - `git_diff_reference`
+  - `review_report_reference`
+
+- Final Approval Target Artifactによって、
+  Humanが判断対象とする
+  特定時点のImplementationを
+  一意に識別できること
+
+- Humanへ提示したFinal Approval対象と、
+  Final Approval Recordおよび
+  Approval Validationの対象が
+  同一のFinal Approval Target Artifactであること
+
+- Humanによる
+  Final Approval Decisionを
+  受け取れること
+
+- Application Layer、
+  AI Runner、
+  Repository、
+  Git Componentその他のComponentが、
+  Humanの代わりに
+  Final Approval Decisionを
+  生成、推測、補完または変更しないこと
+
+- HumanによるFinal Approval Decisionから、
+  Final Approval Recordを
+  構築・保存できること
+
+- Final Approval Recordが、
+  Final Approval Target Artifactを
+  Approval対象として
+  参照できること
+
+- Final Approval Recordについて、
+  Specificationで定義された
+  必要なApproval Record情報を
+  保持できること
+
+- Approval Validationによって、
+  Final Approval Recordが
+  存在することを確認できること
+
+- Approval Validationによって、
+  Final Approval RecordのDecisionが
+  HumanによるApprovalを
+  示していることを確認できること
+
+- Approval Validationによって、
+  Final Approval Recordが
+  現在のFinal Approval Target Artifactに
+  対応していることを確認できること
+
+- Final Approval RecordのArtifact Hashと、
+  現在のFinal Approval Target Artifactから
+  同一の算出規則で計算したArtifact Hashが
+  一致することを確認できること
+
+- Final Approval時点の
+  Implementation BranchおよびHEAD Commitが、
+  現在Mergeしようとしている
+  Implementationと
+  一致することを確認できること
+
+- Final Approval対象となった
+  Implementation Evidence、
+  Git Diff、
+  Review Reportが、
+  現在Mergeしようとしている
+  Implementationと対応していることを
+  確認できること
+
+- Final Approval後に
+  Final Approval Target Artifactまたは
+  対象Implementationが変更された場合、
+  変更前のFinal Approval Recordを
+  変更後のImplementationに対する
+  有効なFinal Approvalとして
+  扱わないこと
+
+- Final Approval Validationに失敗した場合、
+  Mergeを実行しないこと
+
+- Final Approval Validationに失敗した場合、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- HumanによるFinal Approval Decisionだけを根拠として、
+  Mergeを実行しないこと
+
+- HumanによるFinal Approval Decisionだけを根拠として、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- 有効なFinal Approvalを確認した後に、
+  Approval Validationとは独立して
+  Merge Readinessを
+  確認できること
+
+- Approval Validationが成功したことだけを根拠として、
+  Repositoryが安全にMerge可能であると
+  判断しないこと
+
+- Merge開始前に、
+  Repository Safetyおよび
+  Merge Preconditionsを
+  確認できること
+
+- Repositoryが安全にMergeできない場合、
+  Mergeを実行せず、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- 有効なFinal Approvalと
+  Merge Readinessの双方を確認した場合にのみ、
+  Final ApprovalされたImplementation Branchを
+  `developer`へMergeする
+  Git Operationを要求できること
+
+- Application Layerが
+  Git操作そのものを独自実装せず、
+  Phase 6で利用する
+  Git ComponentまたはServiceへ
+  Merge Operationを委譲できること
+
+- Merge Operationの結果を
+  Application Layerが
+  受け取れること
+
+- Merge Operationが成功したことだけを根拠として、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- Merge Operation成功後に、
+  Merge Result Verificationを
+  実行できること
+
+- Merge Result Verificationによって、
+  HumanがFinal Approvalした
+  対象Implementationが
+  `developer`へ正しく取り込まれたことを
+  確認できること
+
+- 少なくとも以下のすべてを
+  確認した場合にのみ、
+  Current Stateを`completed`へ
+  遷移できること
+
+  1. Final Approvalが現在も有効である
+  2. Repositoryが安全にMerge可能である
+  3. Merge Operationが正常に成功した
+  4. Final Approvalされた対象Implementationが
+     `developer`へ正しく取り込まれた
+
+- Merge Operationが失敗した場合、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- Merge Result Verificationに失敗した場合、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- Merge Failureを、
+  Final Approval Failureとして
+  扱わないこと
+
+- Merge Failureまたは
+  Merge Result Verification Failure時に、
+  Current Stateを
+  Specificationで定義された
+  `final_approval_pending`に維持し、
+  Humanへ処理を返せること
+
+- Merge Failureについて、
+  Technical Retryの前提となるArtifactまたは
+  対象範囲を変更せず、
+  新しい設計判断を伴わない
+  同一のGit Operationを
+  安全に再実行できる場合に限り、
+  Technical Retryを
+  実行できること
+
+- Mergeに対するTechnical Retryによって、
+  Final Approval Target Artifactを
+  変更しないこと
+
+- Mergeに対するTechnical Retryによって、
+  Final Approval Recordの有効性を
+  失わせる変更を
+  行わないこと
+
+- Mergeに対するTechnical Retryを、
+  Implementation Correctionとして
+  扱わないこと
+
+- Mergeに対するTechnical Retryによって、
+  Correction Countを
+  増加させないこと
+
+- Merge Failureを解消するために、
+  Final ApprovalされたImplementation自体の
+  変更が必要となる場合、
+  Technical Retryとして
+  継続しないこと
+
+- Final ApprovalされたImplementation自体の
+  変更が必要となる場合、
+  Correction、
+  Critical Change、
+  Plan Revision、
+  Specification Reconsideration、
+  Human Handoffその他の
+  Specificationで定義された
+  適切な工程へRoutingできること
+
+- HumanがFinal Approvalではなく
+  Implementation Correctionを選択した場合、
+  Specificationで定義された
+  Correction工程へRoutingできること
+
+- HumanがPlan Revisionを選択した場合、
+  Plan Revision工程へ
+  Routingできること
+
+- HumanがSpecification Reconsiderationを選択した場合、
+  Specification工程へ
+  Routingできること
+
+- HumanがCancellationを選択した場合、
+  Current Stateを`cancelled`へ
+  遷移できること
+
+- Humanの差し戻しによって
+  Implementationまたは承認対象Artifactが変更された場合、
+  以前のFinal Approval Recordを
+  変更後の対象に
+  自動的に引き継がないこと
+
+- Final Approval、
+  Approval Validation、
+  Merge Readiness、
+  Merge Execution、
+  Merge Result Verification、
+  Failure Handling、
+  `completed`または`cancelled`への遷移に伴う
+  State Transitionが、
+  Specificationで定義された
+  State Modelに従って
+  実行されること
+
+- 必要なState Transition Historyが
+  記録されること
+
+- Phase 6で実装した
+  Final Approval Entry Validation、
+  Final Approval Target Artifact、
+  Human Final Approval Decision、
+  Final Approval Record、
+  Approval Validation、
+  Human Decision Routing、
+  Merge Preconditions、
+  Repository Safety、
+  Merge Execution、
+  Merge Result Verification、
+  CompletionおよびFailure Handlingその他の
+  既存責務を再利用し、
+  Phase 7独自のFinal Approvalまたは
+  Merge機構を
+  重複実装していないこと
+
+- `6. Final Approval and
+  Merge Integration Tests`
+  が成功すること
+
+##### 7. Workflow State, Traceability and Stop / Human Handoff Integration
+
+以下をすべて満たした場合、
+Workflow State、
+Traceabilityおよび
+Stop / Human Handoff Integrationを
+完了とする。
+
+- Workflowの各時点において、
+  Current Stateを取得・確認できること
+
+- Current Stateに基づいて、
+  現在実行可能なUseCaseを
+  識別・制御できること
+
+- 現在のStateで許可されていないUseCaseを
+  実行できないこと
+
+- 必要な前工程、
+  Human Approval、
+  Artifact Validation、
+  Reviewその他のGateを迂回して、
+  後続UseCaseへ
+  進行できないこと
+
+- State Transitionが発生した場合、
+  Current Stateが
+  Specificationで定義された
+  次のStateへ更新されること
+
+- State Transitionが発生した場合、
+  必要なState Transition Historyが
+  記録されること
+
+- Current Stateと
+  State Transition Historyを
+  異なる責務として
+  扱えること
+
+- State Transition Historyを、
+  過去のState Transitionを保持する
+  追記型の履歴として
+  扱えること
+
+- Current Stateの更新によって、
+  過去のState Transition Historyを
+  上書きまたは改変しないこと
+
+- Workflow開始から
+  `completed`、
+  `cancelled`、
+  またはHuman Handoffに至るまでの
+  State Transitionを
+  後から追跡できること
+
+- Human Approval Recordについて、
+  対象Artifact、
+  Human Decision、
+  Artifact Hash、
+  Approval時点その他の
+  必要な情報との対応関係を
+  追跡できること
+
+- Human Approval Recordが、
+  現在の対象Artifactに対して
+  有効であるかを
+  Approval Validationによって
+  確認できること
+
+- Human Approval後に
+  承認対象Artifactが変更された場合、
+  変更前のApproval Recordを
+  変更後のArtifactに対する
+  有効なApprovalとして
+  自動的に引き継がないこと
+
+- Implementation Evidenceについて、
+  対象Implementation、
+  Source Code、
+  Git Diff、
+  Test Code、
+  Test Resultその他の
+  必要な情報との対応関係を
+  追跡できること
+
+- Correctionその他によって
+  Implementation状態が変更された場合、
+  以前のImplementation Evidenceを
+  変更後のImplementationに対する
+  Evidenceとして
+  再利用しないこと
+
+- Correction後に、
+  新しいImplementation Evidenceを
+  構築・保存できること
+
+- Correction前後のImplementation Evidenceを
+  上書きせず、
+  それぞれ異なるImplementation状態に対応する
+  正式Artifactとして
+  追跡できること
+
+- Human Approval Record、
+  Implementation Evidence、
+  Current State、
+  State Transition History、
+  Review Result、
+  Correction履歴、
+  Git Operation Resultその他の
+  正式情報を、
+  Workflow全体で
+  相互に関連付けて追跡できること
+
+- Human Approval Record、
+  Implementation Evidence、
+  Current State、
+  State Transition History、
+  Review Result、
+  Git Operation Resultを、
+  同一の情報または
+  同一の責務として
+  扱わないこと
+
+- Human Approval Recordの存在を、
+  Implementation Evidenceの存在の
+  代わりとして扱わないこと
+
+- Implementation Evidenceの存在を、
+  Human Approvalの存在の
+  代わりとして扱わないこと
+
+- Review Resultが`APPROVED`であることを、
+  Human Final Approvalの
+  代わりとして扱わないこと
+
+- Git Merge Operationの成功を、
+  Human Final Approvalの
+  代わりとして扱わないこと
+
+- Git Merge Operationの成功だけを根拠として、
+  Current Stateを`completed`へ
+  遷移させないこと
+
+- Workflowのいずれかの工程で、
+  必要な正式Documentが不足している場合、
+  不足情報を推測または補完して
+  後続工程へ
+  進行しないこと
+
+- Workflowのいずれかの工程で、
+  必要な有効なHuman Approvalが不足している場合、
+  Human Decisionを
+  推測、補完または生成して
+  後続工程へ
+  進行しないこと
+
+- 必要なImplementation Prompt、
+  Implementation Evidence、
+  Review Input、
+  Review Reportその他の
+  必須Artifactが不足している場合、
+  不足情報を推測または補完して
+  後続工程へ
+  進行しないこと
+
+- Specification、
+  Approved Implementation Plan、
+  Human Approval Scope、
+  Implementation、
+  Implementation Evidence、
+  Review Resultその他の間に、
+  現在のWorkflow内で
+  安全に解消できない
+  不足、矛盾、不整合または曖昧さが存在する場合、
+  Application Layerが
+  独自の設計判断またはHuman Decisionによって
+  解消したものとして
+  扱わないこと
+
+- Specificationで定義された
+  Error and Stop Conditionsを検出した場合、
+  安全にWorkflowを
+  停止できること
+
+- StopまたはHuman Handoffが発生した場合、
+  少なくとも以下を
+  識別可能な状態で扱えること
+
+  - 停止またはHandoffの理由
+  - 現在のState
+  - 影響範囲
+  - 次に必要なHuman操作
+  - 再開可能な工程
+
+- ReviewまたはCorrectionに関連する
+  Human Handoffでは、
+  必要に応じて以下についても
+  識別可能な状態で扱えること
+
+  - Review Result
+  - 対象Implementation
+  - 最新のImplementation Evidence
+  - Review Report
+  - Correction履歴
+  - Correction Count
+
+- StopまたはHuman Handoffによって、
+  それまでに正常に生成・保存された
+  State Transition History、
+  Human Approval Record、
+  Implementation Evidence、
+  Review Reportその他の
+  正式Artifactを
+  失わないこと
+
+- Human Handoff後に、
+  Humanが状況を確認した上で、
+  識別された再開可能な工程から
+  Workflowを
+  再開できること
+
+- Technical Errorが発生した場合、
+  Specificationで定義された条件を
+  満たす場合に限り、
+  Technical Retryを
+  実行できること
+
+- Technical Retryが、
+  Technical Retryの前提となるArtifactまたは
+  対象範囲を変更せず、
+  新しい設計判断を伴わない
+  同一の技術操作の安全な再実行に
+  限定されること
+
+- Technical Retryによって、
+  新しいHuman Approvalが
+  行われたものとして
+  扱わないこと
+
+- Technical Retryによって、
+  新しいCorrectionが
+  行われたものとして
+  扱わないこと
+
+- Technical Retryによって、
+  新しいImplementationが
+  生成されたものとして
+  扱わないこと
+
+- Technical Retryによって、
+  Correction Countを
+  増加させないこと
+
+- Technical Retryに伴う履歴を、
+  Human Approval、
+  Correction、
+  Implementationその他の履歴と
+  混同しないこと
+
+- Technical Retryの条件を満たさず、
+  Artifact変更、
+  Source Code変更、
+  Test Code変更、
+  新しい設計判断、
+  Human Approval Scope変更その他の
+  実質的変更が必要となる場合、
+  Technical Retryとして
+  継続しないこと
+
+- Technical Retryでは継続できない場合、
+  問題の内容に応じて、
+  Correction、
+  Critical Change、
+  Plan Revision、
+  Specification Reconsideration、
+  Human Handoffその他の
+  Specificationで定義された
+  適切な工程へRoutingできること
+
+- Approval不足、
+  Artifact不足、
+  Evidence不足、
+  Review Input不足、
+  Critical Change、
+  Correction Limit、
+  Early Stop、
+  Technical Error、
+  Merge Failureその他の
+  異常系においても、
+  Current Stateが
+  Specificationで定義された範囲を
+  逸脱しないこと
+
+- 異常系においても、
+  必要なState Transition Historyが
+  記録されること
+
+- 異常系においても、
+  Human Approval Boundaryを
+  迂回しないこと
+
+- Application Layerが、
+  HumanまたはUIからのUseCase要求を受け取り、
+  Current Stateを確認し、
+  次に実行可能なUseCaseを制御し、
+  必要なComponentへ処理を委譲し、
+  Artifactを後続工程へ引き渡し、
+  結果に応じたState Transitionまたは
+  Human Handoffを
+  返せること
+
+- Application Layerが、
+  Human、
+  Core、
+  AI Runner、
+  Codex Runner、
+  Repository、
+  Infrastructureその他のComponentの
+  責務を代替しないこと
+
+- Phase 1からPhase 6までに実装した
+  State Management、
+  State Transition History、
+  Approval Record、
+  Approval Validation、
+  Implementation Evidence、
+  Review、
+  Correction、
+  Final Approval、
+  Git Operation、
+  Stop、
+  Human Handoffその他の
+  既存責務を再利用し、
+  Phase 7独自の同等機構を
+  重複実装していないこと
+
+- `7. Workflow State, Traceability and
+  Stop / Human Handoff Integration Tests`
+  が成功すること
+
+##### 8. End-to-End MVP Validation and Completion
+
+以下をすべて満たした場合、
+End-to-End MVP Validation and Completionを
+完了とする。
+
+- Phase 7の
+  Completion Condition 1から
+  Completion Condition 7までを
+  すべて満たしていること
+
+- UIまたは呼び出し元から
+  Specificationを指定して、
+  SpecFlow Version 1 MVPの
+  End-to-End Workflowを
+  開始できること
+
+- 指定されたSpecificationについて、
+  有効なHuman Approvalを
+  確認できること
+
+- 有効なSpecification Approvalが
+  確認された場合にのみ、
+  Implementation Plan Draft生成工程へ
+  進行できること
+
+- ChatGPT Runnerによって、
+  承認済みSpecificationから
+  Implementation Plan Draftを
+  生成できること
+
+- HumanがImplementation Planについて、
+  Approval、
+  Revision Request、
+  Cancellationを
+  選択できること
+
+- HumanがImplementation PlanをApprovalした場合、
+  Approval Recordを構築・保存し、
+  現在のImplementation Planに対する
+  有効性をValidationできること
+
+- 有効なApproved Implementation Planから、
+  Codex Runnerが実行可能な
+  Implementation Promptを
+  生成できること
+
+- Implementation Branchを準備し、
+  Base Commitを
+  識別できること
+
+- Codex Runnerが、
+  Human Approval Scope内で
+  ImplementationおよびTestを
+  実行できること
+
+- 振る舞いを変更するImplementationについて、
+  原則としてTDDを
+  適用できること
+
+- TDD対象について、
+  Implementation前の
+  意図されたInitial Test Failure、
+  Implementation後のTarget Test Result、
+  Full Test Resultを
+  一連のWorkflow内で
+  確認できること
+
+- Implementation完了後に、
+  実際のRepository状態およびTest状態から、
+  Source Code、
+  Git Status、
+  Git Diff、
+  Test Code、
+  Test Resultその他の
+  必要な情報を
+  取得できること
+
+- Implementation Resultから、
+  Implementation Evidenceを
+  JSON形式で
+  構築・保存できること
+
+- Implementation Evidenceと、
+  対象Implementation、
+  Source Code、
+  Git Diff、
+  Test Code、
+  Test Resultとの対応関係を
+  追跡できること
+
+- Review工程へ、
+  少なくとも以下を
+  相互に対応付けたReview Inputとして
+  引き渡せること
+
+  - Specification
+  - Approved Implementation Plan
+  - Codex Prompt
+  - Implementation Evidence
+  - Source Code
+  - Git Diff
+  - Test Code
+  - Test Result
+
+- ChatGPT Runnerによって
+  Reviewを実行し、
+  Review ReportおよびReview Resultを
+  取得できること
+
+- Review Resultとして、
+  `APPROVED`、
+  `REVISION_REQUIRED`、
+  `HUMAN_REVIEW_REQUIRED`
+  を区別し、
+  Specificationで定義された
+  適切な後続工程へ
+  Routingできること
+
+- `REVISION_REQUIRED`について、
+  Human Approval Scope内で
+  安全にCorrection可能な場合、
+  Correctionを
+  実行できること
+
+- Correction後に
+  必要なTestを実行し、
+  Correction後の実際の
+  Repository状態およびTest状態から、
+  新しいImplementation Evidenceを
+  構築・保存できること
+
+- Correction後に、
+  新しいImplementation Evidenceを含む
+  Review Inputによって
+  Re-Reviewを
+  実行できること
+
+- Correction前のImplementation Evidenceを、
+  Correction後のImplementationに対する
+  Evidenceとして
+  再利用しないこと
+
+- Correction Countを、
+  Specificationで定義されたRuleに従って
+  管理できること
+
+- Technical Retryを
+  Correctionとして扱わず、
+  Correction Countを
+  増加させないこと
+
+- Early Stop Conditionを検出した場合、
+  自動処理を停止し、
+  Humanへ処理を
+  返せること
+
+- Correction Limitへ到達した場合、
+  それ以上の自動Correctionを停止し、
+  Humanへ処理を
+  返せること
+
+- Review Resultが
+  `HUMAN_REVIEW_REQUIRED`の場合、
+  Human Decisionを
+  推測、補完または代替せず、
+  Humanへ処理を
+  返せること
+
+- Review Resultが`APPROVED`であり、
+  Phase 5で解決すべき未解決事項が
+  存在しない場合にのみ、
+  Final Approval工程へ
+  進行できること
+
+- HumanへFinal Approvalを要求する前に、
+  Final Approval Target Artifactを
+  構築できること
+
+- HumanがFinal Approvalまたは
+  Specificationで定義された
+  差し戻しを
+  選択できること
+
+- HumanがFinal Approvalした場合、
+  Final Approval Recordを
+  構築・保存できること
+
+- Final Approval Recordと
+  現在のFinal Approval Target Artifactとの
+  整合性を
+  Validationできること
+
+- Human Final Approvalだけを根拠として、
+  Mergeまたは`completed`への
+  State Transitionを
+  実行しないこと
+
+- 有効なFinal Approvalを確認した後に、
+  Approval Validationとは独立して
+  Merge Readinessを
+  確認できること
+
+- Repositoryが安全にMerge可能な場合にのみ、
+  Final ApprovalされたImplementation Branchを
+  `developer`へ
+  Mergeできること
+
+- Merge Operation成功後に、
+  Merge Result Verificationを
+  実行できること
+
+- HumanがFinal Approvalした
+  対象Implementationが
+  `developer`へ正しく取り込まれたことを
+  確認できること
+
+- 以下のすべてが成功した場合にのみ、
+  Current Stateを`completed`へ
+  遷移できること
+
+  1. Final Approval Validation
+  2. Merge Readiness
+  3. Merge Execution
+  4. Merge Result Verification
+
+- Workflow開始から
+  `completed`、
+  `cancelled`、
+  またはHuman Handoffに至るまで、
+  Current Stateを
+  Specificationで定義された
+  State Modelに従って
+  管理できること
+
+- Workflow全体の
+  State Transitionを、
+  State Transition Historyとして
+  後から追跡できること
+
+- Workflow全体について、
+  Human Approval Record、
+  Implementation Evidence、
+  Review Report、
+  Review Result、
+  Correction履歴、
+  Git Operation Resultその他の
+  必要な正式情報を
+  追跡できること
+
+- Human Approvalを必要とする工程を、
+  有効なHuman Approvalなしに
+  通過できないこと
+
+- Human Approval後に
+  Approval対象Artifactまたは
+  対象Implementationが変更された場合、
+  変更前のApproval Recordを
+  変更後の対象に対する
+  有効なApprovalとして
+  自動的に適用しないこと
+
+- Specificationで定義された
+  Error and Stop Conditionsを
+  End-to-End Workflow全体で
+  適用できること
+
+- StopまたはHuman Handoff時に、
+  少なくとも以下を
+  識別可能な状態で扱えること
+
+  - 停止またはHandoffの理由
+  - 現在のState
+  - 影響範囲
+  - 次に必要なHuman操作
+  - 再開可能な工程
+
+- StopまたはHuman Handoffによって、
+  それまでに正常に生成・保存された
+  State Transition History、
+  Human Approval Record、
+  Implementation Evidence、
+  Review Reportその他の
+  正式Artifactを
+  失わないこと
+
+- Specification Approval不足、
+  Plan Revision、
+  Cancellation、
+  Implementation Prompt生成失敗、
+  AI実行不能なPrompt Result、
+  Technical Error、
+  Critical Change、
+  Evidence不足、
+  Review Input不足、
+  `REVISION_REQUIRED`、
+  `HUMAN_REVIEW_REQUIRED`、
+  Correction、
+  Re-Review、
+  Early Stop、
+  Correction Limit、
+  Approval対象Artifact変更、
+  Final Approval Validation Failure、
+  Merge Readiness Failure、
+  Merge Execution Failure、
+  Merge Result Verification Failureその他の
+  Specificationで定義された
+  主要な異常系または分岐について、
+  End-to-Endで
+  正しいRoutingまたはStop / Human Handoffを
+  確認できること
+
+- Technical Retryが、
+  Technical Retryの前提となるArtifactまたは
+  対象範囲を変更せず、
+  新しい設計判断を伴わない
+  同一の技術操作の安全な再実行に
+  限定されること
+
+- Technical Retryの条件を満たさず、
+  実質的なArtifact変更、
+  Source Code変更、
+  Test Code変更、
+  新しい設計判断、
+  Human Approval Scope変更その他が
+  必要となる場合、
+  Technical Retryとして
+  自動継続しないこと
+
+- Phase 1からPhase 7までに
+  追加または変更された振る舞いについて、
+  必要なIntegration Testおよび
+  End-to-End Testが
+  成功すること
+
+- 既存Testを含む
+  Full Test Suiteが
+  成功すること
+
+- Phase 7の統合によって、
+  既存のApplication Layer、
+  Core、
+  Infrastructureその他の
+  既存機能にRegressionが
+  発生していないこと
+
+- Testを成功させることのみを目的として、
+  Specification、
+  Human Approval Boundary、
+  State Model、
+  Correction Ruleその他の
+  既存Ruleを
+  緩和していないこと
+
+- Version 1 MVPの範囲内で
+  安全に解決できない問題について、
+  Application LayerまたはAI Runnerが
+  独自の解釈によって補完せず、
+  Human Handoff、
+  Specification Reconsiderationその他の
+  Specificationで定義された
+  適切な工程へ
+  Routingできること
+
+- Specificationで定義された
+  MVP Completion Conditionsの
+  各項目を
+  Application Layer全体として
+  満たしていること
+
+- `8. End-to-End MVP Validation and
+  Completion Tests`
+  が成功すること
+
+- End-to-End Testが成功したことだけを根拠として、
+  Version 1 MVPを
+  完成したものとして扱わないこと
+
+- Completion Condition 1から
+  Completion Condition 7までを満たし、
+  本Completion Condition 8で定義された
+  End-to-End MVP Validationの各条件と、
+  Specificationで定義された
+  MVP Completion Conditionsの
+  すべてを満たした場合にのみ、
+  Phase 7および
+  SpecFlow Version 1 MVPを
+  完了したものとして扱うこと
+
+- Phase 7およびVersion 1 MVPを
+  完了させるために、
+  Specificationで定義されていない
+  新しいUseCase、
+  新しいHuman Decision、
+  新しいApproval Rule、
+  新しいState、
+  新しいReview Result、
+  新しいCorrection Ruleその他の
+  Version 1 MVP Boundaryを超える機能を
+  追加していないこと
+
+
+
+
+
