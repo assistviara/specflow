@@ -2627,6 +2627,807 @@ Phase 4は、少なくとも以下の条件をすべて満たした場合に完�
 
 ### Phase 5 Review & Correction
 
+#### Purpose
+
+Phase 5では、
+Phase 4で構築されたImplementation Evidenceと実際のImplementation結果を基に、
+Specification、Approved Implementation Planおよび承認されたImplementation Scopeへの
+適合性をReviewし、必要に応じてCorrectionおよびRe-Reviewを実行できる
+Application LayerのReview & Correction基盤を構築する。
+
+Reviewでは、
+Implementation Evidenceのみを根拠とせず、
+Specification、Approved Implementation Plan、Codex Prompt、
+Implementation Evidence、Source Code、Git Diff、Test Code、
+Test実行状態、Test ResultおよびTest Execution Errorを相互に比較し、
+要求不足、Scope逸脱、不必要な変更、Test上の問題、
+Evidenceとの不整合、未完了事項およびHuman判断が必要な事項を検出する。
+
+Review Resultは、
+`APPROVED`、`REVISION_REQUIRED`、`HUMAN_REVIEW_REQUIRED`
+を明確に区別して扱う。
+
+`REVISION_REQUIRED`であり、
+既存のHuman Approval Scope内で安全にCorrection可能な場合は、
+Correction Instruction生成、Correction、再Test、
+新しいImplementation Evidence生成およびRe-Reviewからなる
+Correction Loopを実行できるようにする。
+
+一方、
+`HUMAN_REVIEW_REQUIRED`、
+Critical Change、
+Automatic Correction Limit到達、
+Early Stop Condition、
+または安全な自動継続が困難な場合は、
+AIまたはApplication Layerが独自に判断を補完せず、
+処理を停止してHumanへ判断を返す。
+
+また、
+Review Result、
+Review Failure、
+Technical Retry、
+Correction、
+Re-ReviewおよびHuman Reviewを混同せず、
+それぞれの責務とState TransitionをSpecificationに従って維持する。
+
+Phase 5ではHumanによるFinal Approvalおよび`developer`へのMergeは行わない。
+これらはPhase 6 `Final Approval & Merge`の責務とする。
+
+
+#### Scope
+
+Phase 5の実装範囲は、
+UC-09 `Review Implementation`を中心として、
+Review Resultに基づくCorrectionおよびRe-Reviewを
+Application Layerからオーケストレーションするために必要な範囲とする。
+
+Phase 5では主に、
+
+- Review対象Artifactの対応関係確認
+- Requirement / Scope / Implementation / Test / Evidenceの各観点によるReview
+- 必要に応じたSemantic Staged Review
+- Review ReportおよびReview Resultの生成
+- `APPROVED`、`REVISION_REQUIRED`、`HUMAN_REVIEW_REQUIRED`の区別
+- Test Result `FAIL`とTest Execution Errorの区別
+- Review処理中のTechnical RetryおよびReview Failure処理
+- Correction Instruction生成
+- Human Approval Scope内でのCorrection
+- Correction Count管理
+- Automatic Correction Limit
+- Early Stop ConditionおよびConvergence Detection
+- Correction後の再Test
+- Correction後の新しいImplementation Evidence生成
+- Re-Review
+- Human判断が必要な場合の停止およびHandoff
+- `APPROVED`となったImplementationのPhase 6へのHandoff
+
+を対象とする。
+
+Phase 5では、
+Review自身によるSpecification、Approved Implementation Plan、
+Source CodeまたはTest Codeの直接変更、
+Human Approval Scopeを超えた自動Correction、
+Human判断の代替、
+Final Approval、
+`developer`へのMerge、
+およびMVP全体のIntegration完了判定は行わない。
+
+#### Implementation Targets
+
+##### 1. Review Input and Artifact Consistency
+
+Phase 4から引き継がれたReview対象について、
+Specification、Approved Implementation Plan、Codex Prompt、
+Implementation Evidence、Source Code、Git Diff、Test Code、
+Test実行状態、Test ResultおよびTest Execution Errorを取得し、
+同一の対象Implementationに対する一連のArtifactとして対応していることを確認できるようにする。
+
+Implementation EvidenceのみをReviewの根拠として扱わず、
+Evidenceに記録された内容と実際のRepositoryおよびTestの状態を
+相互に比較できるようにする。
+
+Review対象Artifact間の対応関係を確認できない場合、
+その不整合を無視してReviewを継続し、
+`APPROVED`として扱わない。
+
+
+##### 2. Requirement / Scope / Implementation / Test / Evidence Review
+
+UC-09 `Review Implementation`に従い、
+少なくとも以下の観点からImplementationをReviewできるようにする。
+
+- Requirement Compliance
+- Scope Compliance
+- Implementation Compliance
+- Test Compliance
+- Evidence Compliance
+
+Reviewでは、
+要求されたImplementationの不足、
+要求されていないImplementationの追加、
+承認Scope外の変更、
+不要なSource Code変更、
+Test不足またはTest不整合、
+Implementation Evidenceと実状態の不一致、
+Error、Warning、未完了事項、
+Human Approvalを必要とする事項等を検出できるようにする。
+
+Review自身は、
+Specification、Approved Implementation Plan、
+Source Code、Test Codeその他の承認対象Artifactを変更しない。
+
+
+##### 3. Semantic Staged Review
+
+Review対象が一括Reviewに適した規模である場合は一括Reviewを許可し、
+対象が大きい場合または一括Reviewによって精度低下が予想される場合は、
+意味単位およびReview責務単位によるSemantic Staged Reviewを実行できるようにする。
+
+必要に応じて、
+
+- Requirement Review
+- Change Scope Review
+- Implementation Review
+- Test Review
+- Integration Review
+
+へ分割し、
+単純な文字数、行数、Token数のみを基準とした機械的分割を
+基本方式としない。
+
+各Stageには、
+そのReview判断に必要なArtifactおよび情報を優先して渡し、
+最終的にIntegration Reviewによって
+Implementation全体としての適合性を判断できるようにする。
+
+
+##### 4. Review Result and Review Report
+
+Review結果を少なくとも以下の3種類として明確に扱えるようにする。
+
+- `APPROVED`
+- `REVISION_REQUIRED`
+- `HUMAN_REVIEW_REQUIRED`
+
+`APPROVED`は、
+Specification、Approved Implementation Planおよび
+承認されたImplementation Scopeへの適合が確認され、
+Review上の重大な問題が存在しない場合にのみ使用する。
+
+`REVISION_REQUIRED`は、
+検出されたImplementation上の問題について、
+既存のHuman Approval Scope内で安全にCorrection可能であることを
+確認できた場合に使用する。
+
+`HUMAN_REVIEW_REQUIRED`は、
+SpecificationまたはPlanの不足・矛盾・不明確さ、
+承認Scopeを超える変更、
+Critical Change、
+Humanによる設計判断、
+または安全なCorrection Scopeを確定できない場合等に使用する。
+
+Review結果とともに、
+Review Reportとして少なくとも以下を保持できるようにする。
+
+- 適合または不適合となった項目
+- 不適合箇所
+- 判断根拠
+- Testに関する評価
+- 修正対象
+- 修正工程の返却先
+- Humanへの確認事項
+- 未解決事項
+
+
+##### 5. Test Result and Review Failure Handling
+
+Reviewでは、
+
+- Expected Test Failure
+- Test Result `PASS`
+- Test Result `FAIL`
+- Test Execution Error
+
+を明確に区別して扱う。
+
+Implementation後のTest Resultが`FAIL`であることのみを理由として、
+Technical Error、`implementation_failed`、
+または自動的な`REVISION_REQUIRED`として扱わない。
+
+`FAIL`の場合は、
+Source Code、Test Code、Specification、
+Approved Implementation Plan、Git Diff、
+Implementation Evidence等を比較し、
+原因および必要な修正Scopeを評価する。
+
+Review処理そのものを正常に完了できないTechnical Errorについては、
+Technical Retry可能性を確認し、
+成果物を変更せず安全に再実行可能な場合のみTechnical Retryを行う。
+
+Technical RetryによってRecoveryできた場合は`reviewing`を維持し、
+Reviewを継続する。
+
+Technical Retry不能またはRecovery Failedの場合は、
+`review_failed`としてHumanへ判断を返す。
+
+`REVISION_REQUIRED`または`HUMAN_REVIEW_REQUIRED`を
+`review_failed`として扱わない。
+
+
+##### 6. Correction Routing and Correction Instruction
+
+Review Resultが`REVISION_REQUIRED`となった場合、
+Review Report、Review Result、現在のState、
+Human Approval Scope、Correction CountおよびEarly Stop情報を基に、
+Correction可能性と適切なReturn Destinationを決定できるようにする。
+
+修正対象に応じて、必要な工程へ処理を戻せるようにする。
+
+- Specification策定工程
+- Plan修正工程
+- Prompt再生成工程
+- Implementation再実装工程
+- Test修正工程
+- Human判断
+- Critical Change Approval工程
+
+自動Correction可能な場合は、
+Review結果からCorrection Instructionを生成し、
+Implementation Roleへ渡せるようにする。
+
+UC-11およびApplication Layerは、
+修正内容そのものを独自に決定または実装せず、
+Review Reportと既存の承認Scopeに基づいて
+再開すべき工程をオーケストレーションする。
+
+
+##### 7. Correction Loop and Evidence Regeneration
+
+`REVISION_REQUIRED`であり、
+既存のSpecification、Approved Implementation Planおよび
+Human Approval Scope内で安全にCorrection可能な場合、
+Correction Loopを実行できるようにする。
+
+Correctionでは、
+成果物を変更してReviewで検出された問題を修正し、
+Correction Countを1増加させる。
+
+Correction後は少なくとも、
+
+- 対象Testの再実行
+- 必要な既存Testの再実行
+- Test実行状態の確認
+- Test ResultおよびTest Execution Errorの記録
+- 新しいImplementation Evidenceの生成
+- Re-Review
+
+を実行する。
+
+Correction後の成果物を、
+新しいImplementation Evidenceを生成せず
+そのままRe-Reviewへ渡してはならない。
+
+以前のImplementation Evidenceを上書きせず、
+Correction前後のEvidenceおよびCorrection Historyを
+追跡可能な状態で保持する。
+
+Re-Reviewでは、
+現在の成果物だけでなく、
+Correction前のReview Result、
+Correction内容、
+Test ResultおよびCorrection Historyとの比較を行えるようにする。
+
+
+##### 8. Correction Limit, Early Stop and Convergence
+
+Version 1では、
+初回ImplementationをCorrection Countへ含めず、
+成果物を変更するCorrectionのみをCountする。
+
+自動CorrectionのMaximum Correction Countは原則3回とし、
+3回実施しても`APPROVED`とならない場合は
+自動Correctionを停止してHumanへ判断を返す。
+
+ただし、
+Correction Countが3回未満であっても、
+Early Stop Conditionを検出した場合は
+自動Correctionを停止する。
+
+少なくとも、
+
+- 同一または実質的に同一のReview指摘が繰り返される
+- CorrectionによってPlan外変更が発生する
+- 変更対象ファイルが不合理に増加する
+- 以前成功していたTestがFAILとなる
+- Test Resultが悪化する
+- 新しいTest Execution Errorが発生する
+- Errorまたは重大なWarningが増加する
+- Approved Implementation Plan内では解決できない
+- Specificationの曖昧さまたは矛盾が疑われる
+- Architecture上の新しい判断が必要となる
+- Human Approval Scopeを超える変更が必要となる
+- Critical Changeが必要となる
+- 問題の原因または影響範囲を安全に確定できない
+
+等を停止条件として扱えるようにする。
+
+Correction Loopが単に継続可能かだけでなく、
+問題解決へ向かって収束しているかを評価し、
+非収束または悪化が確認された場合は
+Maximum Correction Count到達前でもHumanへ判断を返す。
+
+
+##### 9. Human Escalation and Phase 6 Handoff
+
+Review Resultが`HUMAN_REVIEW_REQUIRED`の場合、
+自動Correction Loopへ進まず、
+`reviewing`を維持したままHumanへ判断を返す。
+
+HumanがCorrectionを要求した場合のみ、
+必要な条件を確認した上で`correction_requested`へ遷移できるようにする。
+
+既存のHuman Approval Scopeを超える変更が必要な場合は、
+通常のCorrectionとして扱わず、
+Critical ChangeとしてUC-07のApproval工程へ処理を渡す。
+
+Human判断が完了するまで、
+Application LayerまたはAI Runnerが独自にMain Transitionを再開してはならない。
+
+Review Resultが`APPROVED`となり、
+Phase 5で解決すべき未解決事項が存在しない場合にのみ、
+Phase 6 `Final Approval & Merge`が開始可能な状態へHandoffする。
+
+Phase 5では、
+HumanによるFinal Approval、
+Final Approval Recordの生成・検証、
+`developer`へのMerge、
+および`completed`への最終遷移は行わない。
+
+#### Tests
+
+Phase 5の実装では、
+追加または変更する振る舞いについて原則としてTDDを適用する。
+
+少なくとも以下をTest対象とする。
+
+
+##### Review Input and Artifact Consistency
+
+- Phase 4から引き継がれたSpecification、Approved Implementation Plan、
+  Codex Prompt、Implementation Evidence、Source Code、Git Diff、
+  Test Code、Test実行状態、Test ResultおよびTest Execution Errorを
+  Review Inputとして取得できること
+
+- Review対象となる各Artifactが、
+  同一の対象Implementationに対応していることを確認できること
+
+- Implementation Evidenceに記録された内容と、
+  実際のRepositoryおよびTestの状態を相互に比較できること
+
+- Implementation Evidenceのみを根拠として
+  Review Resultを決定していないこと
+
+- Artifact間の対応関係に不整合がある場合、
+  その不整合を検出できること
+
+- Artifact間の対応関係を確認できない状態を無視して
+  `APPROVED`として扱わないこと
+
+
+##### Requirement / Scope / Implementation / Test / Evidence Review
+
+- Requirement ComplianceをReviewできること
+
+- Scope ComplianceをReviewできること
+
+- Implementation ComplianceをReviewできること
+
+- Test ComplianceをReviewできること
+
+- Evidence ComplianceをReviewできること
+
+- SpecificationまたはApproved Implementation Planで要求された
+  Implementationの不足を検出できること
+
+- 要求されていないImplementationの追加を検出できること
+
+- Human Approval Scope外の変更を検出できること
+
+- 不要なSource Code変更を検出できること
+
+- Test不足またはTest不整合を検出できること
+
+- Implementation Evidenceと実状態との不一致を検出できること
+
+- Error、Warning、未完了事項および
+  Human Approvalを必要とする事項をReview対象として扱えること
+
+- Review自身がSpecification、Approved Implementation Plan、
+  Source Code、Test Codeその他の承認対象Artifactを変更しないこと
+
+
+##### Semantic Staged Review
+
+- Review対象が一括Reviewに適した範囲である場合、
+  一括Reviewを実行できること
+
+- Review対象が大きい場合、
+  または一括Reviewによる精度低下が予想される場合、
+  Semantic Staged Reviewを選択できること
+
+- Semantic Staged Reviewを、
+  単純な文字数、行数、Token数のみを基準として
+  機械的に分割していないこと
+
+- 必要に応じて、
+  Requirement Review、
+  Change Scope Review、
+  Implementation Review、
+  Test Review、
+  Integration Review
+  の責務単位でReviewできること
+
+- 各Review Stageへ、
+  その判断に必要なArtifactおよび情報を渡せること
+
+- Integration Reviewによって、
+  各Stageの結果をImplementation全体として統合できること
+
+- 個別Stageが適合していても、
+  Stage間に不整合が存在する場合は
+  Implementation全体を`APPROVED`として扱わないこと
+
+
+##### Review Result and Review Report
+
+- Review Resultとして少なくとも
+  `APPROVED`、
+  `REVISION_REQUIRED`、
+  `HUMAN_REVIEW_REQUIRED`
+  を区別して扱えること
+
+- Specification、Approved Implementation Planおよび
+  Human Approval Scopeへの適合が確認され、
+  Review上の重大な問題が存在しない場合にのみ
+  `APPROVED`として扱えること
+
+- Human Approval Scope内で安全にCorrection可能な
+  Implementation上の問題について、
+  `REVISION_REQUIRED`として扱えること
+
+- SpecificationまたはPlanの不足・矛盾・不明確さ、
+  Human Approval Scopeを超える変更、
+  Critical Change、
+  Humanによる設計判断、
+  または安全なCorrection Scopeを確定できない場合を
+  `HUMAN_REVIEW_REQUIRED`として扱えること
+
+- Review Reportに少なくとも、
+  適合または不適合となった項目、
+  不適合箇所、
+  判断根拠、
+  Testに関する評価、
+  修正対象、
+  修正工程の返却先、
+  Humanへの確認事項、
+  未解決事項
+  を保持できること
+
+- `REVISION_REQUIRED`の場合、
+  修正対象、その根拠、および
+  Human Approval Scope内でCorrection可能と判断した理由を
+  後続処理から確認できること
+
+- `HUMAN_REVIEW_REQUIRED`の場合、
+  AIが判断内容を補完せず、
+  Humanが判断すべき事項を確認できること
+
+
+##### Test Result and Review Failure Handling
+
+- Expected Test Failure、
+  Test Result `PASS`、
+  Test Result `FAIL`、
+  Test Execution Error
+  を区別して扱えること
+
+- Implementation後のTest Resultが`FAIL`であることのみを理由として、
+  Technical Errorとして扱わないこと
+
+- Test Resultが`FAIL`であることのみを理由として、
+  `implementation_failed`へ遷移しないこと
+
+- Test Resultが`FAIL`であることのみを理由として、
+  自動的に`REVISION_REQUIRED`としないこと
+
+- Test Resultが`FAIL`の場合、
+  Source Code、Test Code、Specification、
+  Approved Implementation Plan、Git Diff、
+  Implementation Evidence等を比較して、
+  原因および必要な修正ScopeをReviewできること
+
+- Review処理中にTechnical Errorが発生した場合、
+  Technical Retry可能性を判定できること
+
+- 成果物を変更せず安全に再実行可能な場合のみ、
+  Technical Retryを実行できること
+
+- Technical RetryによるRecovery Successの場合、
+  `reviewing`を維持してReviewを継続できること
+
+- Technical Retry不能またはRecovery Failedの場合、
+  `review_failed`としてHumanへ判断を返せること
+
+- Technical Retryによって
+  Review対象Artifact、Implementation Evidence、
+  Specification、Approved Implementation Planまたは
+  Human Approval Scopeを変更しないこと
+
+- `REVISION_REQUIRED`および`HUMAN_REVIEW_REQUIRED`を
+  `review_failed`として扱わないこと
+
+
+##### Correction Routing and Correction Instruction
+
+- Review Resultが`REVISION_REQUIRED`の場合、
+  `reviewing`から`correction_requested`へ遷移できること
+
+- Review Report、Review Result、現在のState、
+  Human Approval Scope、Correction Countおよび
+  Early Stop情報を基にCorrection可能性を確認できること
+
+- 修正対象に応じて、
+  Specification策定工程、
+  Plan修正工程、
+  Prompt再生成工程、
+  Implementation再実装工程、
+  Test修正工程、
+  Human判断、
+  Critical Change Approval工程
+  の適切なReturn Destinationを扱えること
+
+- Human Approval Scope内で自動Correction可能な場合、
+  Review結果からCorrection Instructionを生成できること
+
+- Correction InstructionをImplementation Roleへ渡せること
+
+- UC-11またはApplication Layer自身が、
+  Review Reportおよび既存のHuman Approval Scopeを超えて
+  修正内容そのものを独自に決定または実装しないこと
+
+
+##### Correction Loop and Evidence Regeneration
+
+- `REVISION_REQUIRED`であり、
+  Human Approval Scope内で安全にCorrection可能な場合のみ、
+  自動Correction Loopへ進めること
+
+- 成果物を変更するCorrectionを実行した場合、
+  Correction Countを1増加できること
+
+- Correction後に対象Testを再実行できること
+
+- Correction後に必要な既存Testを再実行できること
+
+- Correction後のTest実行状態、
+  Test ResultおよびTest Execution Errorを記録できること
+
+- Correction後に新しいImplementation Evidenceを生成できること
+
+- 新しいImplementation Evidence生成後に
+  Re-Reviewを実行できること
+
+- Correction後の成果物を、
+  新しいImplementation Evidenceを生成せず
+  直接Re-Reviewへ渡さないこと
+
+- Correction前のImplementation Evidenceを上書きしないこと
+
+- Correction前後のImplementation Evidenceおよび
+  Correction Historyを追跡できること
+
+- Re-Review時に、
+  Correction前のReview Result、
+  Correction内容、
+  Test ResultおよびCorrection Historyを
+  比較可能な状態で利用できること
+
+
+##### Correction Limit, Early Stop and Convergence
+
+- Initial ImplementationをCorrection Countへ含めないこと
+
+- 成果物を変更するCorrectionのみを
+  Correction Countへ含めること
+
+- Technical Retryによって
+  Correction Countを増加させないこと
+
+- Version 1ではMaximum Correction Countを
+  原則3回として扱えること
+
+- 3回のCorrectionを実施しても`APPROVED`とならない場合、
+  自動Correctionを停止してHumanへ判断を返せること
+
+- Correction Countが3回未満でも、
+  Early Stop Conditionを検出した場合は
+  自動Correctionを停止できること
+
+- 同一または実質的に同一のReview指摘の反復を
+  Early Stop判断に利用できること
+
+- CorrectionによるPlan外変更、
+  不合理な変更対象ファイル増加、
+  既存PASS TestのFAIL化、
+  Test Resultの悪化、
+  新しいTest Execution Error、
+  Errorまたは重大なWarningの増加等を
+  Early Stop判断に利用できること
+
+- Approved Implementation Plan内で解決できない問題、
+  Specificationの曖昧さまたは矛盾、
+  Architecture上の新しい判断、
+  Human Approval Scopeを超える変更、
+  Critical Change、
+  安全に原因または影響範囲を確定できない状態を
+  自動継続しないこと
+
+- Correctionが問題解決へ向かって収束しているかを評価できること
+
+- 非収束または悪化を検出した場合、
+  Maximum Correction Count到達前でも
+  Humanへ判断を返せること
+
+
+##### Human Escalation and Phase 6 Handoff
+
+- Review Resultが`HUMAN_REVIEW_REQUIRED`の場合、
+  自動Correction Loopへ進まないこと
+
+- `HUMAN_REVIEW_REQUIRED`の場合、
+  `reviewing`を維持してHumanへ判断を返せること
+
+- Human判断が完了するまで、
+  Application LayerまたはAI Runnerが
+  独自にMain Transitionを再開しないこと
+
+- HumanがCorrectionを要求した場合のみ、
+  必要な条件を確認した上で
+  `correction_requested`へ遷移できること
+
+- Human Approval Scopeを超える変更が必要な場合、
+  通常のCorrectionとして扱わず、
+  Critical Change Approval工程へ処理を渡せること
+
+- Review Resultが`APPROVED`であり、
+  Phase 5で解決すべき未解決事項が存在しない場合にのみ、
+  Phase 6 `Final Approval & Merge`へHandoffできること
+
+- `REVISION_REQUIRED`または`HUMAN_REVIEW_REQUIRED`の状態から、
+  `final_approval_pending`へ進まないこと
+
+- Phase 5がHumanによるFinal Approvalを実行しないこと
+
+- Phase 5がFinal Approval Recordの生成または検証を行わないこと
+
+- Phase 5が`developer`へのMergeを実行しないこと
+
+- Phase 5が`completed`への最終遷移を実行しないこと
+
+- Phase 5で追加または変更した振る舞いに対するTestが成功すること
+
+- 既存Testを含むFull Test Suiteが成功し、
+  Phase 5の変更によって既存機能を破壊していないこと
+
+#### Completion Conditions
+
+Phase 5は、少なくとも以下をすべて満たした場合に完了とする。
+
+- UC-09 `Review Implementation`をApplication Layerから実行できること
+
+- Specification、Approved Implementation Plan、Codex Prompt、
+  Implementation Evidence、Source Code、Git Diff、Test Code、
+  Test実行状態、Test ResultおよびTest Execution Errorを
+  同一の対象Implementationに対するReview Inputとして扱い、
+  相互に比較できること
+
+- Implementation EvidenceのみをReviewの根拠とせず、
+  実際のRepositoryおよびTestの状態との整合性を確認できること
+
+- Requirement Compliance、Scope Compliance、
+  Implementation Compliance、Test Compliance、
+  Evidence Complianceの各観点からReviewでき、
+  要求不足、Scope逸脱、不必要な変更、Test上の問題、
+  Evidenceとの不整合、Error、Warning、未完了事項および
+  Human判断が必要な事項を検出できること
+
+- Review対象に応じて一括ReviewまたはSemantic Staged Reviewを選択でき、
+  Semantic Staged Reviewを使用する場合は、
+  意味およびReview責務単位でReviewした結果を
+  Integration ReviewによってImplementation全体として統合できること
+
+- Review Resultとして
+  `APPROVED`、`REVISION_REQUIRED`、`HUMAN_REVIEW_REQUIRED`
+  を明確に区別し、
+  それぞれSpecificationで定義された条件に基づいて判断できること
+
+- Review Reportに、
+  適合・不適合事項、判断根拠、Test評価、修正対象、
+  Return Destination、Humanへの確認事項および未解決事項を
+  後続処理が確認可能な形で保持できること
+
+- Expected Test Failure、Test Result `PASS`、
+  Test Result `FAIL`およびTest Execution Errorを区別し、
+  Test Result `FAIL`のみを理由としてTechnical Error、
+  `implementation_failed`または自動的な`REVISION_REQUIRED`
+  として扱わないこと
+
+- Review処理中のTechnical Errorについて、
+  成果物を変更しないTechnical RetryとCorrectionを区別し、
+  Recovery Successの場合は`reviewing`を維持してReviewを継続し、
+  Retry不能またはRecovery Failedの場合は
+  `review_failed`としてHumanへ判断を返せること
+
+- `REVISION_REQUIRED`の場合、
+  Review Report、Human Approval Scope、Correction Count、
+  Early Stop情報等に基づいてCorrection可能性および
+  適切なReturn Destinationを判断し、
+  自動Correction可能な場合はCorrection Instructionを
+  Implementation Roleへ渡せること
+
+- Human Approval Scope内で安全にCorrection可能な場合にのみ
+  自動Correction Loopを実行し、
+  Correction後に再Test、新しいImplementation Evidence生成、
+  Re-Reviewの順序を維持できること
+
+- Correction前のImplementation Evidenceを上書きせず、
+  Correction前後のEvidence、Review Result、
+  Test ResultおよびCorrection Historyを追跡できること
+
+- Initial ImplementationをCorrection Countへ含めず、
+  成果物を変更するCorrectionのみをCountし、
+  Technical RetryによってCorrection Countを増加させないこと
+
+- Version 1のAutomatic Correction Limitを原則3回として扱い、
+  Maximum Correction Count到達時には
+  自動Correctionを停止してHumanへ判断を返せること
+
+- Maximum Correction Count到達前であっても、
+  異常、悪化、非収束、承認範囲外変更、
+  Critical Change、SpecificationまたはPlanの問題、
+  その他安全な自動継続が困難な状態を検出した場合は
+  Early Stopできること
+
+- `HUMAN_REVIEW_REQUIRED`の場合は自動Correctionへ進まず、
+  `reviewing`を維持してHumanへ判断を返し、
+  Human判断が完了するまでApplication LayerまたはAI Runnerが
+  独自にMain Transitionを再開しないこと
+
+- Human Approval Scopeを超える変更またはCritical Changeを
+  通常のCorrectionとして処理せず、
+  必要なHuman Approval工程へHandoffできること
+
+- Review自身またはApplication Layerが、
+  Specification、Approved Implementation Plan、
+  Source Code、Test Code等を責務外で変更したり、
+  Human判断を独自に代替したりしないこと
+
+- Review Resultが`APPROVED`であり、
+  Phase 5で解決すべき未解決事項が存在しない場合にのみ、
+  Phase 6 `Final Approval & Merge`を開始可能な状態へ
+  Handoffできること
+
+- Phase 5ではFinal Approval、
+  Final Approval Recordの生成・検証、
+  `developer`へのMerge、
+  `completed`への最終遷移を実行しないこと
+
+- Phase 5で追加または変更した振る舞いに対するTestが成功し、
+  既存Testを含むFull Test Suiteが成功すること
+
+- 上記を満たした状態で、
+  Phase 6 `Final Approval & Merge`の実装を開始できること
+
 ### Phase 6 Final Approval & Merge
 
 ### Phase 7 Integration & MVP Completion
