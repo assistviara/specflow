@@ -152,34 +152,37 @@ Version 1では、以下のような高度なGit運用は必須としない。
 
 Application Layerは、以下を担当する。
 
-* HumanまたはUIからUseCase実行要求を受け取る
-* 現在の開発状態を確認する
-* 次に実行可能なUseCaseを制御する
-* 必要なEngineおよびAI Runnerを呼び出す
-* 各工程の成果物を次工程へ受け渡す
-* Human承認を記録する
-* Human未承認時に次工程への進行を停止する
-* 実装証拠をReview工程へ渡す
-* Review不適合時に修正工程へ戻す
-* 実行結果と状態遷移を呼び出し元へ返す
+- HumanまたはUIからUseCase実行要求を受け取る
+- 現在の開発状態を確認する
+- 次に実行可能なUseCaseを制御する
+- 必要なEngineおよびAI Runnerを呼び出す
+- 各工程の成果物を次工程へ受け渡す
+- Humanによる判断をApproval Recordとして記録する
+- Approval Recordと現在のArtifactの整合性を確認し、Human Approvalの有効性を検証する
+- 有効なHuman Approvalを確認できない場合、承認を必要とする次工程への進行を停止する
+- Implementation EvidenceおよびReviewに必要な成果物をReview工程へ渡す
+- Review Resultに応じて、次工程、修正工程、またはHuman判断への返却を制御する
+- 実行結果と状態遷移を呼び出し元へ返す
 
 ---
 
 # 4. Non-Responsibility
 
-Application Layerは、以下を直接実装しない。
+Application Layerは、以下を直接実装または独自判断しない。
 
-* Markdown文書の解析
-* Prompt Templateの展開
-* AI Provider固有の通信
-* Codexの内部実装処理
-* テストコードの具体的な生成
-* Specificationの内容変更
-* Implementation Planの内容決定
-* Review結果の最終判断
-* Humanに代わる承認
+- Markdown文書の解析
+- Prompt Templateの展開
+- AI Provider固有の通信
+- Codexの内部実装処理
+- テストコードの具体的な生成
+- Specificationの内容変更
+- Implementation Plan Draftの内容生成
+- Implementationの適合性に関するReview Resultの生成
+- Humanに代わる承認判断
 
-これらは、それぞれ既存Engine、AI Runner、またはHumanの責務とする。
+これらは、それぞれ既存Engine、AI Runner、Codex Runner、またはHumanの責務とする。
+
+Application Layerは、これらの処理結果を受け取り、必要な検証、工程制御、状態遷移、および次工程への受け渡しを担当する。
 
 ---
 
@@ -241,7 +244,7 @@ Source Code・Git Diff・Test Code・Test ResultをReview
 [Application Layer]
 Review結果を評価
         ↓
-適合
+[Review Result: APPROVED]
         ↓
 最終承認待ちへ遷移
         ↓
@@ -314,10 +317,13 @@ TDDの具体的な適用範囲および例外条件は、15.10で定義する。
 * Implementation Plan Template
 * Plan Prompt Template
 * Project Metadata
+* Specification Approval Record
+
+
 
 ### Output
 
-* 読み込み対象情報
+* 読み込まれたDevelopment Input
 * 入力検証結果
 * 開発対象識別情報
 
@@ -332,6 +338,31 @@ Project全体の自動探索・自動読み込みは必須としない。
 必要に応じて、対応するApproval Recordおよび現在のArtifact Hashとの整合性を確認し、有効な承認状態であることを検証する。
 
 Development Inputの読み込みと、Human Approvalの有効性判定は責務を区別する。
+
+Specificationに対するHuman Approvalは、Application Layerが生成または代替するものではない。
+
+Version 1では、HumanがApplication Layerの外部でSpecificationを作成または選択し、その内容を承認する。
+
+Specification Approval Recordは、そのHumanによる承認判断の証拠としてDevelopment InputとともにApplication Layerへ渡される。
+
+Application Layerは、後続工程へ進む前に、現在のSpecificationからArtifact Hashを計算し、Specification Approval Recordに記録された`artifact_hash`との一致を確認する。
+
+Specification Approval Recordが存在しない場合、`decision`が承認を示していない場合、または現在のSpecificationのArtifact Hashと一致しない場合、そのSpecificationを有効に承認済みとして扱ってはならない。
+
+Specification Approvalの判断主体と、その承認の有効性を検証する責務は区別する。
+
+```text
+Human
+    ↓
+Specificationを作成・選択・承認
+    ↓
+Specification Approval Record
+    ↓
+Application Layer
+    ↓
+現在のSpecificationとの同一性を検証
+    ↓
+有効な場合のみ後続工程へ進行
 
 ---
 
@@ -366,7 +397,11 @@ AIResponse
 
 ### Completion
 
-生成物はDraftであり、Human承認前に実装工程へ渡してはならない。
+生成されたImplementation PlanはDraftとして扱う。
+
+Implementation Planに対する有効なHuman Approvalが確認されるまで、Codex Prompt生成工程へ進んではならない。
+
+単にImplementation Plan Draftが生成されたことをもって、承認済みImplementation Planとして扱ってはならない。
 
 ---
 
@@ -380,7 +415,6 @@ Implementation Plan DraftをHumanへ提示し、承認、修正依頼、また�
 
 - Implementation Plan Draft
 - 対象Implementation PlanのPath
-- 現在のImplementation PlanのHash
 - 必要に応じて関連するSpecificationおよびPlan生成情報
 
 ### Human Actions
@@ -391,7 +425,15 @@ Implementation Plan DraftをHumanへ提示し、承認、修正依頼、また�
 
 ### Approval Record
 
-Humanの判断は、15.4で定義したApproval Recordとして`approvals/`配下へ保存する。
+Humanの判断は、15.4および15.16で定義したApproval Recordとして`approvals/`配下へ保存する。
+
+Human Decisionを受け取ったApplication Layerは、`ApprovalRecordService`へApproval Recordの構築を依頼する。
+
+`ApprovalRecordService`は、承認対象となる現在のImplementation Planを識別し、定義された算出規則に従ってArtifact Hashを計算した上で、Approval Recordを構築する。
+
+構築されたApproval Recordは、`ApprovalRecordRepository`を介して保存する。
+
+Version 1では、その具体実装として`JsonApprovalRecordRepository`を使用し、Approval Recordを`approvals/`配下のJSONファイルとして保存する。
 
 Approval Recordには、少なくとも以下を保持する。
 
@@ -404,6 +446,7 @@ decision
 approved_at
 comment
 ```
+
 Implementation Planを承認する場合、概念的には以下のようなApproval Recordを生成する。
 
 ```json
@@ -422,49 +465,87 @@ Implementation Planを承認する場合、概念的には以下のようなAppr
 
 中止の場合は、`decision`に中止を示す値を記録する。
 
+Application Layer、`ApprovalRecordService`、`ApprovalRecordRepository`、またはその他のComponentがHumanの代わりにApproval Decisionを生成してはならない。
+
 ### Approval Validation
 
 HumanがImplementation Planを承認した場合、その承認は承認時点の特定内容のImplementation Planに対してのみ有効とする。
 
-後続工程へ進む前に、Application Layerは現在のImplementation PlanからHashを計算し、Approval Recordに保存された`artifact_hash`と比較する。
+後続工程へ進む前に、Application Layerは15.17で定義した`ApprovalValidationService`を利用して、保存されたApproval Recordが現在のImplementation Planに対して有効であることを確認する。
+
+`ApprovalValidationService`は、少なくとも以下を確認する。
+
+```text
+Approval Recordが存在する
+
+decisionが承認を示している
+
+Approval Recordが現在のImplementation Planに対応している
+
+現在のImplementation PlanからArtifact Hashを計算できる
+
+Approval Recordに保存されたartifact_hashと
+現在のImplementation PlanのArtifact Hashが一致する
+```
+
+概念的には、以下とする。
 
 ```text
 Approval Record
-artifact_hash
-        │
-        │ compare
-        │
+        +
 Current Implementation Plan
-current_hash
+        ↓
+ApprovalValidationService
+        ↓
+Validation Result
+        ↓
+Application Layer
 ```
 
-Hashが一致し、かつ`decision`が承認を示している場合にのみ、現在のImplementation Planを有効に承認済みとして扱う。
+`ApprovalValidationService`が有効な承認であると判定した場合にのみ、Application Layerは現在のImplementation Planを有効に承認済みとして扱い、後続工程へ進行できる。
 
-承認後にImplementation Planが変更されHashが一致しなくなった場合、以前のApproval Recordを現在のImplementation Planに対する有効な承認として扱ってはならない。
+承認後にImplementation Planが変更され、現在のArtifact HashとApproval Recordの`artifact_hash`が一致しなくなった場合、以前のApproval Recordを変更後のImplementation Planに対する有効な承認として扱ってはならない。
+
+Approval Validationに失敗した場合、Application LayerはそのApproval Recordを前提として後続工程へ進行してはならず、`plan_approved`へ遷移してはならない。
+
+この場合、Humanによる次の判断が行われるまで`plan_approval_pending`を維持し、Humanへ判断を返す。
+
+Humanは、必要に応じて再承認、Implementation Planの修正、または中止等の次の操作を判断する。
 
 ### Output
 
 - Human Decision
 - Approval Record
+- Approval Validation Result
 - 承認有効性に関する情報
 - 修正依頼内容
 - 中止情報
 
 ### Transition
 
-Humanが有効に承認した場合は、`plan_approved`へ遷移し、Codex Prompt生成工程へ進むことができる。
+HumanがImplementation Planを承認し、`ApprovalValidationService`によってそのApproval Recordが現在のImplementation Planに対して有効であることを確認できた場合は、`plan_approved`へ遷移し、Codex Prompt生成工程へ進むことができる。
 
 修正依頼の場合は、`plan_revision_requested`へ遷移し、Implementation Plan修正工程へ戻る。
 
 中止の場合は、`cancelled`へ遷移する。
 
+Approval Validationに失敗した場合は、`plan_approved`へ遷移せず、必要に応じてHumanへの再承認または適切な修正工程へ処理を返す。
+
 ### Rule
 
-Application LayerまたはAI RunnerがHumanの代わりにImplementation Planを承認してはならない。
+Application Layer、AI Runner、`ApprovalRecordService`、`ApprovalValidationService`、`ApprovalRecordRepository`、またはその他のComponentがHumanの代わりにImplementation Planを承認してはならない。
 
 単に`state.json`が`plan_approved`であることや、Implementation Plan本文に承認済み表記が存在することだけを根拠として、有効なHuman Approvalと判断してはならない。
 
-有効な承認の判断には、HumanによるApproval Recordと現在のImplementation PlanのArtifact Hashの一致を必要とする。
+有効な承認の判断には、HumanによるApproval Recordが存在し、そのApproval Recordが現在のImplementation Planに対応しており、`decision`が承認を示し、かつApproval Recordに保存された`artifact_hash`と現在のImplementation Planから算出したArtifact Hashが一致することを必要とする。
+
+Approval Recordの構築は15.16および15.18で定義した責務分離に従う。
+
+Approval Recordの保存および読み出しは15.18および15.19で定義した`ApprovalRecordRepository`および`JsonApprovalRecordRepository`の責務分離に従う。
+
+Approval Recordの有効性検証は15.17および15.18で定義した`ApprovalValidationService`の責務に従う。
+
+Application Layerは、これらのServiceおよびRepositoryを利用して工程を制御するが、Human Approvalそのものを生成、推定、補完、または代替してはならない。
 
 ---
 
@@ -476,20 +557,28 @@ Humanからの修正依頼を基にImplementation Plan Draftを再生成する�
 
 ### Input
 
-* 現在のImplementation Plan Draft
-* Humanの修正理由
-* 元のSpecification
-* 関連文書
+- 現在のImplementation Plan Draft
+- Humanの修正理由または修正要求
+- 元のSpecification
+- 関連文書
 
 ### Output
 
-* 修正版Implementation Plan Draft
-* 変更点
-* 前版との対応情報
+- 修正版Implementation Plan Draft
+- 変更点
+- 前版との対応情報
 
 ### Transition
 
-修正版生成後は、再びPlan承認待ちへ戻る。
+修正版Implementation Plan Draftを生成した後は、`plan_approval_pending`へ遷移し、再びHuman Approvalを求める。
+
+### Rule
+
+修正版Implementation Plan Draftは、新しい承認対象Artifactとして扱う。
+
+以前のImplementation Planに対するApproval Recordを、修正版Implementation Planに対する有効な承認として引き継いではならない。
+
+修正版Implementation Planを後続工程で使用するためには、UC-03で定義したApproval Validationに従い、新たなHuman Approvalを取得しなければならない。
 
 ---
 
@@ -533,6 +622,19 @@ Codex RunnerがSpecificationまたはApproved Implementation Planに存在しな
 ### Output
 
 - Codex用Implementation Prompt
+- 使用したSpecificationの参照
+- 使用したApproved Implementation Planの参照
+- Prompt生成結果
+
+### Transition
+
+Codex Prompt生成工程を開始する場合、Application Layerは`implementation_prompt_generating`へ遷移する。
+
+Codex Promptが正常に生成され、使用したSpecificationおよびApproved Implementation Planとの対応関係を確認でき、Codex Runnerへ渡すImplementation Promptとして利用可能であることを確認した場合は、`implementation_ready`へ遷移する。
+
+Codex Prompt生成に失敗した場合、または生成結果を安全にImplementationへ使用できない場合は、`implementation_ready`へ遷移してはならない。
+
+その場合は、停止理由および現在の状態を記録し、定められたFailure HandlingまたはHuman判断へ処理を返す。
 
 ### Rule
 
@@ -550,6 +652,8 @@ Codex Runnerには、Implementation Evidenceを構築するために必要な実
 
 最終的なImplementation Evidenceは、Application LayerがCodex Runnerの実行結果と実際のSource Code、Git Status、Git Diff、およびTest Result等を収集して構築する。
 
+生成されたCodex Promptは、どのSpecificationおよびApproved Implementation Planを基に生成されたかを後続工程で識別可能でなければならない。
+
 ---
 
 ## UC-06 Execute Implementation
@@ -557,6 +661,8 @@ Codex Runnerには、Implementation Evidenceを構築するために必要な実
 ### Purpose
 
 Implementation Roleに割り当てられたCodex Runnerを使用し、Approved Implementation PlanおよびCodex Promptで承認された範囲内のImplementationとTestを実行する。
+
+Codex RunnerはImplementationおよびTestの実行を担当するが、Test ResultまたはTechnical Errorに基づく後続Workflowの判断を独自に行ってはならない。
 
 ### Input
 
@@ -593,7 +699,20 @@ TDD適用要否を確認
         ↓
 必要な既存Testを実行
         ↓
-実装結果をApplication Layerへ返す
+Test Execution Statusを確認
+        │
+        ├── Test正常実行
+        │       ↓
+        │  Test Resultを記録
+        │  （PASS / FAIL）
+        │       ↓
+        │  実装結果をApplication Layerへ返す
+        │
+        └── Test Execution Error
+                ↓
+           Technical Errorとして記録
+                ↓
+           実装結果をApplication Layerへ返す
 ```
 
 TDDの適用要否は、単純なファイル拡張子ではなく、変更がSystemの振る舞いを変更するかどうかを本質的な基準として判断する。
@@ -602,16 +721,74 @@ TDDの適用要否は、単純なファイル拡張子ではなく、変更がSy
 
 文書修正、コメント修正、その他Systemの振る舞いを変更しない変更については、TDDを必須としない。
 
+### Test Result Handling
+
+Test実行結果については、Testが正常に実行された結果としての`PASS`または`FAIL`と、Test実行処理そのものを正常に完了できなかった`Test Execution Error`を区別する。
+
+TDD対象のImplementationにおいて、Implementation前に期待される振る舞いを表現したTestが意図どおり`FAIL`となることは、TDD上の正常な工程として扱う。
+
+```text
+Expected Test Failure
+= TDDにおいてImplementation前に
+  意図的に確認する正常な工程
+```
+
+Implementation後にTestが正常に実行され、その結果として`FAIL`となった場合、その結果はTechnical Errorとして扱ってはならない。
+
+```text
+Test Execution Completed
+        │
+        ├── PASS
+        │      ↓
+        │  Test Resultとして記録
+        │
+        └── FAIL
+               ↓
+           Test Resultとして記録
+```
+
+Codex Runnerは、Test Resultが`FAIL`であることのみを根拠として、独自にCorrection Loopを開始してはならない。
+
+Test Resultが`PASS`または`FAIL`である場合は、その結果を実装結果の一部としてApplication Layerへ返す。
+
+Testを開始できない、Test Runnerが異常終了する、必要な実行環境を利用できない、その他Test Resultを正常に取得できない場合は、`Test Execution Error`としてApplication Layerへ返す。
+
+```text
+Test Execution Error
+        ↓
+Technical Error
+        ↓
+Application Layerへ返す
+```
+
+Codex Runner自身が、Technical Retry、Implementation Failure、Correction、Critical Change、またはHuman判断への遷移を独自に決定してはならない。
+
+Application Layerは、Test Result、Test Execution Error、およびその他のImplementation Evidenceに基づき、通常のReview工程、Technical Retry、Implementation Failure、Correction、Critical Change、またはHuman判断のいずれへ処理を進めるかを決定する。
+
 ### Output
 
 - Codex Runner実行結果
 - 作成・変更・削除したファイルに関する情報
 - 実行したCommandに関する情報
-- Test実行結果
+- Test実行状態
+- Test Result（PASS / FAIL）
+- Test Execution Error
 - ErrorおよびWarning
 - 未完了事項
 - Human Approvalが必要な事項
 - 成功または失敗
+
+### Transition
+
+有効なCodex PromptおよびImplementation開始に必要なInputが確認され、UC-06によるImplementation実行を開始する場合、Application Layerは`implementation_ready`から`implementing`へ遷移する。
+
+Implementationが承認されたScope内で正常に完了し、必要なTest実行およびImplementation Evidence構築に必要な実行結果の取得が完了した場合、Application Layerは`implementation_completed`へ遷移する。
+
+Implementationを正常に継続または完了できない場合は、`implementation_completed`へ遷移してはならない。
+
+Codex Runnerの実行失敗、Test実行処理そのものの失敗、実行環境上の問題、またはその他の技術的理由によりImplementation工程を正常に継続または完了できない場合は、10.4.1で定義したImplementation Failure Transitionに従う。
+
+Critical Changeが必要となった場合は、`implementation_completed`へ遷移せず、`critical_approval_pending`へ遷移してUC-07へ処理を渡す。
 
 ### Rule
 
@@ -622,6 +799,20 @@ Codex Runnerは、Specification、Approved Implementation Plan、およびCodex 
 Codex RunnerはImplementation Evidenceの正当性を自己確定してはならない。
 
 Application LayerはCodex Runnerから返された実装結果に加え、実際のSource Code、Git Status、Git Diff、およびTest Result等を収集し、Implementation Evidenceを構築する。
+
+Codex Runnerは、Test Resultが`FAIL`であることと、Test実行処理そのものが失敗したことを混同してはならない。
+
+Test Resultが`FAIL`である場合、その事実のみを根拠としてCodex Runnerが独自に承認範囲を拡張したり、Correction Loopを開始したりしてはならない。
+
+成果物を変更せず同一の技術操作を再実行する必要がある場合、その処理をTechnical Retryとして実行可能かどうかは、15.22で定義した条件に基づきApplication Layerが判断する。
+
+Test Resultが`FAIL`であり、成果物の変更が必要な場合はTechnical Retryとして扱ってはならない。
+
+承認済みScope内で成果物を変更する場合はCorrectionとして扱い、既存のHuman Approval Scopeを超える変更が必要な場合はCritical Changeまたは上位成果物の再検討として扱う。
+
+承認範囲を超える変更がUC-07で定義したCritical Changeに該当する場合、Application LayerはImplementationを継続させず、`critical_approval_pending`へ遷移してUC-07 `Request Critical Change Approval`へ処理を渡す。
+
+Critical Changeに対する有効なHuman Approvalが確認されるまで、Codex Runnerは当該変更を含むImplementationを再開してはならない。
 
 ---
 
@@ -669,11 +860,48 @@ Critical Changeは、Codex RunnerまたはApplication Layerが独自判断で実
 - Implementation Planの再検討へ戻す
 - Implementationを中止
 
+### Critical Change Request
+
+Critical Change Approvalでは、Humanへ提示する変更内容、変更理由、対象Implementation、変更対象、および影響範囲をCritical Change Requestとして構築・保存し、承認対象Artifactとして扱う。
+
+Application Layerは、Humanへ判断を求める前にCritical Change Requestを識別可能なArtifactとして確定する。
+
+Critical Change Requestには、少なくとも以下を識別可能な情報として含める。
+
+```text
+Critical Changeの内容
+
+Critical Changeが必要となった理由
+
+対象Implementation
+
+Implementation Branch
+
+変更対象
+
+影響範囲
+
+必要に応じて関連するSpecification、
+Approved Implementation Plan、
+Codex Prompt、
+Implementation Evidence等への参照
+```
+
+Humanへ提示したCritical Change Requestと、後にApproval RecordおよびApproval Validationで参照するCritical Change Requestは、同一の承認対象Artifactとして識別可能でなければならない。
+
+Application LayerはCritical Change RequestをHumanへ提示する工程を制御するが、Humanに代わってCritical ChangeへのApproval Decisionを生成してはならない。
+
 ### Approval Record
 
-HumanによるCritical Changeへの判断は、15.4で定義したApproval Recordとして記録する。
+HumanによるCritical Changeへの判断は、15.4および15.16で定義したApproval Recordとして記録する。
 
-Critical Change Approvalでは、Humanへ提示したCritical Change Requestを承認対象Artifactとして扱う。
+Human Decisionを受け取ったApplication Layerは、`ApprovalRecordService`へApproval Recordの構築を依頼する。
+
+`ApprovalRecordService`は、承認対象として確定されたCritical Change Requestを識別し、定義された算出規則に従ってArtifact Hashを計算した上で、Approval Recordを構築する。
+
+構築されたApproval Recordは、`ApprovalRecordRepository`を介して保存する。
+
+Version 1では、その具体実装として`JsonApprovalRecordRepository`を使用し、Approval Recordを`approvals/`配下のJSONファイルとして保存する。
 
 Approval Recordには、少なくとも以下を保持する。
 
@@ -687,39 +915,89 @@ approved_at
 comment
 ```
 
-Critical Change Approval Recordの`artifact_path`および`artifact_hash`は、承認対象となったCritical Change Requestを参照する。
+Critical Change Approval Recordの`artifact_path`および`artifact_hash`は、Humanへ提示された承認対象Critical Change Requestを参照する。
 
-Critical Changeを承認する場合、その承認はHumanへ提示された特定のCritical Change Requestおよび対象Implementationに対してのみ有効とする。
+Critical Changeを承認する場合、その承認はHumanへ提示された特定のCritical Change Requestおよび、そのRequestに記録された対象Implementationに対してのみ有効とする。
 
-Application Layerは、Critical Change承認後にImplementationを再開する前に、現在のCritical Change RequestからHashを計算し、Approval Recordに保存された`artifact_hash`と比較する。
+修正依頼の場合は、`decision`に修正要求を示す値を記録し、Humanによる修正理由または要求内容を`comment`へ記録する。
+
+SpecificationまたはImplementation Planの再検討をHumanが選択した場合は、その判断を後続工程で識別可能な形で記録する。
+
+中止の場合は、`decision`に中止を示す値を記録する。
+
+Application Layer、`ApprovalRecordService`、`ApprovalRecordRepository`、Codex Runner、AI Runner、またはその他のComponentがHumanの代わりにApproval Decisionを生成してはならない。
+
+### Approval Validation
+
+HumanがCritical Changeを承認した場合、その承認は承認時点の特定のCritical Change Requestおよび対象Implementationに対してのみ有効とする。
+
+Implementationを再開する前に、Application Layerは15.17で定義した`ApprovalValidationService`を利用して、保存されたCritical Change Approval Recordが現在のCritical Change Requestおよび対象Implementationに対して有効であることを確認する。
+
+`ApprovalValidationService`は、少なくとも以下を確認する。
 
 ```text
-Approval Record
-artifact_hash
-        │
-        │ compare
-        │
-Current Critical Change Request
-current_hash
+Critical Change Approval Recordが存在する
+
+decisionが承認を示している
+
+Approval Recordが現在の
+Critical Change Requestに対応している
+
+現在のCritical Change Requestから
+Artifact Hashを計算できる
+
+Approval Recordに保存されたartifact_hashと
+現在のCritical Change Requestの
+Artifact Hashが一致する
+
+Critical Change Requestに記録された
+対象Implementationと
+現在の対象Implementationとの
+同一性を確認できる
+
+必要なApproval固有の
+追加検証条件を満たしている
 ```
 
-Hashが一致し、かつ`decision`が承認を示している場合にのみ、そのCritical Change Approvalを有効として扱う。
+概念的には、以下とする。
 
-Critical Change Requestの内容がHuman承認後に変更されHashが一致しなくなった場合、以前のApproval Recordを変更後のCritical Changeに対する有効な承認として扱ってはならない。
+```text
+Critical Change Approval Record
+        +
+Current Critical Change Request
+        +
+Current Implementation
+        ↓
+ApprovalValidationService
+        ↓
+Validation Result
+        ↓
+Application Layer
+```
 
-対象Implementationが承認時点から変更され、Critical Change Requestに記録された対象Implementationとの同一性を確認できない場合も、以前のApproval Recordを有効な承認として扱ってはならない。
+`ApprovalValidationService`が有効な承認であると判定した場合にのみ、Application LayerはそのCritical Change Approvalを現在のImplementationに対して使用できる承認として扱う。
+
+Critical Change Requestの内容がHuman承認後に変更され、現在のArtifact HashとApproval Recordに保存された`artifact_hash`が一致しなくなった場合、以前のApproval Recordを変更後のCritical Change Requestに対する有効な承認として扱ってはならない。
+
+対象Implementationが承認時点から変更され、Critical Change Requestに記録された対象Implementationとの同一性を確認できない場合も、以前のApproval Recordを現在のImplementationに対する有効な承認として扱ってはならない。
+
+Approval Validationに失敗した場合、Application LayerはそのApproval Recordを前提としてImplementationを再開してはならない。
+
+必要に応じて、Humanへの再承認、Critical Change Requestの修正、または適切な修正・再検討工程へ処理を返す。
 
 ### Transition
 
 Critical Changeが検出された場合は、`critical_approval_pending`へ遷移する。
 
-HumanがCritical Changeを有効に承認した場合は、承認された範囲内で`implementing`へ戻り、Implementationを再開できる。
+HumanがCritical Changeを承認し、`ApprovalValidationService`によってそのCritical Change Approval Recordが現在のCritical Change Requestおよび対象Implementationに対して有効であることを確認できた場合にのみ、承認された範囲内で`implementing`へ戻り、Implementationを再開できる。
 
 修正依頼の場合は、`correction_requested`へ遷移し、指定された修正工程へ戻る。
 
 SpecificationまたはImplementation Planの再検討が必要な場合は、それぞれ対応する策定・修正工程へ戻る。
 
 中止の場合は、`cancelled`へ遷移する。
+
+Approval Validationに失敗した場合は、`implementing`へ戻ってはならず、必要に応じてHumanへの再承認または適切な修正・再検討工程へ処理を返す。
 
 ```text
 implementing
@@ -728,7 +1006,19 @@ critical_approval_pending
         │
         ├── 承認
         │      ↓
-        │  implementing
+        │  Approval Validation
+        │      │
+        │      ├── valid
+        │      │     ↓
+        │      │ implementing
+        │      │
+        │      └── invalid
+        │            ↓
+        │        implementingへ戻らない
+        │            ↓
+        │        critical_approval_pendingを維持
+        │            ↓
+        │        Human判断へ返す
         │
         ├── 修正
         │      ↓
@@ -747,6 +1037,7 @@ critical_approval_pending
 
 - Human Decision
 - Critical Change Approval Record
+- Approval Validation Result
 - 承認有効性に関する情報
 - 承認された変更範囲
 - 修正要求
@@ -757,11 +1048,23 @@ critical_approval_pending
 
 Humanによる有効な承認が確認される前に、Critical Changeを実行してはならない。
 
-Critical Change Approvalは、提示された特定の変更内容に対する承認であり、Specification、Approved Implementation Plan、またはImplementation全体を包括的に変更する権限をCodex Runnerへ与えるものではない。
+Critical Change Approvalは、Humanへ提示された特定のCritical Change Requestに対する承認であり、Specification、Approved Implementation Plan、Codex Prompt、またはImplementation全体を包括的に変更する権限をCodex Runnerへ与えるものではない。
 
-Codex Runner、Application Layer、またはAI RunnerがHumanの代わりにCritical Changeを承認してはならない。
+Codex Runner、Application Layer、AI Runner、`ApprovalRecordService`、`ApprovalValidationService`、`ApprovalRecordRepository`、またはその他のComponentがHumanの代わりにCritical Changeを承認してはならない。
 
-有効なCritical Change Approvalを確認した場合でも、Implementationは承認された変更範囲内でのみ再開できる。
+有効なCritical Change Approvalを確認した場合でも、ImplementationはHumanによって承認されたCritical Change Requestに記録された変更範囲内でのみ再開できる。
+
+Critical Change Requestの内容または対象ImplementationがHuman Approval後に変更され、現在の承認対象との同一性を確認できなくなった場合、以前のApproval Recordを現在のCritical Changeに対する有効な承認として使用してはならない。
+
+単に`state.json`が`critical_approval_pending`またはその他の承認済み状態を示していることだけを根拠として、有効なHuman Approvalと判断してはならない。
+
+Approval Recordの構築は15.16および15.18で定義した責務分離に従う。
+
+Approval Recordの保存および読み出しは15.18および15.19で定義した`ApprovalRecordRepository`および`JsonApprovalRecordRepository`の責務分離に従う。
+
+Approval Recordの有効性検証は15.17および15.18で定義した`ApprovalValidationService`の責務に従う。
+
+Application Layerは、これらのServiceおよびRepositoryを利用してCritical Change Approval工程を制御するが、Human Approvalそのものを生成、推定、補完、または代替してはならない。
 
 ---
 
@@ -833,6 +1136,7 @@ Application Layerは、少なくとも以下を確認する。
 - 実行したTestおよびその結果を確認できる
 - Error、Warningおよび未完了事項を記録できる
 - Human Approvalが必要な事項を記録できる
+- 使用したCodex Promptが、対象SpecificationおよびApproved Implementation Planに対応するPromptであることを確認できる
 
 Codex Runnerから返された情報と実際のRepositoryまたはTestの状態に不一致がある場合、その不一致を無視してEvidenceを正常として扱ってはならない。
 
@@ -881,12 +1185,20 @@ Reviewは、単にTestが成功しているかを確認する工程ではない�
 
 必要なTestが存在するか
 
+Testが正常に実行されているか
+
+Test Resultが要求された振る舞いと整合しているか
+
 既存の振る舞いを不必要に変更していないか
 
 未完了事項、Error、Warning等が残っていないか
 
 Human Approvalを必要とする変更が含まれていないか
 ```
+
+Reviewは不適合の検出、原因、および必要な修正Scopeの評価を担当する。
+
+Review自身がSource Code、Test Code、Specification、Approved Implementation Plan、またはその他の承認対象Artifactを修正してはならない。
 
 ---
 
@@ -901,11 +1213,17 @@ Reviewでは、少なくとも以下を参照する。
 - Source Code
 - Git Diff
 - Test Code
-- Test Result
+- Test実行状態
+- Test Result（PASS / FAIL）
+- Test Execution Error
 
 Implementation EvidenceのみをReviewの根拠としてはならない。
 
-Implementation Evidenceに記録された内容と、実際のSource Code、Git Diff、Test Code、およびTest Resultを相互に比較する。
+Implementation Evidenceに記録された内容と、実際のSource Code、Git Diff、Test Code、Test実行状態、Test Result、およびTest Execution Errorを相互に比較する。
+
+Review開始前に、Specification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、Implementation Branch、および関連するGit Diff等が、同一の対象Implementationに対する一連のArtifactとして対応していることを確認する。
+
+Review対象Artifact間の対応関係を確認できない場合、その不整合を無視してReviewを継続し、`APPROVED`としてはならない。
 
 ---
 
@@ -938,17 +1256,25 @@ Reviewでは、少なくとも以下を確認する。
 
 - 必要なTestが作成または更新されているか
 - TDD対象のImplementationについて、期待される振る舞いを検証するTestが存在するか
-- 対象Testが成功しているか
-- 既存Testを含む全体Testが成功しているか
+- TDDにおけるImplementation前のExpected Test Failureが正常な工程として適切に扱われているか
+- 対象Testが正常に実行されているか
+- 対象TestのTest Resultが`PASS`であるか
+- 必要な既存Testが正常に実行されているか
+- 既存Testを含むTest Resultに`FAIL`が存在しないか
+- Test Execution Errorが存在しないか
 - TestがSpecificationまたはApproved Implementation Planで要求された振る舞いを適切に検証しているか
+- Test Resultが`FAIL`の場合、その原因がImplementation、Test Code、Specification、Approved Implementation Plan、またはその他の要因のいずれに関係するかを確認できるか
 
 #### Evidence Compliance
 
 - Implementation Evidenceに必要な情報が存在するか
 - Implementation Evidenceと実際のGit Diffが一致しているか
 - Implementation Evidenceに記録された変更ファイルと実際の変更ファイルが一致しているか
+- Test実行状態がImplementation Evidenceの記録と一致しているか
 - Test ResultがImplementation Evidenceの記録と一致しているか
+- Test Execution Errorが存在する場合、その内容がImplementation Evidenceへ適切に記録されているか
 - Error、Warning、未完了事項が適切に記録されているか
+- Specification、Approved Implementation Plan、Codex Prompt、Implementation Evidence、およびGit Diff等の対応関係が確認できるか
 
 ---
 
@@ -988,7 +1314,9 @@ Source CodeおよびGit Diffを確認し、要求されたImplementationが正�
 
 #### Test Review
 
-Test CodeおよびTest Resultを確認し、要求された振る舞いが適切に検証されているか、既存の振る舞いが維持されているかを確認する。
+Test Code、Test実行状態、Test Result、およびTest Execution Errorを確認し、要求された振る舞いが適切に検証されているか、既存の振る舞いが維持されているかを確認する。
+
+Test Resultが`FAIL`の場合は、その事実だけでReview Resultを決定せず、Source Code、Test Code、Specification、Approved Implementation Plan、Git Diff、およびImplementation Evidenceとの関係から原因と必要な修正Scopeを評価する。
 
 #### Integration Review
 
@@ -998,13 +1326,73 @@ Test CodeおよびTest Resultを確認し、要求された振る舞いが適切
 
 ---
 
+### Test Result Evaluation
+
+Reviewでは、Testが正常に実行された結果としての`PASS`または`FAIL`と、Test実行処理そのものを正常に完了できなかった`Test Execution Error`を区別する。
+
+また、TDDにおいてImplementation前に意図的に確認するExpected Test Failureは、Implementation後のTest Resultとしての`FAIL`とは区別する。
+
+```text
+Expected Test Failure
+= TDDにおいてImplementation前に
+  意図的に確認する正常な工程
+
+Test Result = PASS
+= Testが正常に実行され、
+  期待された振る舞いを満たした結果
+
+Test Result = FAIL
+= Testが正常に実行されたが、
+  期待された振る舞いを満たしていない結果
+
+Test Execution Error
+= Test Resultそのものを
+  正常に取得できなかった技術的問題
+```
+
+Implementation後にTestが正常に実行され、その結果として`FAIL`となった場合、その事実をTechnical Errorまたは`implementation_failed`として扱ってはならない。
+
+Reviewは、Test Code、Test Result、Source Code、Git Diff、Specification、Approved Implementation Plan、およびImplementation Evidenceを相互に比較し、Test Resultが`FAIL`となった原因と、修正に必要なScopeを評価する。
+
+```text
+Test Result = FAIL
+        ↓
+原因および必要な修正Scopeを評価
+        │
+        ├── Human Approval Scope内で
+        │   Correction可能
+        │       ↓
+        │  REVISION_REQUIRED
+        │
+        └── Human Approval Scope内で
+            安全にCorrectionできない
+                ↓
+           HUMAN_REVIEW_REQUIRED
+                ↓
+           Human判断へ返す
+```
+
+Test Resultが`FAIL`であることのみを根拠として、Reviewが自動的に`REVISION_REQUIRED`と判断してはならない。
+
+Specificationの不足・矛盾・不明確さ、Approved Implementation Planの変更、Human Approval Scopeを超える変更、Critical Change、その他Human判断を必要とする問題が原因である場合は、`HUMAN_REVIEW_REQUIRED`として扱う。
+
+一方、Testを開始できない、Test Runnerが異常終了する、必要な実行環境を利用できない、その他Test Resultを正常に取得できない問題は`Test Execution Error`として扱う。
+
+`Test Execution Error`について、Review自身が成果物を変更して解消しようとしてはならない。
+
+Technical Retryとして処理可能か、またはFailure Stateとして扱う必要があるかについては、Application Layerが10.4.1、10.5、および15.22で定義した規則に従って判断する。
+
+---
+
 ### Review Result
 
 Review結果は、少なくとも以下のいずれかとして扱う。
 
 ```text
 APPROVED
+
 REVISION_REQUIRED
+
 HUMAN_REVIEW_REQUIRED
 ```
 
@@ -1012,9 +1400,13 @@ HUMAN_REVIEW_REQUIRED
 
 Specification、Approved Implementation Plan、および承認されたImplementation Scopeに適合し、Review上の重大な問題が確認されない場合。
 
+必要なTestが正常に実行され、要求された振る舞いおよび既存の正常な振る舞いについて、Review上問題となるTest Resultが確認されないことを含む。
+
 #### REVISION_REQUIRED
 
-承認された範囲内で修正可能なImplementation上の問題が確認された場合。
+承認されたHuman Approval Scope内でCorrection可能なImplementation上の問題が確認された場合。
+
+Test Resultが`FAIL`の場合であっても、その原因および必要な修正が既存のHuman Approval Scope内で安全にCorrection可能であることを確認した場合に`REVISION_REQUIRED`として扱うことができる。
 
 #### HUMAN_REVIEW_REQUIRED
 
@@ -1031,7 +1423,10 @@ Critical Changeが必要
 
 Humanによる設計判断が必要
 
-安全に自動修正を継続できない
+Test ResultがFAILとなった原因または
+必要な修正Scopeを安全に確定できない
+
+安全に自動Correctionを継続できない
 ```
 
 ---
@@ -1045,12 +1440,13 @@ Reviewは、少なくとも以下を出力する。
 - 適合または不適合となった項目
 - 不適合箇所
 - 判断根拠
+- Testに関する評価
 - 修正対象
 - 修正工程の返却先
 - Humanへの確認事項
 - 未解決事項
 
-`REVISION_REQUIRED`の場合は、後続のCorrection Instructionおよび修正ループで利用できるよう、修正対象とその根拠を明確にする。
+`REVISION_REQUIRED`の場合は、後続のCorrection InstructionおよびCorrection Loopで利用できるよう、修正対象、その根拠、および既存のHuman Approval Scope内で修正可能と判断した理由を明確にする。
 
 `HUMAN_REVIEW_REQUIRED`の場合は、AIが判断を補完せず、Humanが判断すべき事項を明確にして処理を返す。
 
@@ -1062,19 +1458,32 @@ ReviewはSpecification自体を変更してはならない。
 
 ReviewはApproved Implementation Plan自体を変更してはならない。
 
+ReviewはSource CodeまたはTest Codeを変更してはならない。
+
 Reviewは、CodexがImplementation Evidence内に記述した自己評価のみを根拠としてはならない。
 
 以下を相互に比較して判断する。
 
 ```text
 Specification
+
 Approved Implementation Plan
+
 Codex Prompt
+
 Implementation Evidence
+
 Source Code
+
 Git Diff
+
 Test Code
+
+Test実行状態
+
 Test Result
+
+Test Execution Error
 ```
 
 CodexがImplementation Evidence内で、
@@ -1087,6 +1496,10 @@ out_of_scope_changes = []
 
 同様に、SpecificationまたはApproved Implementation Planで要求されたImplementationが、Source Code、Git Diff、Test Code、またはTest Resultから確認できない場合は、Implementation不足として扱う。
 
+Reviewは、Test Resultが`FAIL`であることと、Test実行処理そのものが失敗したことを混同してはならない。
+
+Reviewは不適合の検出、原因、および必要な修正Scopeの評価を担当するが、Review自身がSource Code、Test Code、Specification、Approved Implementation Plan、またはその他の承認対象Artifactを修正してはならない。
+
 ReviewによってSpecification、Approved Implementation Plan、またはHuman Approval Scopeそのものの変更が必要と判断された場合は、Review側で変更してはならない。
 
 その場合は、
@@ -1097,9 +1510,14 @@ HUMAN_REVIEW_REQUIRED
 
 として、対応する工程またはHumanへ判断を返す。
 
-Review結果が`REVISION_REQUIRED`の場合は、15.11で定義した修正ループの規則に従う。
+Review Resultが`REVISION_REQUIRED`の場合は、15.11および15.22で定義したCorrection Loopの規則に従う。
 
-自動修正を行う場合であっても、修正回数上限、Early Stop Condition、Convergence Detection、およびHuman Escalationの規則を無視してはならない。
+自動Correctionを行う場合であっても、Automatic Correction Limit、Early Stop Condition、Convergence Detection、およびHuman Escalationの規則を無視してはならない。
+
+Reviewが`Test Execution Error`を検出した場合、Review自身がTechnical Retryを実行したり、成果物を変更して問題を解消したりしてはならない。
+
+Technical Retryとして処理可能かどうか、および復旧不能時にどのFailure Stateへ遷移するかは、Application Layerが関連するState Transitionおよび15.22の規則に従って判断する。
+
 ---
 
 ## UC-10 Request Final Approval
@@ -1108,16 +1526,80 @@ Review結果が`REVISION_REQUIRED`の場合は、15.11で定義した修正ル�
 
 Review ReportをHumanへ提示し、対象Implementationを`developer`へ取り込んでよいかについて最終判断を受け取る。
 
+UC-10はHumanによるFinal Approvalを取得・記録・検証するUseCaseであり、実際のmerge処理は行わない。
+
+有効なFinal Approvalが確認された場合にのみ、UC-12 `Merge Approved Implementation`へ進むことができる。
+
 ### Input
 
 - Review Report
 - Review Result
 - 対象Implementation Branch
 - Base Commit
+- 現在のHEAD Commit
 - Implementation Evidence
 - Git Diff
 - 対象Implementationを識別する情報
 - 必要に応じて関連するApproval Record
+
+### Precondition
+
+Final ApprovalをHumanへ求める前に、少なくとも以下を確認する。
+
+```text
+Review ResultがAPPROVEDである
+
+対象Implementation Branchを識別できる
+
+現在のHEAD Commitを識別できる
+
+Base Commitを識別できる
+
+Implementation Evidenceを参照できる
+
+Git Diffを参照できる
+
+Review Reportを参照できる
+```
+
+Review Resultが`REVISION_REQUIRED`または`HUMAN_REVIEW_REQUIRED`である場合、Final Approval工程へ進んではならない。
+
+### Final Approval Target Artifact
+
+Final Approvalでは、Humanが最終Reviewを経て`developer`へ取り込むことを承認する特定時点のImplementationを承認対象とする。
+
+Application Layerは、HumanへFinal Approvalを求める前に、15.4で定義したFinal Approval Target Artifactを構築し、承認対象Artifactとして確定する。
+
+Final Approval Target Artifactには、少なくとも以下を含める。
+
+```text
+implementation_branch
+head_commit
+base_commit
+implementation_evidence_reference
+git_diff_reference
+review_report_reference
+```
+
+概念的には、以下とする。
+
+```text
+Reviewed Implementation
+        ↓
+Final Approval Target Artifact
+        ├── Implementation Branch
+        ├── HEAD Commit
+        ├── Base Commit
+        ├── Implementation Evidence
+        ├── Git Diff
+        └── Review Report
+        ↓
+Human Final Approval
+```
+
+Humanへ提示したFinal Approval Target Artifactと、後続のApproval RecordおよびApproval Validationで参照するFinal Approval Target Artifactは、同一の承認対象Artifactとして識別可能でなければならない。
+
+Application LayerはFinal Approval Target ArtifactをHumanへ提示する工程を制御するが、Humanに代わってFinal Approval Decisionを生成してはならない。
 
 ### Human Actions
 
@@ -1129,9 +1611,17 @@ Review ReportをHumanへ提示し、対象Implementationを`developer`へ取り�
 
 ### Approval Record
 
-Humanによる最終判断は、15.4で定義したApproval Recordとして`approvals/`配下へ保存する。
+Humanによる最終判断は、15.4および15.16で定義したApproval Recordとして`approvals/`配下へ保存する。
 
-最終承認の場合、Approval Recordには少なくとも以下を保持する。
+Human Decisionを受け取ったApplication Layerは、`ApprovalRecordService`へApproval Recordの構築を依頼する。
+
+`ApprovalRecordService`は、承認対象として確定されたFinal Approval Target Artifactを識別し、15.4で定義した算出規則に従ってArtifact Hashを計算した上で、Final Approval Recordを構築する。
+
+構築されたFinal Approval Recordは、`ApprovalRecordRepository`を介して保存する。
+
+Version 1では、その具体実装として`JsonApprovalRecordRepository`を使用し、Final Approval Recordを`approvals/`配下のJSONファイルとして保存する。
+
+Approval Recordには、少なくとも以下を保持する。
 
 ```text
 approval_id
@@ -1143,15 +1633,15 @@ approved_at
 comment
 ```
 
-最終承認時には、Humanが承認した対象Implementationを識別できる情報およびHashをApproval Recordへ記録する。
+Final Approvalの場合、`artifact_path`はFinal Approval Target Artifactを参照し、`artifact_hash`には当該Artifactから算出したHashを記録する。
 
 概念的には、以下のようなApproval Recordを生成する。
 
 ```json
 {
   "approval_id": "final_approval_001",
-  "artifact_type": "implementation",
-  "artifact_path": "<approved implementation reference>",
+  "artifact_type": "final_approval_target",
+  "artifact_path": "<Final Approval Target Artifact path>",
   "artifact_hash": "<SHA-256 hash>",
   "decision": "approved",
   "approved_at": "<timestamp>",
@@ -1159,40 +1649,86 @@ comment
 }
 ```
 
+実装修正、Plan修正、Specification再検討、または中止をHumanが選択した場合は、その判断を後続工程で識別可能な形で記録する。
+
+Application Layer、`ApprovalRecordService`、`ApprovalRecordRepository`、AI Runner、またはその他のComponentがHumanの代わりにFinal Approval Decisionを生成してはならない。
+
 ### Approval Validation
 
-Humanによる最終承認は、承認時点の特定のImplementationに対してのみ有効とする。
+HumanによるFinal Approvalは、承認時点の特定のFinal Approval Target Artifactおよび対象Implementationに対してのみ有効とする。
 
-merge工程へ進む前に、Application Layerは現在の対象ImplementationとApproval Recordに記録された承認対象が一致していることを確認する。
+UC-12 `Merge Approved Implementation`へ進む前に、Application Layerは15.17で定義した`ApprovalValidationService`を利用して、保存されたFinal Approval Recordが現在のFinal Approval Target Artifactおよび対象Implementationに対して有効であることを確認する。
 
-少なくとも以下を確認する。
+`ApprovalValidationService`は、少なくとも以下を確認する。
 
 ```text
 Final Approval Recordが存在する
 
 decisionが承認を示している
 
-対象Implementation Branchが一致する
+Approval Recordが現在の
+Final Approval Target Artifactに対応している
 
-対象Implementationが承認された内容と一致する
+現在のFinal Approval Target Artifactから
+Artifact Hashを計算できる
 
-Approval Recordのartifact_hashと
-現在の対象Implementationから計算したHashが一致する
+Approval Recordに保存されたartifact_hashと
+現在のFinal Approval Target Artifactから
+同一の算出規則で計算したArtifact Hashが一致する
+
+対象Implementation Branchが
+承認時点と一致する
+
+対象ImplementationのHEAD Commitが
+承認時点と一致する
+
+Base Commitが
+承認時点の対象と一致する
+
+Implementation Evidence、
+Git Diff、
+Review Report等の参照関係が
+承認対象Artifactと整合している
 ```
 
-いずれかの条件を満たさない場合、そのFinal Approvalを現在のImplementationに対する有効な承認として扱ってはならない。
+概念的には、以下とする。
+
+```text
+Final Approval Record
+        +
+Current Final Approval Target Artifact
+        +
+Current Implementation
+        ↓
+ApprovalValidationService
+        ↓
+Validation Result
+        ↓
+Application Layer
+```
+
+`ApprovalValidationService`が有効なFinal Approvalであると判定した場合にのみ、Application LayerはUC-12 `Merge Approved Implementation`へ進むことができる。
+
+Final Approval Target Artifactの内容がHuman承認後に変更された場合、または対象Implementation BranchのHEAD Commitが承認時点から変更された場合、以前のFinal Approval Recordを現在のImplementationに対する有効な承認として扱ってはならない。
+
+Approval Validationに失敗した場合、Application LayerはそのFinal Approval Recordを前提としてmerge工程へ進んではならない。
+
+必要に応じて、Humanへの再承認または適切な修正・再検討工程へ処理を返す。
 
 ### Output
 
 - Human Decision
+- Final Approval Target Artifact
 - Final Approval Record
+- Approval Validation Result
 - 承認有効性に関する情報
 - 修正要求
+- 再検討対象
 - 中止情報
 
 ### Transition
 
-Humanが最終承認し、そのApproval Recordが現在の対象Implementationに対して有効であることを確認できた場合、Application Layerは`MergeApprovedImplementationUseCase`へ進むことができる。
+Humanが最終承認し、`ApprovalValidationService`によってそのFinal Approval Recordが現在のFinal Approval Target Artifactおよび対象Implementationに対して有効であることを確認できた場合、Application LayerはUC-12 `Merge Approved Implementation`へ進むことができる。
 
 実装修正が選択された場合は、対応するImplementation修正工程へ戻る。
 
@@ -1202,15 +1738,54 @@ Specification再検討が選択された場合は、Specification策定工程へ
 
 中止の場合は、`cancelled`へ遷移する。
 
+Approval Validationに失敗した場合は、UC-12へ進まず、必要に応じてHumanへの再承認または適切な修正・再検討工程へ処理を返す。
+
+概念的には、以下とする。
+
+```text
+Review Result = APPROVED
+        ↓
+Final Approval Target Artifactを確定
+        ↓
+Human Final Approval
+        ↓
+Final Approval Record
+        ↓
+Approval Validation
+        │
+        ├── valid
+        │      ↓
+        │  UC-12 Merge Approved Implementation
+        │
+        └── invalid
+               ↓
+           mergeへ進まない
+               ↓
+           再承認または
+           適切な工程へ返却
+```
+
 ### Rule
 
-Application LayerまたはAI RunnerがHumanの代わりにFinal Approvalを行ってはならない。
+Application Layer、AI Runner、`ApprovalRecordService`、`ApprovalValidationService`、`ApprovalRecordRepository`、またはその他のComponentがHumanの代わりにFinal Approvalを行ってはならない。
 
-Humanによる最終承認のみをもって`completed`へ遷移してはならない。
+HumanによるFinal Approvalのみをもって`completed`へ遷移してはならない。
 
-有効なFinal Approvalを確認した後、15.14で定義したmerge工程を実行し、対象Implementation Branchの`developer`へのmergeが正常に完了した場合にのみ`completed`へ遷移できる。
+Final Approvalの対象は、Humanへ提示された特定のFinal Approval Target Artifactであり、対象Implementation全体に対する無制限の承認として扱ってはならない。
 
-merge開始前に、Approval Recordと現在の対象Implementationの整合性を確認しなければならない。
+Final Approval後に対象Implementation Branch、HEAD Commit、Base Commit、Final Approval Target Artifact、Implementation Evidence、Git Diff、Review Report、またはその他の承認対象情報が変更され、承認時点との同一性を確認できなくなった場合、以前のFinal Approval Recordを現在のImplementationに対する有効な承認として使用してはならない。
+
+単に`state.json`がFinal Approval済みを示す状態であることや、Implementation本文またはReview Reportに承認済み表記が存在することだけを根拠として、有効なHuman Approvalと判断してはならない。
+
+Approval Recordの構築は15.16および15.18で定義した責務分離に従う。
+
+Approval Recordの保存および読み出しは15.18および15.19で定義した`ApprovalRecordRepository`および`JsonApprovalRecordRepository`の責務分離に従う。
+
+Approval Recordの有効性検証は15.17および15.18で定義した`ApprovalValidationService`の責務に従う。
+
+有効なFinal Approvalを確認した後も、Application Layer自身がmergeを完了したものとして扱ってはならない。
+
+実際のmergeはUC-12 `Merge Approved Implementation`で実行し、15.14で定義したmerge工程に従って対象Implementation Branchの`developer`へのmergeが正常に完了したことを確認できた場合にのみ`completed`へ遷移できる。
 
 ---
 
@@ -1296,7 +1871,396 @@ UC-11は、Specification、Approved Implementation Plan、またはHuman Approva
 
 修正後に再Reviewを行う場合は、第9章で定義した新しいImplementation Evidenceを生成し、以前のEvidenceを上書きしてはならない。
 
+修正によってHuman Approvalの対象Artifactが変更された場合、変更前のApproval Recordを変更後のArtifactに対する有効な承認として引き継いではならない。
+
+UC-11は修正工程へ処理を戻す際、修正によって再取得が必要となるHuman Approvalを識別し、対応するApproval工程を経ずに後続工程へ進行させてはならない。
 ---
+
+## UC-12 Merge Approved Implementation
+
+### Purpose
+
+Humanによって最終承認されたImplementationについて、Final Approvalの有効性および対象Implementationの同一性を確認し、Repositoryが安全にmerge可能な状態であることを確認した上で、Implementation Branchを`developer`へmergeする。
+
+UC-12はHumanによるFinal Approvalを代替するUseCaseではなく、有効なFinal Approvalを前提として承認済みImplementationを`developer`へ取り込む工程を実行する。
+
+UC-12では、以下をそれぞれ区別して扱う。
+
+```text
+Final Approvalが現在も有効であること
+
+Repositoryがmerge可能な状態であること
+
+merge処理そのものが正常に実行されたこと
+
+merge結果として対象Implementationが
+developerへ正しく取り込まれたこと
+```
+
+これらすべてを確認できた場合にのみ、`completed`へ遷移できる。
+
+### Input
+
+- 対象Implementation Branch
+- Base Commit
+- 現在のHEAD Commit
+- Final Approval Record
+- Final Approval Target Artifact
+- Implementation Evidence
+- Review Report
+- Review Result
+- 現在のState
+- 必要に応じてGit StatusおよびGit Diff
+
+### Precondition
+
+merge開始前に、少なくとも以下を確認する。
+
+```text
+Review ResultがAPPROVEDである
+
+Final Approval Recordが存在する
+
+Final Approval Target Artifactが存在する
+
+対象Implementation Branchを識別できる
+
+現在のHEAD Commitを識別できる
+
+Base Commitを識別できる
+
+Implementation Evidenceを参照できる
+
+Review Reportを参照できる
+```
+
+さらに、Application Layerは15.17で定義した`ApprovalValidationService`を利用し、Final Approval Recordが現在のFinal Approval Target Artifactおよび対象Implementationに対して有効であることを確認する。
+
+`ApprovalValidationService`は、少なくとも以下を検証する。
+
+```text
+Final Approval Recordのdecisionが
+承認を示している
+
+Final Approval Recordが現在の
+Final Approval Target Artifactに対応している
+
+現在のFinal Approval Target Artifactから
+Artifact Hashを計算できる
+
+Final Approval Recordのartifact_hashと
+現在のFinal Approval Target Artifactから
+同一の算出規則で計算したArtifact Hashが一致する
+
+対象Implementation Branchが
+承認時点と一致する
+
+HEAD Commitが
+承認時点と一致する
+
+Base Commitが
+承認時点の対象と一致する
+
+Implementation Evidence、
+Git Diff、
+Review Report等の参照関係が
+承認対象Artifactと整合している
+```
+
+Approval Validationに失敗した場合、そのFinal Approvalを現在のImplementationに対する有効な承認として使用してはならず、mergeを開始してはならない。
+
+### Processing
+
+UC-12の処理は、概念的に以下の4段階へ分離する。
+
+```text
+1. Approval Validation
+
+2. Merge Readiness Check
+
+3. Merge Execution
+
+4. Merge Result Verification
+```
+
+全体の流れは、以下とする。
+
+```text
+Final Approval Record
+        +
+Final Approval Target Artifact
+        +
+Current Implementation
+        ↓
+ApprovalValidationService
+        ↓
+Approval Validation Result
+        │
+        ├── invalid
+        │      ↓
+        │  mergeを開始しない
+        │      ↓
+        │  Human判断または
+        │  適切な工程へ返す
+        │
+        └── valid
+               ↓
+        Merge Readiness Check
+               │
+               ├── not ready
+               │      ↓
+               │  mergeを開始しない
+               │      ↓
+               │  Human判断へ返す
+               │
+               └── ready
+                      ↓
+                Merge Execution
+                      ↓
+                Merge Result
+                      │
+                      ├── failure
+                      │      ↓
+                      │  completedへ遷移しない
+                      │      ↓
+                      │  Human判断へ返す
+                      │
+                      └── success
+                             ↓
+                      Merge Result Verification
+                             │
+                             ├── failed
+                             │      ↓
+                             │  completedへ遷移しない
+                             │      ↓
+                             │  Human判断へ返す
+                             │
+                             └── verified
+                                    ↓
+                                completed
+```
+
+### Approval Validation
+
+Final Approvalの有効性確認は、15.17および15.18で定義した`ApprovalValidationService`を利用して行う。
+
+Application LayerはFinal Approvalの有効性を独自に判定するのではなく、`ApprovalValidationService`から返されたValidation Resultを受け取り、merge工程へ進行可能かを制御する。
+
+概念的には、以下とする。
+
+```text
+Final Approval Record
+        +
+Current Final Approval Target Artifact
+        +
+Current Implementation
+        ↓
+ApprovalValidationService
+        ↓
+Validation Result
+        ↓
+Application Layer
+```
+
+`is_valid = true`の場合にのみ、Merge Readiness Checkへ進むことができる。
+
+`is_valid = false`の場合、Application Layerはmergeを開始してはならない。
+
+必要に応じて、Humanへの再承認または適切な修正・再検討工程へ処理を返す。
+
+### Merge Readiness Check
+
+Final Approvalが有効であることと、Repositoryが安全にmerge可能な状態であることは別の条件として扱う。
+
+Approval Validationが成功した後、Application LayerはGit操作を担当するComponentまたはServiceを利用し、merge実行前のRepository状態を確認する。
+
+Merge Readiness Checkでは、少なくとも以下のような事項を確認する。
+
+```text
+merge元Branchを識別できる
+
+merge先Branchがdeveloperである
+
+対象Implementation Branchが
+期待された状態にある
+
+Repositoryに安全なmergeを妨げる
+未処理の状態が存在しない
+
+承認対象外の変更が
+混入していない
+
+必要なGit情報を取得できる
+
+その他、自動mergeを安全に実行できない
+Repository上の問題が存在しない
+```
+
+具体的なGit Status、Branch状態、Working Tree状態、競合可能性等の確認方法は、Git操作を担当するComponentまたはServiceの実装責務とする。
+
+Merge Readiness Checkによって安全にmerge可能であることを確認できない場合、mergeを開始してはならない。
+
+その場合、Application Layerは問題の内容を記録し、Humanへ判断を返す。
+
+### Merge Execution
+
+Approval Validationが成功し、Merge Readiness Checkによってmerge可能であることを確認できた場合にのみ、Implementation Branchを`developer`へmergeする。
+
+Git操作そのものはApplication Layerが直接実装せず、Git操作を担当するComponentまたはServiceを利用する。
+
+概念的には、以下とする。
+
+```text
+Application Layer
+        ↓
+Git操作を担当する
+Component / Service
+        ↓
+Implementation Branch
+        ↓
+developer
+        ↓
+merge
+        ↓
+Merge Result
+```
+
+UC-12は、Final Approvalの対象となったImplementationをmergeのために変更してはならない。
+
+mergeを成立させるためにImplementation自体の修正が必要となった場合は、承認済みImplementationを直接修正してmergeを継続してはならない。
+
+その場合はmerge処理を停止し、適切な修正工程へ処理を戻す。
+
+merge conflictが発生した場合も、承認済みImplementationまたは`developer`側の内容をApplication Layerが独自に変更して自動解決したものとして扱ってはならない。
+
+### Merge Result Verification
+
+Git操作が成功を返したことだけをもって、対象Implementationが`developer`へ正しく取り込まれたと判断してはならない。
+
+merge実行後、Git操作を担当するComponentまたはServiceを利用してmerge結果を確認する。
+
+少なくとも以下を確認可能でなければならない。
+
+```text
+merge処理が正常終了している
+
+merge先Branchがdeveloperである
+
+対象Implementationが
+developerへ取り込まれている
+
+merge後Commitを識別できる
+
+Repositoryがmerge後に
+想定された状態となっている
+
+merge処理によって
+承認対象外のImplementation変更が
+行われていない
+```
+
+Merge Result Verificationに成功した場合にのみ、mergeが正常に完了したものとして扱う。
+
+merge処理自体が成功していても、結果を確認できない場合または想定された状態との一致を確認できない場合は、`completed`へ遷移してはならない。
+
+### Output
+
+- Approval Validation Result
+- Merge Readiness Result
+- Merge Result
+- Merge Verification Result
+- merge対象Implementation
+- merge元Branch
+- merge先Branch
+- merge前Commitに関する情報
+- merge後Commitに関する情報
+- ErrorおよびWarning
+- Human判断が必要な事項
+- 遷移可能なState
+
+### Transition
+
+以下のすべてを満たした場合にのみ、`completed`へ遷移する。
+
+```text
+Review ResultがAPPROVEDである
+
+Final Approvalが
+現在の対象Implementationに対して有効である
+
+Merge Readiness Checkに成功している
+
+merge処理が正常に完了している
+
+Merge Result Verificationに成功している
+
+対象Implementationがdeveloperへ
+正しく取り込まれたことを確認できる
+```
+
+概念的には、以下とする。
+
+```text
+Final Approval
+        ↓
+Approval Validation
+        │
+        └── valid
+               ↓
+        Merge Readiness Check
+               │
+               └── ready
+                      ↓
+                Merge Execution
+                      │
+                      └── success
+                             ↓
+                Merge Result Verification
+                             │
+                             └── verified
+                                    ↓
+                                completed
+```
+
+いずれかの工程に失敗した場合は、`completed`へ遷移してはならない。
+
+merge conflict、Repository状態の不整合、承認対象との不一致、承認対象外の変更、その他安全に自動継続できない問題が確認された場合は、自動的に問題を解消したものとして処理してはならない。
+
+必要な情報を記録し、Humanへ判断を返すか、適切な修正・再承認工程へ処理を戻す。
+
+### Rule
+
+Humanによる有効なFinal Approvalが確認される前にmergeを実行してはならない。
+
+Final Approvalの有効性は、15.17および15.18で定義した`ApprovalValidationService`によって検証する。
+
+Application LayerはHumanによるFinal Approvalを生成、推定、補完、または代替してはならない。
+
+Final Approval後に対象Implementation Branch、HEAD Commit、Base Commit、Final Approval Target Artifact、Implementation Evidence、Git Diff、Review Report、またはその他の承認対象情報が変更され、承認時点との同一性を確認できなくなった場合、以前のFinal Approvalを現在のImplementationに対する有効な承認として使用してはならない。
+
+Final Approvalが有効であることだけを根拠として、Repositoryがmerge可能な状態であると判断してはならない。
+
+Approval ValidationとMerge Readiness Checkは異なる確認工程として扱う。
+
+UC-12は、Final Approvalの対象となったImplementationを変更してはならない。
+
+mergeのためにImplementation自体の修正が必要となった場合は、承認済みImplementationを直接修正してmergeを継続せず、適切な修正工程へ処理を戻す。
+
+merge conflictまたはRepository状態の不整合が発生した場合、Application LayerまたはGit操作を担当するComponent / Serviceが、Human Approval Scopeを超える変更を独自に行って問題を解消してはならない。
+
+Git操作そのものはApplication Layerが直接実装せず、Git操作を担当するComponentまたはServiceを利用する。
+
+Git操作が成功を返したことだけをもって`completed`へ遷移してはならない。
+
+Merge Result Verificationによって、対象Implementationが`developer`へ正しく取り込まれたことを確認できた場合にのみ`completed`へ遷移できる。
+
+単に`state.json`がFinal Approval済みまたはmerge可能な状態を示していることだけを根拠としてmergeを実行してはならない。
+
+Approval Recordの有効性、現在のImplementationとの同一性、Repositoryのmerge可能性、およびmerge結果をそれぞれ確認した上でState Transitionを行う。
+
+---
+
+
 
 # 7. Human Approval Points
 
@@ -1306,23 +2270,31 @@ Version 1では、少なくとも以下のHuman承認ポイントを設ける。
 
 SpecificationはHumanが作成または承認する。
 
-Application Layerは、未承認Specificationを実装工程へ渡してはならない。
+Application Layerは、Specificationに対する有効なHuman Approvalを確認できない限り、Plan生成工程へ進んではならない。
+
+Specification Approvalの有効性は、対応するApproval Recordと現在のSpecificationのArtifact Hashが一致することによって確認する。
 
 ---
 
 ## Approval Point 2: Implementation Plan
 
-ChatGPTが生成したImplementation Plan DraftをHumanが確認する。
+ChatGPT Runnerが生成したImplementation Plan DraftをHumanが確認する。
 
-Humanが承認するまでCodex用Prompt生成へ進んではならない。
+Application Layerは、Implementation Planに対する有効なHuman Approvalを確認できない限り、Codex Prompt生成工程へ進んではならない。
+
+Implementation Plan Approvalの有効性は、UC-03および15.4で定義したApproval Recordと現在のImplementation PlanのArtifact Hashが一致することによって確認する。
 
 ---
 
 ## Approval Point 3: Critical Change
 
-Codex実行中に重要変更が必要になった場合、Human承認を求める。
+Codex RunnerによるImplementation中にCritical Changeが必要となった場合、Implementationを停止してHumanへ判断を求める。
 
-承認されない場合、変更を実行してはならない。
+HumanによるCritical Changeへの判断は、UC-07および15.4で定義したCritical Change Requestを承認対象Artifactとして記録する。
+
+Critical Change Requestに対する有効なApproval Recordが確認されない限り、Critical Changeを実行してはならない。
+
+HumanがCritical Changeを承認した場合でも、Implementationは承認された変更範囲内でのみ再開できる。
 
 ---
 
@@ -1394,9 +2366,9 @@ Review Result
     │       │       │
     │       │       ├── 上限未満
     │       │       │       ↓
-    │       │       │   修正指示生成
+    │       │       │   Correction Instruction生成
     │       │       │       ↓
-    │       │       │   Codex再実装
+    │       │       │   Codex Correction
     │       │       │       ↓
     │       │       │   再テスト
     │       │       │       ↓
@@ -1437,9 +2409,11 @@ AIが推測でSpecificationを補完してはならない。
 
 ---
 
-## 8.4 Retry Limit
+## 8.4 Automatic Correction Limit
 
-Version 1では、自動修正の回数を記録する。
+Version 1では、Implementation Correction Loopにおける自動修正の回数を記録する。
+
+本節で定義する修正回数は、15.22で定義した`Correction`の回数を対象とし、成果物を変更せず同一の技術操作を再実行する`Technical Retry`は含めない。
 
 初回Implementationは修正回数に含めず、ChatGPT Reviewによる`REVISION_REQUIRED`を受けてCodexが修正を実行した時点で、1回の修正として数える。
 
@@ -1813,41 +2787,184 @@ Critical Change Approvalの有効性は、UC-07および15.4で定義したAppro
 
 ## 10.4.1 Implementation Failure Transition
 
-Implementation中に、Codex Runnerの実行失敗、Test失敗、またはその他の理由によりImplementationを正常に完了できず、定められた範囲で処理を継続できない場合は、`implementation_failed`へ遷移する。
+Implementation中に、Codex Runnerの実行失敗、Test実行処理そのものの失敗、実行環境上の問題、またはその他の技術的理由によりImplementation工程を正常に継続または完了できない場合は、`implementation_failed`へ遷移する。
+
+ただし、Technical Errorが発生した時点で直ちに`implementation_failed`へ遷移するのではなく、15.22で定義した条件に従い、安全にTechnical Retryを実行可能かを確認する。
 
 ```text
 implementing
         ↓
-Implementation Failure
+Technical Error
         ↓
-implementation_failed
-        ↓
-停止条件確認
+Technical Retry可能？
         │
-        ├── 再試行可能
+        ├── Yes
         │      ↓
-        │  定められた範囲で再試行
+        │  15.22で定義した範囲で
+        │  Technical Retry
+        │      │
+        │      ├── Recovery Success
+        │      │      ↓
+        │      │  implementingを維持
+        │      │
+        │      └── Recovery Failed
+        │             ↓
+        │      implementation_failed
         │
-        └── 継続不能
+        └── No
                ↓
-           Human判断へ返す
+        implementation_failed
+               ↓
+        Human判断へ返す
 ```
 
-`implementation_failed`は、TDDにおける期待されたTest失敗を示すStateではない。
+### Test Failureとの境界
+
+`implementation_failed`は、Testが正常に実行された結果として`FAIL`となったこと自体を示すStateではない。
+
+Testに関する結果は、少なくとも以下を区別する。
+
+```text
+TDDにおける期待されたTest失敗
+
+Testが正常に実行された結果としてのFAIL
+
+Test実行処理そのものの失敗
+```
 
 TDD対象のImplementationにおいて、Implementation前に期待される振る舞いを表現したTestが意図どおり失敗することは正常な工程として扱い、それ自体を`implementation_failed`への遷移理由としてはならない。
 
-`implementation_failed`への遷移は、Codex Runnerの実行失敗、Implementation後のTest失敗、実行環境上の問題、またはその他の理由により、現在のImplementationを正常に継続または完了できない場合に使用する。
+また、Implementation後にTestが正常に実行され、その結果として`FAIL`となった場合も、それ自体をTechnical Errorまたは`implementation_failed`として扱ってはならない。
 
-再試行可能な場合は、第13章および15.13で定義した範囲内で再試行できる。
+この場合は、Test ResultをImplementation Evidenceへ記録し、Source Code、Test Code、Git Diff、その他のImplementation EvidenceとともにReview工程へ渡す。
 
-再試行によって解消できない場合は、自動的に別のAI Runnerへ切り替えず、停止理由、現在の状態、影響範囲、および再開に必要なHuman操作を記録してHumanへ判断を返す。
+概念的には、以下とする。
+
+```text
+Test Execution
+        │
+        ├── Expected FAIL before Implementation
+        │       ↓
+        │  TDD上の正常な工程
+        │       ↓
+        │  implementingを継続
+        │
+        ├── Test Execution Completed
+        │       +
+        │     Result = PASS
+        │       ↓
+        │  Implementation Evidence
+        │       ↓
+        │  Review
+        │
+        ├── Test Execution Completed
+        │       +
+        │     Result = FAIL
+        │       ↓
+        │  Implementation Evidence
+        │       ↓
+        │  Review
+        │       ↓
+        │  必要に応じて
+        │  REVISION_REQUIRED
+        │  または
+        │  HUMAN_REVIEW_REQUIRED
+        │
+        └── Test Execution Error
+                ↓
+           Technical Error
+                ↓
+           Technical Retry判定
+```
+
+Testが正常に実行された結果としての`FAIL`について、Application LayerまたはCodex Runnerが独自に成果物を修正し、Testを通過するまで無制限にImplementationを継続してはならない。
+
+修正が必要である場合は、Review Resultおよび15.11、15.22で定義したCorrectionの規則に従う。
+
+修正に必要な変更が既存のSpecification、Approved Implementation Plan、またはHuman Approval Scopeを超える場合は、通常のCorrectionとして扱わず、Critical Changeまたは上位成果物の再検討として扱う。
+
+### Technical Error
+
+Testを開始できない、Test Runnerが異常終了する、必要な実行環境を利用できない、その他Test Resultそのものを正常に取得できない問題は、Test Resultとしての`FAIL`ではなくTechnical Errorとして扱う。
+
+`implementation_failed`への遷移は、Codex Runnerの実行失敗、Test実行処理そのものの失敗、実行環境上の問題、またはその他の技術的理由により、現在のImplementation工程を正常に継続または完了できない場合に使用する。
+
+Technical Retryが可能な場合は、15.22で定義した条件および制限に従い、成果物を変更せず同一の技術操作を再実行できる。
+
+Technical Retryによって解消できない場合、またはTechnical Retryとして安全に処理できない場合は、`implementation_failed`へ遷移する。
+
+`implementation_failed`へ遷移した後は、自動的に別のAI Runnerへ切り替えたり、成果物を修正して処理を継続したりしてはならない。
+
+停止理由、現在の状態、影響範囲、および再開に必要なHuman操作を記録してHumanへ判断を返す。
+
+### Responsibility Boundary
+
+Version 1では、Testに関する以下の概念を混同しない。
+
+```text
+Expected Test Failure
+= TDDにおいてImplementation前に
+  意図的に確認する正常な工程
+
+Test Result = FAIL
+= Testは正常に実行されたが、
+  期待された振る舞いを満たしていない結果
+
+Test Execution Error
+= Test処理そのものを
+  正常に実行または完了できない技術的問題
+
+Technical Retry
+= 成果物を変更せず、
+  同一の技術操作を安全に再実行する処理
+
+implementation_failed
+= Technical Retryによって復旧できない、
+  またはTechnical Retryとして
+  安全に処理できない技術的失敗により、
+  Implementation工程を正常に継続できないState
+```
+
+したがって、以下を基本とする。
+
+```text
+Expected Test Failure
+≠ implementation_failed
+
+Test Result = FAIL
+≠ Technical Error
+
+Test Result = FAIL
+≠ implementation_failed
+
+Test Execution Error
+= Technical Errorの候補
+
+Technical Error
+≠ 直ちにimplementation_failed
+
+Technical Retry成功
+→ implementingを維持
+
+Technical Retry不能または復旧失敗
+→ implementation_failed
+```
+
+この区別により、Testが正常に問題を検出した場合と、Testそのものを正常に実行できなかった場合を分離する。
+
+TestによってImplementation上の問題が検出された場合はReviewおよびCorrectionの経路で扱い、実行環境等の技術的問題についてはTechnical RetryおよびImplementation Failureの経路で扱う。
 
 ---
 
-## 10.5 Review Failure Transition
+## 10.5 Review Result / Review Failure Transition
+
+Review工程では、Reviewが正常に完了して得られたReview Resultと、Review処理そのものを正常に完了できなかったReview Failureを区別する。
 
 Review Resultが`REVISION_REQUIRED`または`HUMAN_REVIEW_REQUIRED`の場合、Main Transitionを継続して`final_approval_pending`へ進んではならない。
+
+`REVISION_REQUIRED`および`HUMAN_REVIEW_REQUIRED`はReview処理が正常に完了した結果であり、それ自体を`review_failed`への遷移理由としてはならない。
+
+---
 
 ### REVISION_REQUIRED
 
@@ -1858,25 +2975,31 @@ reviewing
         ↓
 [Review Result: REVISION_REQUIRED]
         ↓
-review_failed
-        ↓
 correction_requested
         ↓
-異常・停止条件確認
+Correction可能性・停止条件確認
         │
-        ├── 自動修正可能
+        ├── 承認Scope内で自動Correction可能
         │       ↓
-        │  修正回数確認
+        │  Correction Count確認
         │       │
         │       ├── 上限未満
         │       │       ↓
         │       │  指定された修正工程
+        │       │       ↓
+        │       │  新しいImplementation Evidence
         │       │       ↓
         │       │    Re-Review
         │       │
         │       └── 上限到達
         │               ↓
         │          Human判断へ返す
+        │
+        ├── Critical Changeに該当
+        │       ↓
+        │  critical_approval_pending
+        │       ↓
+        │  Human Approval
         │
         └── Early Stop Condition
                 ↓
@@ -1887,48 +3010,359 @@ correction_requested
 
 ```text
 Specification修正
+
 Plan修正
+
 Prompt修正
+
 Implementation修正
+
 Test修正
 ```
 
-Specification、Approved Implementation Planおよび既存のHuman Approvalの範囲内で自動修正可能な場合は、15.11で定義したCorrection Loopに従って修正およびRe-Reviewを行う。
+Specification、Approved Implementation Plan、および既存のHuman Approval Scopeの範囲内で自動Correction可能な場合は、15.11および15.22で定義したCorrection Loopに従って修正およびRe-Reviewを行う。
 
-修正完了後は、問題の種類に応じた工程へ戻る。
+Correctionによって成果物を変更した場合は、第9章および15.22で定義した規則に従い、新しいImplementation Evidenceを生成する。
+
+修正に必要な変更が既存のHuman Approval Scopeを超える場合は、通常のCorrectionとして自動継続してはならず、15.22で定義したCritical Changeとして扱う。
+
+Correction完了後は、問題の種類に応じた工程へ戻る。
+
+---
 
 ### HUMAN_REVIEW_REQUIRED
 
-Review Resultが`HUMAN_REVIEW_REQUIRED`の場合は、自動修正ループへ進んではならない。
+Review Resultが`HUMAN_REVIEW_REQUIRED`の場合は、自動Correction Loopへ進んではならない。
 
 ```text
 reviewing
         ↓
 [Review Result: HUMAN_REVIEW_REQUIRED]
         ↓
-correction_requested
+reviewingを維持
         ↓
 Human判断へ返す
 ```
 
-Humanは、Review Reportおよび停止理由を確認し、必要な修正工程、承認、再検討、または中止等の次の操作を判断する。
+`HUMAN_REVIEW_REQUIRED`は、Correctionが必要であることを確定するResultではない。
 
-`REVISION_REQUIRED`であっても、Early Stop Conditionを検出した場合、または自動修正の最大回数に到達した場合は、自動修正を継続せずHumanへ判断を返す。
+Humanは、Review Report、停止理由、Implementation Evidence、および必要に応じて関連するApproval Record等を確認し、次の処理を判断する。
 
-`REVISION_REQUIRED`および`HUMAN_REVIEW_REQUIRED`はStateではなく、UC-09で定義したReview Resultである。
+Humanによる判断には、少なくとも以下が含まれ得る。
+
+```text
+現在のImplementationについて
+追加Correction不要と判断し、
+必要なReview工程を再開する
+
+Correctionを要求する
+
+Implementation Planの再検討へ戻す
+
+Specificationの再検討へ戻す
+
+Critical Change Approval工程へ進める
+
+Implementationを中止する
+```
+
+HumanがCorrectionを要求した場合に、`correction_requested`へ遷移する。
+
+HumanがCritical Changeに該当する変更を必要とすると判断した場合は、UC-07および10.4で定義した工程へ進む。
+
+Humanによる判断が完了するまで、Application LayerまたはAI Runnerが独自にMain Transitionを再開してはならない。
+
 ---
 
-## 10.6 Final Rejection Transition
+### Review Failure
+
+`review_failed`は、Review Resultの内容を表すStateではなく、Review処理そのものを正常に完了できなかった場合に使用する。
+
+例えば、以下のような状況を対象とし得る。
+
+```text
+Reviewを担当するAI Runnerの実行失敗
+
+Review処理中の技術的Error
+
+必要なReview Inputを取得できない
+
+Review Resultを正常に構築できない
+
+その他、Review処理そのものを
+正常に完了できない問題
+```
+
+Review処理中にTechnical Errorが発生した場合は、15.22で定義したTechnical Retryの条件を確認する。
+
+```text
+reviewing
+        ↓
+Technical Error
+        ↓
+Technical Retry可能？
+        │
+        ├── Yes
+        │      ↓
+        │  15.22で定義した範囲で
+        │  Technical Retry
+        │      │
+        │      ├── Recovery Success
+        │      │       ↓
+        │      │   reviewingを維持し、
+        │      │   Review処理を継続
+        │      │
+        │      └── Recovery Failed
+        │              ↓
+        │         review_failed
+        │
+        └── No
+               ↓
+          review_failed
+               ↓
+          Human判断へ返す
+```
+
+Technical Retryでは、Review対象Artifact、Implementation Evidence、Specification、Approved Implementation Plan、またはHuman Approval Scopeを変更してはならない。
+
+Review対象の内容を変更する必要がある場合はTechnical Retryとして扱わず、CorrectionまたはCritical Changeの規則に従う。
+
+---
+
+### Early Stop
+
+Review Resultが`REVISION_REQUIRED`であっても、Early Stop Conditionを検出した場合、またはAutomatic Correction Limitへ到達した場合は、自動Correctionを継続せずHumanへ判断を返す。
+
+少なくとも以下の場合は、自動Correctionを停止する。
+
+```text
+Correctionが非収束または悪化している
+
+Automatic Correction Limitへ到達した
+
+既存のHuman Approval Scopeを超える変更が必要
+
+Critical Changeに該当する
+
+SpecificationまたはApproved Implementation Planに
+不足・矛盾・不明確さがある
+
+安全な自動継続を判断できない
+```
+
+---
+
+### State / Result / Actionの区別
+
+Version 1では、Review工程に関するState、Result、およびActionを混同しない。
+
+```text
+State
+├── reviewing
+├── review_failed
+├── correction_requested
+└── critical_approval_pending
+
+
+Review Result
+├── APPROVED
+├── REVISION_REQUIRED
+└── HUMAN_REVIEW_REQUIRED
+
+
+Action / Processing
+├── Technical Retry
+├── Correction
+├── Re-Review
+└── Human Review
+```
+
+したがって、
+
+```text
+REVISION_REQUIRED
+≠ review_failed
+
+HUMAN_REVIEW_REQUIRED
+≠ correction_requested
+
+Technical Retry
+≠ review_failed
+```
+
+とする。
+
+`review_failed`はReview処理そのものを正常に完了できなかったStateとして使用し、Reviewが正常に完了して得られたReview Resultとは明確に区別する。
+
+---
+
+## 10.6 Final Approval Decision Transition
+
+`final_approval_pending`では、HumanがUC-10で定義したFinal Approvalに関する判断を行う。
+
+Humanによる判断に応じて、以下のように遷移する。
 
 ```text
 final_approval_pending
-        ↓
-correction_requested
-        ↓
-指定された修正工程
+        │
+        ├── 最終承認
+        │      ↓
+        │  Final Approval Validation
+        │      │
+        │      ├── 有効
+        │      │      ↓
+        │      │  UC-12
+        │      │  Merge Approved Implementation
+        │      │      ↓
+        │      │  developerへmerge
+        │      │      │
+        │      │      ├── merge成功
+        │      │      │      ↓
+        │      │      │  completed
+        │      │      │
+        │      │      └── merge失敗
+        │      │             ↓
+        │      │        completedへ遷移しない
+        │      │             ↓
+        │      │        final_approval_pendingを維持
+        │      │             ↓
+        │      │        Human判断へ返す
+        │      │
+        │      └── 無効
+        │             ↓
+        │        mergeを実行しない
+        │             ↓
+        │        final_approval_pending維持
+        │             ↓
+        │        Human判断へ返す
+        │
+        ├── 実装修正
+        │      ↓
+        │  correction_requested
+        │      ↓
+        │  Implementation修正工程
+        │
+        ├── Plan修正
+        │      ↓
+        │  Implementation Plan修正工程
+        │
+        ├── Specification再検討
+        │      ↓
+        │  Specification策定・修正工程
+        │
+        └── 中止
+               ↓
+           cancelled
 ```
 
-Humanによる最終承認、および承認されたImplementation Branchの`developer`へのmergeが正常に完了しない限り、`completed`へ遷移してはならない。
+### Final Approval
+
+Humanによる最終承認のみをもって`completed`へ遷移してはならない。
+
+Humanが最終承認した場合、Application LayerはUC-10および15.17で定義した規則に従い、Final Approval Recordが現在の対象Implementationに対して有効であることを確認する。
+
+少なくとも以下を確認する。
+
+```text
+Final Approval Recordが存在する
+
+decisionが承認を示している
+
+対象Implementation Branchが一致する
+
+HEAD Commitが承認時点と一致する
+
+Final Approval Target Artifactが一致する
+
+Approval Recordのartifact_hashと
+現在のFinal Approval Target Artifactから
+同一の算出規則で計算したArtifact Hashが一致する
+```
+
+Final Approvalが現在の対象Implementationに対して有効であることを確認できた場合にのみ、UC-12 `Merge Approved Implementation`へ進むことができる。
+
+Final Approvalが無効である場合、以前のApproval Recordを現在のImplementationに対する有効な承認として扱ってはならず、mergeを実行してはならない。
+
+### Correction
+
+Humanが実装修正を要求した場合は、`correction_requested`へ遷移し、指定されたImplementation修正工程へ戻る。
+
+修正後のImplementationは、以前のFinal Approvalの対象となったImplementationと同一であるとみなしてはならない。
+
+必要なImplementation、Review、およびFinal Approval工程を再度実行する。
+
+修正内容が既存のSpecification、Approved Implementation Plan、またはHuman Approval Scopeを超える場合は、通常のCorrectionとして処理せず、15.22で定義したCritical Changeまたは上位成果物の再検討として扱う。
+
+### Plan Revision
+
+HumanがImplementation Planの修正を要求した場合は、Implementation Plan修正工程へ戻る。
+
+Implementation Planを変更した場合、変更前のPlanに対するApproval Recordを変更後のPlanに対する有効な承認として使用してはならない。
+
+修正後のImplementation Planについて、必要なPlan Approvalを改めて取得する。
+
+### Specification Reconsideration
+
+HumanがSpecificationの再検討を要求した場合は、Specification策定・修正工程へ戻る。
+
+Specification変更後は、その変更によって影響を受けるImplementation Plan、Codex Prompt、Implementation、および関連するApprovalについて再評価する。
+
+以前のApproval Recordを変更後のArtifactへ自動的に引き継いではならない。
+
+### Cancellation
+
+Humanが中止を判断した場合は、`cancelled`へ遷移する。
+
+Application LayerまたはAI RunnerがHumanの中止判断を変更、無視、または自動的に再開してはならない。
+
+### Merge Failure
+
+有効なFinal Approvalを確認した後であっても、mergeが正常に完了しない限り`completed`へ遷移してはならない。
+
+merge conflict、Repository状態の不整合、承認対象との不一致、その他安全に自動継続できない問題が発生した場合は、UC-12および15.21、15.22で定義した規則に従う。
+
+成果物を変更せず同一のGit操作を安全に再実行可能な場合は、Technical Retryとして扱うことができる。
+
+一方、mergeを成立させるために承認済みImplementationそのものを変更する必要がある場合は、Technical Retryとして扱ってはならない。
+
+その場合は、変更内容に応じてCorrection、Critical Change、または上位成果物の再検討へ処理を戻す。
+
+### Rule
+
+Final Approvalに関するHuman Decisionと、その後のmerge処理を区別する。
+
+```text
+Human Final Approval
+= developerへのmergeを許可する判断
+
+Merge
+= 承認されたImplementationを
+  developerへ実際に取り込む処理
+
+completed
+= 有効なFinal Approvalに基づくmergeが
+  正常に完了した状態
+```
+
+したがって、
+
+```text
+Final Approval
+≠ completed
+
+Final Rejection
+≠ 必ずCorrection
+
+Merge Failure
+≠ Approval Failure
+
+Technical Retry
+≠ Implementation Correction
+```
+
+とする。
+
+Humanによる有効なFinal Approval、および承認されたImplementation Branchの`developer`へのmergeが正常に完了した場合にのみ、`completed`へ遷移できる。
 
 ---
 
@@ -1952,16 +3386,16 @@ Application Layerに配置するUseCaseクラスは、15.2で定義した命名�
 Application Layer
 ├── LoadDevelopmentInputUseCase
 ├── GenerateImplementationPlanUseCase
-├── ApproveImplementationPlanUseCase
+├── RequestPlanApprovalUseCase
 ├── ReviseImplementationPlanUseCase
 ├── GenerateCodexPromptUseCase
 ├── ExecuteImplementationUseCase
-├── ApproveCriticalChangeUseCase
+├── RequestCriticalChangeApprovalUseCase
 ├── CollectImplementationEvidenceUseCase
 ├── ReviewImplementationUseCase
-├── ApproveFinalResultUseCase
-├── MergeApprovedImplementationUseCase
-└── ResumeCorrectionUseCase
+├── RequestFinalApprovalUseCase
+├── ResumeCorrectionUseCase
+└── MergeApprovedImplementationUseCase
 ```
 
 各UseCaseは、必要な既存EngineまたはServiceを利用する。
@@ -2026,7 +3460,7 @@ state_history/*.json
 - PromptResultがAI実行可能でない
 - ChatGPT RunnerまたはCodex Runnerの実行に失敗し、定められた範囲で処理を継続できない
 - CodexがHuman承認を必要とする重要変更の必要性を報告した
-- Implementation後の対象Testまたは全体Testが期待に反して失敗し、自動修正可能な範囲で解消できない
+- Implementation後の対象Testまたは全体Testが期待に反して`FAIL`となり、UC-09によるReviewの結果、既存のHuman Approval Scope内で安全にCorrectionできない、またはCorrection Loopによって解消できない
 - Implementation Evidenceが不足している
 - Reviewに必要な成果物が不足している
 - Specificationに不足・矛盾・不明確さがあり、現在の承認範囲内で処理を継続できない
@@ -2163,14 +3597,14 @@ Pythonのクラス名はPascalCaseとする。
 ```python
 LoadDevelopmentInputUseCase
 GenerateImplementationPlanUseCase
-ApproveImplementationPlanUseCase
+RequestPlanApprovalUseCase
 ReviseImplementationPlanUseCase
 GenerateCodexPromptUseCase
 ExecuteImplementationUseCase
-ApproveCriticalChangeUseCase
+RequestCriticalChangeApprovalUseCase
 CollectImplementationEvidenceUseCase
 ReviewImplementationUseCase
-ApproveFinalResultUseCase
+RequestFinalApprovalUseCase
 ResumeCorrectionUseCase
 MergeApprovedImplementationUseCase
 ```
@@ -2182,14 +3616,14 @@ MergeApprovedImplementationUseCase
 ```text
 load_development_input_use_case.py
 generate_implementation_plan_use_case.py
-approve_implementation_plan_use_case.py
+request_plan_approval_use_case.py
 revise_implementation_plan_use_case.py
 generate_codex_prompt_use_case.py
 execute_implementation_use_case.py
-approve_critical_change_use_case.py
+request_critical_change_approval_use_case.py
 collect_implementation_evidence_use_case.py
 review_implementation_use_case.py
-approve_final_result_use_case.py
+request_final_approval_use_case.py
 resume_correction_use_case.py
 merge_approved_implementation_use_case.py
 ```
@@ -2215,6 +3649,42 @@ GenerateImplementationPlanUseCase
 ```
 
 とすることで、Application Layerに属するUseCaseであることを明示できる。
+
+また、Human Approvalを扱うUseCaseについては、Application Layer自身が承認を行うのではなく、Humanへ判断を求め、その結果を記録・検証・状態遷移へ反映する責務を持つ。
+
+そのため、Human Approvalを扱うUseCaseでは、
+
+```text
+Approve...
+```
+
+ではなく、
+
+```text
+Request...Approval...
+```
+
+を使用する。
+
+例えば、
+
+```python
+RequestPlanApprovalUseCase
+RequestCriticalChangeApprovalUseCase
+RequestFinalApprovalUseCase
+```
+
+とすることで、
+
+```text
+Human
+= Approval Decision
+
+Application Layer
+= Approval Request / Record / Validation / State Transition
+```
+
+という責務分離を名称上も明確にする。
 
 SpecFlowでは今後、以下のような異なる責務を持つコンポーネントが共存する。
 
@@ -2388,6 +3858,7 @@ Humanによる承認記録は、独立したJSONファイルとして`approvals/
 projects/specflow/
 ├── state.json
 └── approvals/
+    ├── specification_approval_001.json
     ├── plan_approval_001.json
     ├── critical_change_approval_001.json
     └── final_approval_001.json
@@ -2461,6 +3932,46 @@ state.json + approvals/*.json
 
 による分離管理を採用する。
 
+### Specification Approval
+
+Specificationに対するHuman Approvalは、Application Layerが生成または代替するものではない。
+
+Version 1では、HumanがApplication Layerの外部でSpecificationを作成または選択し、その内容を承認する。
+
+HumanによるSpecificationへの承認判断は、Specification Approval Recordとして`approvals/`配下に保存し、Development InputとともにApplication Layerへ渡す。
+
+Specification Approval Recordでは、承認対象となったSpecificationそのものをArtifactとして扱う。
+
+Approval Recordの`artifact_path`は承認対象Specificationを参照し、`artifact_hash`にはHumanが承認した時点のSpecificationから算出したHashを記録する。
+
+概念的には、以下とする。
+
+```text
+Specification
+        ↓
+Human Review / Approval
+        ↓
+Specification Approval Record
+        ├── artifact_path
+        └── artifact_hash
+        ↓
+Development Input
+        ↓
+Application Layer
+        ↓
+Current Specification Hashとの同一性確認
+```
+
+Application Layerは、Specificationを後続工程で使用する前に、現在のSpecificationからArtifact Hashを計算し、Specification Approval Recordに保存された`artifact_hash`と比較する。
+
+Hashが一致し、かつ`decision`が承認を示している場合にのみ、現在のSpecificationを有効に承認済みとして扱う。
+
+Specification Approval Recordが存在しない場合、`decision`が承認を示していない場合、または現在のSpecificationのHashと`artifact_hash`が一致しない場合、そのSpecificationを有効に承認済みとして扱ってはならない。
+
+Humanによる承認後にSpecificationが変更された場合、以前のSpecification Approval Recordを変更後のSpecificationに対する有効な承認として使用してはならない。
+
+Specificationの承認判断はHumanの責務とし、Application Layerはその判断を代替せず、承認記録と現在のSpecificationとの同一性を検証する。
+
 ### Critical Change Approval
 
 Critical Changeに対するHuman Approvalでは、Humanへ提示した変更要求そのものを承認対象Artifactとして扱う。
@@ -2483,10 +3994,58 @@ artifact_hash
         ↓
 Critical Change Requestとの同一性確認
 ```
-
 Critical Change Requestの内容がHuman承認後に変更され、現在のHashとApproval Recordに保存された`artifact_hash`が一致しなくなった場合、以前のApproval Recordを変更後のCritical Changeに対する有効な承認として扱ってはならない。
 
 この方式により、Critical Change Approvalについても、Humanが具体的にどの変更要求を承認したかをArtifact単位で追跡可能にする。
+
+### Final Approval
+
+Final Approvalでは、Humanが最終Reviewを経て`developer`へ取り込むことを承認した特定時点のImplementationを承認対象とする。
+
+Version 1では、承認対象Implementationを少なくともImplementation Branchおよび承認時点のHEAD Commitによって識別する。
+
+Final Approvalの対象となるImplementationについて、承認対象を識別可能なFinal Approval Target Artifactを構築・保存し、そのArtifactをApproval Recordの承認対象として扱う。
+
+Final Approval Target Artifactには、少なくとも以下を含める。
+
+```text
+implementation_branch
+head_commit
+base_commit
+implementation_evidence_reference
+git_diff_reference
+review_report_reference
+```
+
+Approval Recordの`artifact_path`はFinal Approval Target Artifactを参照し、`artifact_hash`には当該Artifactから算出したHashを記録する。
+
+概念的には、以下とする。
+
+```text
+Reviewed Implementation
+        ↓
+Final Approval Target Artifact
+        ├── Implementation Branch
+        ├── HEAD Commit
+        ├── Base Commit
+        ├── Implementation Evidence
+        ├── Git Diff
+        └── Review Report
+        ↓
+Human Final Approval
+        ↓
+Approval Record
+        ├── artifact_path
+        └── artifact_hash
+        ↓
+merge開始前に同一性確認
+```
+
+merge開始前に、Application Layerは現在の対象ImplementationからFinal Approval Target Artifactに対応する情報を確認し、承認時点の対象Implementationと一致していることを検証する。
+
+Final Approval Target Artifactの内容が承認後に変更された場合、または対象Implementation BranchのHEAD Commitが承認時点から変更された場合、以前のFinal Approval Recordを現在のImplementationに対する有効な承認として扱ってはならない。
+
+Final ApprovalにおけるArtifact Hashは、承認時とmerge開始前で同一の算出規則を使用する。
 
 ---
 
@@ -3920,79 +5479,190 @@ Documentation / Non-Behavior Change
 
 **Status: Decided**
 
-Version 1では、ChatGPT Reviewによって修正が必要と判断された場合、Codexによる自動修正を一定回数まで許可する。
+Version 1では、UC-09 `Review Implementation`によるReview Resultが`REVISION_REQUIRED`であり、既存のHuman Approval Scope内でCorrection可能と判断された場合、Codexによる自動Correctionを一定回数まで許可する。
 
-ただし、修正ループの制御を最大回数のみに依存させない。
+本節でいうCorrectionは、15.22で定義した`Correction`を意味する。
 
-修正過程において異常または収束しない兆候を検出した場合は、最大回数へ到達する前であっても自動修正を停止し、Humanによる判断を要求する。
+成果物を変更せず同一の技術操作を再実行する`Technical Retry`はCorrectionではなく、本節で定義するMaximum Correction Countには含めない。
+
+自動Correctionは、Test Resultが`FAIL`であることのみを根拠として開始してはならない。
+
+Test Resultが`FAIL`の場合は、UC-09で定義したReviewによって原因および必要な修正Scopeを評価し、Review Resultが`REVISION_REQUIRED`であり、既存のHuman Approval Scope内でCorrection可能と判断された場合にのみ、自動Correction Loopへ進むことができる。
+
+ただし、Correction Loopの制御を最大回数のみに依存させない。
+
+Correction過程において異常、悪化、非収束、承認範囲外変更、またはその他安全に自動継続できない兆候を検出した場合は、最大回数へ到達する前であっても自動Correctionを停止し、Humanによる判断を要求する。
 
 基本原則は、以下とする。
 
 ```text
-正常に収束している修正
-    → AIによる自動修正を継続
+REVISION_REQUIRED
+        ↓
+Human Approval Scope内で
+Correction可能
+        ↓
+正常に収束している
+        → AIによる自動Correctionを継続
 
-異常または非収束を検出
-    → 早期停止
-    → Human Review Required
+異常・悪化・非収束を検出
+        → Early Stop
+        → Human判断へ返す
 
-最大修正回数へ到達
-    → 自動修正停止
-    → Human Review Required
+Maximum Correction Countへ到達
+        → Automatic Correction Stop
+        → Human判断へ返す
 ```
+
+---
 
 ### Correction Loop
 
-基本的な修正ループは、以下とする。
+基本的なCorrection Loopは、以下とする。
 
 ```text
 Codex Implementation
         ↓
+Test実行
+        ↓
+Implementation Evidence構築
+        ↓
 ChatGPT Review
         │
-        ├─ APPROVED
+        ├── APPROVED
         │       ↓
         │  Human Final Approval Candidate
         │
-        ├─ REVISION_REQUIRED
+        ├── REVISION_REQUIRED
         │       ↓
-        │  異常・停止条件確認
+        │  Correction Scope確認
         │       │
-        │  ┌────┴────┐
-        │  │         │
-        │ 問題なし   問題あり
-        │  │         │
-        │  ↓         ↓
-        │ 修正回数確認  Early Stop
-        │  │         ↓
-        │  │    Human Review Required
-        │  │
-        │ ┌┴────────┐
-        │ │         │
-        │ 上限未満   上限到達
-        │ │         │
-        │ ↓         ↓
-        │ Codex     Stop
-        │ Correction │
-        │ ↓         ↓
-        │ Re-Review Human Review Required
+        │       ├── Human Approval Scope内
+        │       │       ↓
+        │       │  異常・停止条件確認
+        │       │       │
+        │       │  ┌────┴────┐
+        │       │  │         │
+        │       │ 問題なし   問題あり
+        │       │  │         │
+        │       │  ↓         ↓
+        │       │ 修正回数確認 Early Stop
+        │       │  │         ↓
+        │       │  │    Human判断へ返す
+        │       │  │
+        │       │ ┌┴────────┐
+        │       │ │         │
+        │       │ 上限未満   上限到達
+        │       │ │         │
+        │       │ ↓         ↓
+        │       │ Codex     Stop
+        │       │ Correction │
+        │       │ ↓         ↓
+        │       │ Test再実行 Human判断へ返す
+        │       │ ↓
+        │       │ 新しいImplementation Evidenceを生成
+        │       │ ↓
+        │       │ Re-Review
+        │       │
+        │       └── Human Approval Scope内で
+        │           安全にCorrectionできない
+        │                   ↓
+        │            HUMAN_REVIEW_REQUIRED   
+        │                   ↓
+        │             Human判断へ返す
         │
-        └─ HUMAN_REVIEW_REQUIRED
+        └── HUMAN_REVIEW_REQUIRED
                 ↓
-           Human Review Required
+           Human判断へ返す
 ```
 
-Humanは、通常の修正ループへ毎回介入する必要はない。
+Humanは、通常のCorrection Loopへ毎回介入する必要はない。
 
-Specification、Approved Implementation Planおよび既存の承認範囲内で修正可能であり、修正が正常に収束している場合は、CodexとChatGPT Reviewの間で自動修正を継続できる。
+Specification、Approved Implementation Plan、および既存のHuman Approval Scope内でCorrection可能であり、Correctionが正常に収束している場合は、CodexとChatGPT Reviewの間で自動Correctionを継続できる。
+
+ただし、Codex Correction後は、修正された成果物をそのままRe-Reviewへ渡してはならない。
+
+Correction後は、少なくとも以下を実行する。
+
+```text
+Codex Correction
+        ↓
+対象Testを再実行
+        ↓
+必要な既存Testを再実行
+        ↓
+Test実行状態を確認
+        ↓
+Test Resultおよび
+Test Execution Errorを記録
+        ↓
+新しいImplementation Evidenceを生成
+        ↓
+Re-Review
+```
+
+Re-Reviewでは、Correction後の現在の成果物だけでなく、Correction前のReview Result、Correction内容、Test Result、およびCorrection Historyとの比較を行う。
+
+---
+
+### CorrectionとTechnical Retryの境界
+
+CorrectionとTechnical Retryを混同してはならない。
+
+```text
+Correction
+= 成果物を変更して
+  Reviewで検出された問題を修正する処理
+
+Technical Retry
+= 成果物を変更せず
+  同一の技術操作を再実行する処理
+```
+
+Test Resultが`FAIL`であり、問題を解消するためにSource Code、Test Code、またはその他の成果物を変更する場合はCorrectionとして扱う。
+
+Testを開始できない、Test Runnerが異常終了する、必要な実行環境を利用できない等のTechnical Errorに対し、成果物を変更せず同一のTest実行を再試行する場合はTechnical Retryとして扱う。
+
+Technical RetryはCorrectionではないため、Correction Countを増加させてはならない。
+
+```text
+Test Result = FAIL
+        ↓
+Review
+        ↓
+REVISION_REQUIRED
+        ↓
+成果物を変更
+        ↓
+Correction
+        ↓
+Correction Count +1
+```
+
+一方、
+
+```text
+Test Execution Error
+        ↓
+Technical Error
+        ↓
+成果物を変更せず再実行
+        ↓
+Technical Retry
+        ↓
+Correction Countは変更しない
+```
+
+とする。
+
+Technical Retryの実行条件、制限、および復旧不能時の処理は、10.4.1および15.22で定義した規則に従う。
 
 ---
 
 ### Maximum Correction Count
 
-Version 1では、初回Implementationを修正回数には含めない。
+Version 1では、初回ImplementationをCorrection Countには含めない。
 
-ChatGPT Reviewによる`REVISION_REQUIRED`を受けてCodexが修正を実行した時点で、1回の修正として数える。
+UC-09による`REVISION_REQUIRED`を受け、Codexが成果物を変更するCorrectionを実行した時点で、1回のCorrectionとして数える。
 
 概念的には、以下とする。
 
@@ -4001,45 +5671,68 @@ Initial Implementation
         ↓
 Review
         ↓
+REVISION_REQUIRED
+        ↓
 Correction 1
         ↓
+Test
+        ↓
+新しいImplementation Evidenceを生成
+        ↓
 Review
+        ↓
+REVISION_REQUIRED
         ↓
 Correction 2
         ↓
+Test
+        ↓
+新しいImplementation Evidenceを生成
+        ↓
 Review
         ↓
+REVISION_REQUIRED
+        ↓
 Correction 3
+        ↓
+Test
+        ↓
+新しいImplementation Evidenceを生成
         ↓
 Review
 ```
 
-Version 1における自動修正の最大回数は、原則として**3回**とする。
+Version 1における自動Correctionの最大回数は、原則として**3回**とする。
 
-3回の自動修正を実施してもReviewが適合とならない場合は、それ以上CodexとChatGPT Reviewのみで修正を継続せず、自動修正を停止してHumanへ判断を返す。
+3回の自動Correctionを実施してもReviewが`APPROVED`とならない場合は、それ以上CodexとChatGPT ReviewのみでCorrectionを継続せず、自動Correctionを停止してHumanへ判断を返す。
 
-最大回数は無限ループ防止のSafety Limitとして扱う。
+Maximum Correction Countは、無限ループ防止のSafety Limitとして扱う。
+
+Maximum Correction Countは、自動Correctionを必ず3回まで実行することを意味しない。
+
+Early Stop Conditionを検出した場合は、Correction Countが3回未満であっても自動Correctionを停止する。
 
 ---
 
 ### Early Stop
 
-最大修正回数は、自動修正を必ずその回数まで実行することを意味しない。
-
-以下のような状態を検出した場合は、最大回数へ到達する前であっても修正ループを停止する。
+以下のような状態を検出した場合は、Maximum Correction Countへ到達する前であってもCorrection Loopを停止する。
 
 ```text
 同一または実質的に同一のReview指摘が繰り返される
 
-修正によって新たなPlan外変更が発生する
+Correctionによって新たなPlan外変更が発生する
 
-修正のたびに変更対象ファイルが不合理に増加する
+Correctionのたびに変更対象ファイルが不合理に増加する
 
-修正によって、それまで成功していたTestが失敗する
+Correctionによって、それまで成功していたTestがFAILとなる
 
-Test Resultが修正前より悪化する
+Test ResultがCorrection前より悪化する
 
-修正によって新たなErrorまたは重大なWarningが発生する
+Correction後に、それまで正常に実行できていたTestで
+Test Execution Errorが発生する
+
+Correctionによって新たなErrorまたは重大なWarningが発生する
 
 Approved Implementation Planの範囲内では解決できない
 
@@ -4049,7 +5742,11 @@ Implementation Plan自体の修正が必要と判断される
 
 Architecture上の新たな判断が必要になる
 
-既存のHuman承認範囲を超える変更が必要になる
+既存のHuman Approval Scopeを超える変更が必要になる
+
+Critical Changeが必要になる
+
+Correctionの原因または影響範囲を安全に確定できない
 ```
 
 これらを検出した場合は、
@@ -4061,23 +5758,25 @@ Early Stop Condition Detected
         ↓
 Automatic Correction Stop
         ↓
-Human Review Required
+Human判断へ返す
 ```
 
 へ遷移する。
+
+Early Stop後に、CodexまたはChatGPT Reviewが独自に問題を解消したものとしてCorrection Loopを再開してはならない。
 
 ---
 
 ### Convergence Detection
 
-Version 1では、修正ループが単に継続可能かだけでなく、修正が問題解決へ向かって収束しているかを確認する。
+Version 1では、Correction Loopが単に継続可能かだけでなく、Correctionが問題解決へ向かって収束しているかを確認する。
 
 例えば、以下は非収束または悪化の兆候として扱う。
 
 ```text
 同じ問題が解消されない
 
-修正するたびに別の問題が発生する
+Correctionするたびに別の問題が発生する
 
 変更範囲が拡大し続ける
 
@@ -4085,43 +5784,94 @@ Plan外変更が増加する
 
 Test失敗数が増加する
 
-以前成功していたTestが失敗する
+以前成功していたTestがFAILとなる
 
-Review指摘数または重大度が改善しない
+Test Execution Errorが新たに発生する
+
+Review指摘数が改善しない
+
+Review指摘の重大度が改善しない
+
+Correctionによって解決した問題より
+新たに発生した問題の影響が大きい
 ```
 
 このような状態では、
 
 ```text
-まだ最大回数に達していない
+まだMaximum Correction Countに達していない
 ```
 
-ことだけを理由として自動修正を継続してはならない。
+ことだけを理由として自動Correctionを継続してはならない。
+
+Convergence Detectionでは、単純なTest失敗数またはReview指摘数だけでなく、問題の重大度、変更範囲、既存の正常な振る舞いへの影響、およびHuman Approval Scopeとの関係を考慮する。
+
+---
+
+### Test Result Handling in Correction Loop
+
+Correction後のTestについても、UC-06およびUC-09で定義した以下の区別を維持する。
+
+```text
+Expected Test Failure
+
+Test Result = PASS
+
+Test Result = FAIL
+
+Test Execution Error
+```
+
+Correction後にTestが正常に実行され、その結果として`FAIL`となった場合、その事実をTechnical Errorとして扱ってはならない。
+
+当該Test ResultはImplementation Evidenceへ記録し、Re-Reviewによって原因、残存問題、および必要なCorrection Scopeを評価する。
+
+一方、Correction後にTest Resultそのものを正常に取得できない場合は`Test Execution Error`として扱う。
+
+`Test Execution Error`がTechnical Retryとして安全に処理可能な場合は、15.22で定義した範囲内でTechnical Retryを実行できる。
+
+Technical Retryによって復旧した場合は、Correction Countを増加させず、Correction後のTest工程を継続する。
+
+Technical Retryによって復旧できない場合、またはTechnical Retryとして安全に処理できない場合は、自動Correction Loopを継続せず、関連するFailure StateまたはHuman判断へ処理を返す。
 
 ---
 
 ### Human Escalation
 
-修正ループが早期停止または最大回数到達によって停止した場合、Application Layerは状態をHuman判断が必要な状態へ遷移させる。
+Correction LoopがEarly StopまたはMaximum Correction Count到達によって停止した場合、Application Layerは状態をHuman判断が必要な状態へ遷移させる。
 
 Humanへ提示する情報には、少なくとも以下を含める。
 
 ```text
 Original Implementation Evidence
+
+Current Implementation Evidence
+
 Correction History
+
 Review History
+
 Current Source Code
+
 Git Diff
+
+Test Execution Status
+
 Test Results
+
+Test Execution Error
+
 Remaining Review Issues
+
 Stop Reason
+
 Correction Count
 ```
 
 Humanは、状況に応じて以下を判断できる。
 
 ```text
-追加修正を許可する
+追加Correctionを許可する
 
 Implementation Planを修正する
 
@@ -4129,41 +5879,74 @@ Specificationへ戻る
 
 Architecture上の判断を行う
 
+Critical Change Approval工程へ進める
+
 Implementation Branchを破棄する
 
 別の実装方針を選択する
+
+Implementationを中止する
 ```
 
-Humanによる判断なしに、自動的に修正回数上限を解除してはならない。
+Humanによる判断なしに、自動的にMaximum Correction Countを解除してはならない。
+
+Humanが追加Correctionを許可した場合であっても、その許可Scopeを超えてCorrectionを実行してはならない。
+
+Specification、Approved Implementation Plan、またはHuman Approval Scopeそのものが変更された場合は、以前のApprovalを変更後のArtifactに対する有効なApprovalとして自動的に引き継いではならない。
 
 ---
 
 ### Correction History
 
-各修正について、何を指摘され、何を修正し、その結果がどう変化したかを追跡可能にする。
+各Correctionについて、何を指摘され、何を修正し、その結果がどう変化したかを追跡可能にする。
 
 最低限、以下を識別できるようにする。
 
 ```text
 correction_number
+
 review_issues
+
 correction_summary
+
 changed_files
+
+test_execution_status
+
 test_result
+
+test_execution_error
+
 remaining_issues
 ```
 
-これにより、Application LayerおよびChatGPT Reviewは、単一の修正結果だけでなく、修正ループ全体の推移を確認できる。
+これにより、Application LayerおよびChatGPT Reviewは、単一のCorrection結果だけでなく、Correction Loop全体の推移を確認できる。
 
-特に、同一指摘の繰り返しやTest Resultの悪化等を検出するために使用する。
+特に、以下の検出に使用する。
+
+```text
+同一指摘の繰り返し
+
+Test Resultの悪化
+
+Test Execution Errorの新規発生
+
+変更範囲の拡大
+
+Review指摘数または重大度の非改善
+```
+
+Technical Retryを実行した場合は、その事実を必要に応じて実行履歴へ記録する。
+
+ただし、Technical RetryをCorrection History上の新たなCorrectionとして数えてはならない。
 
 ---
 
 ### Review Rule
 
-ChatGPT Reviewは、各修正を独立したImplementationとしてのみ評価してはならない。
+ChatGPT Reviewは、各Correctionを独立したImplementationとしてのみ評価してはならない。
 
-必要に応じて以前のReviewおよび修正結果と比較し、
+必要に応じて以前のReview、Correction結果、Test Result、およびImplementation Evidenceと比較し、
 
 ```text
 問題が減っているか
@@ -4173,11 +5956,17 @@ ChatGPT Reviewは、各修正を独立したImplementationとしてのみ評価�
 新しい問題を発生させていないか
 
 変更範囲が不必要に拡大していないか
+
+Test Resultが改善しているか
+
+Test Execution Errorが新たに発生していないか
+
+Human Approval Scope内に留まっているか
 ```
 
 を確認する。
 
-したがって、修正ループの評価では、
+したがって、Correction Loopの評価では、
 
 ```text
 Current Result
@@ -4187,40 +5976,103 @@ Current Result
 
 ```text
 Correction History
++
+Review History
++
+Implementation Evidence
 ```
 
 もReview Contextとして利用する。
+
+Review自身がCorrectionを実行してはならない。
+
+ReviewはCorrectionの必要性、問題の原因、および必要なCorrection Scopeを評価し、その結果をApplication Layerへ返す。
+
+---
+
+### Responsibility Boundary
+
+Correction Loopにおける基本的な責務は、以下とする。
+
+```text
+Codex Runner
+= 承認されたCorrection Scope内で
+  成果物を修正する
+  Testを実行する
+  実行結果を返す
+
+ChatGPT Review
+= Correction結果を評価する
+  問題の残存、改善、悪化、
+  非収束およびScope逸脱を検出する
+
+Application Layer
+= Correction Loopを制御する
+  Correction Countを管理する
+  Early Stop Conditionを確認する
+  Convergenceを評価する
+  Technical Retryとの境界を管理する
+  必要に応じてHumanへEscalationする
+
+Human
+= AIおよびApplication Layerの
+  判断権限を超える事項を決定する
+```
+
+Codex Runner、ChatGPT Review、およびApplication Layerは、それぞれに定義された責務を超えてHuman Approvalを代替してはならない。
 
 ---
 
 ### Decision Reason
 
-修正ループを無制限に許可すると、CodexとChatGPT Reviewが収束しない修正を繰り返す可能性がある。
+Correction Loopを無制限に許可すると、CodexとChatGPT Reviewが収束しないCorrectionを繰り返す可能性がある。
 
-一方、最大回数だけで修正ループを制御すると、明らかに悪化または非収束している場合でも、設定された回数まで不要な修正を継続する可能性がある。
+一方、Maximum Correction CountだけでCorrection Loopを制御すると、明らかに悪化または非収束している場合でも、設定された回数まで不要なCorrectionを継続する可能性がある。
 
-SpecFlowでは、Humanがすべての修正へ逐次介入するのではなく、AIによって安全に解決可能な修正については自動化する。
+また、Technical RetryとCorrectionを区別しない場合、成果物を変更していない単純な技術操作の再実行までCorrection Countとして数えられ、Correction Loopの状態を正しく評価できなくなる。
+
+SpecFlowでは、HumanがすべてのCorrectionへ逐次介入するのではなく、AIによって安全に解決可能なCorrectionについては自動化する。
 
 ただし、
 
 ```text
-自動修正が正常に収束している
+既存のHuman Approval Scope内である
+
+        +
+
+Correctionが正常に収束している
+
+        +
+
+新たな重大な問題を発生させていない
 ```
 
 ことを自律継続の条件とする。
 
-異常、悪化、非収束、承認範囲外変更等を検出した場合は、最大回数にかかわらず早期停止し、Humanへ判断を返す。
+異常、悪化、非収束、承認範囲外変更、Critical Change、Test Execution Errorの継続等を検出した場合は、Maximum Correction CountにかかわらずEarly Stopし、Humanへ判断を返す。
 
 これにより、
 
 ```text
 Humanの不要な介入を減らす
+
         +
-無駄なAI修正ループを防止する
+
+安全なCorrectionを自動化する
+
         +
-異常を早期に検出する
+
+無駄なAI Correction Loopを防止する
+
         +
-SpecificationおよびPlanからの逸脱拡大を防止する
+
+異常および非収束を早期に検出する
+
+        +
+
+Specification、Plan、
+Human Approval Scopeからの
+逸脱拡大を防止する
 ```
 
 ことを両立する。
@@ -4229,17 +6081,27 @@ SpecificationおよびPlanからの逸脱拡大を防止する
 
 ```text
 Maximum Correction Count
+
         +
+
 Early Stop Conditions
+
         +
+
 Convergence Detection
+
         +
+
+Test Result Monitoring
+
+        +
+
 Human Escalation
 ```
 
-によって修正ループを制御する。
+によってCorrection Loopを制御する。
 
-自動修正の最大回数は原則3回とする。
+自動Correctionの最大回数は原則3回とする。
 
 ---
 
@@ -4963,7 +6825,9 @@ Codex Runner Failure
 
 のようなFallback Routingは、Version 1では行わない。
 
-Runner実行不能時は、失敗状態を記録し、再試行可能な場合は定められた範囲で再試行し、それでも処理できない場合は停止またはHuman判断が必要な状態へ遷移する。
+Runner実行不能時は、失敗内容を記録し、15.22で定義したTechnical Retryとして安全に処理可能な場合は、成果物およびHuman Approval Scopeを変更せず、同一のRunnerによる同一の技術操作を定められた範囲で再実行できる。
+
+Technical Retryによって復旧できない場合、またはTechnical Retryとして安全に処理できない場合は、自動的に別のAI Runnerへ切り替えず、停止またはHuman判断が必要な状態へ遷移する。
 
 これにより、Humanが認識しないまま異なるAIへ処理主体が変更されることを防止する。
 
@@ -5286,3 +7150,2208 @@ Version 1の正式Specification策定前にHumanによる決定を必要とし�
 また、本章で`Future Extension`として記録した事項は、Version 1の実装対象ではない。
 
 Future Extensionは、将来の検討候補を保持するための記録であり、Humanによる新たな判断なしにVersion 1へ追加実装してはならない。
+
+---
+
+## 15.16 Approval Recordの生成・保存責務
+
+**Status: Decided**
+
+Version 1では、Human Approvalに関する判断、工程制御、Approval Recordの構築、および保存の責務を分離する。
+
+責務分担は、以下を基本とする。
+
+```text
+Human
+    ↓
+Approval Decision
+    ↓
+Application Layer
+    ↓
+ApprovalRecordService
+    ↓
+ApprovalRecordRepository
+    ↓
+approvals/*.json
+```
+
+### Human
+
+Humanは、承認対象Artifactの内容を確認し、承認、修正依頼、中止、その他必要な判断を行う。
+
+Human Approvalの判断をApplication Layer、AI Runner、Service、Repository等が代替してはならない。
+
+### Application Layer
+
+Application Layerは、開発工程においてHuman Approvalが必要となる時点を制御し、Humanによる判断結果を受け取る。
+
+Application Layerは、Humanの判断結果に基づいてApproval Recordの構築を依頼し、その後のState Transitionおよび後続工程への進行可否を制御する。
+
+Application Layer自身がHumanに代わってApproval Decisionを生成してはならない。
+
+### ApprovalRecordService
+
+`ApprovalRecordService`は、HumanによるApproval Decisionと承認対象Artifactに関する情報を受け取り、15.4で定義した形式に従ってApproval Recordを構築する責務を持つ。
+
+少なくとも以下の情報を扱う。
+
+```text
+approval_id
+artifact_type
+artifact_path
+artifact_hash
+decision
+approved_at
+comment
+```
+
+`artifact_hash`は、承認対象Artifactに対して定義された算出規則に従って生成する。
+
+`ApprovalRecordService`は、HumanによるApproval Decisionの内容を独自に変更、補完、または代替してはならない。
+
+また、承認対象Artifactの内容が適切であるかどうかを判断する責務を持たない。
+
+### ApprovalRecordRepository
+
+`ApprovalRecordRepository`は、`ApprovalRecordService`によって構築されたApproval Recordの保存および読み出しを担当する。
+
+Version 1では、Approval Recordを`approvals/`配下のJSONファイルとして保存する。
+
+`ApprovalRecordRepository`は、Human Approvalの判断、Approval Recordの内容に関する業務的判断、または後続工程への進行可否を決定してはならない。
+
+### Common Use
+
+`ApprovalRecordService`および`ApprovalRecordRepository`は、特定のApproval UseCase専用とはせず、以下のHuman Approvalで共通して利用可能な仕組みとする。
+
+```text
+Specification Approval
+Implementation Plan Approval
+Critical Change Approval
+Final Approval
+```
+
+各Approvalで承認対象となるArtifactは異なるが、Humanによる判断を特定のArtifactおよびArtifact Hashと関連付けて記録する基本的な責務は共通とする。
+
+### Responsibility Boundary
+
+Version 1における責務境界は、以下を基本とする。
+
+```text
+Human
+= Approval Decisionを行う
+
+Application Layer
+= Approvalが必要となる工程を制御し、
+  ServiceおよびRepositoryを利用して
+  後続工程とState Transitionを制御する
+
+Core
+├── ApprovalRecordService
+│   = Humanの判断をApproval Recordとして構築する
+│
+├── ApprovalValidationService
+│   = Approval Recordが現在のArtifactに対して
+│     有効であるかを検証する
+│
+└── ApprovalRecordRepository
+    = Approval Recordの保存・取得に必要な
+      抽象的な契約を定義する
+
+Infrastructure / Adapter
+└── JsonApprovalRecordRepository
+    = ApprovalRecordRepositoryの契約に従い、
+      JSONファイルを用いて
+      Approval Recordを永続化・読み出しする
+```
+
+この責務分離により、Human Approvalの判断主体と、承認記録の構築・保存処理を分離し、Application LayerまたはAIがHuman Approvalを暗黙的に代替することを防止する。
+
+---
+
+## 15.17 Approval Recordの検証責務
+
+**Status: Decided**
+
+Version 1では、保存されたApproval Recordが現在の承認対象Artifactに対して有効であるかを検証する共通責務を、`ApprovalValidationService`として定義する。
+
+`ApprovalValidationService`はHumanによるApproval Decisionを行うものではなく、既に記録されたHuman Approvalと現在の承認対象Artifactとの整合性を検証する。
+
+概念的な処理は、以下とする。
+
+```text
+Approval Record
+        │
+        ├── decision
+        ├── artifact_type
+        ├── artifact_path
+        └── artifact_hash
+                │
+                │ compare
+                │
+Current Artifact
+        │
+        ├── artifact_type
+        ├── artifact_path
+        └── current_hash
+                │
+                ↓
+    ApprovalValidationService
+                ↓
+        Validation Result
+```
+
+### Responsibility
+
+`ApprovalValidationService`は、少なくとも以下を確認する。
+
+```text
+Approval Recordが存在する
+
+decisionが要求された承認状態を示している
+
+Approval Recordが現在の承認対象Artifactに対応している
+
+現在のArtifactからHashを計算できる
+
+Approval Recordのartifact_hashと
+現在のArtifact Hashが一致する
+```
+
+対象となるApprovalの種類に応じて追加の同一性確認が必要な場合は、その確認も行う。
+
+例えばFinal Approvalでは、15.4で定義したFinal Approval Target Artifactに基づき、Implementation Branch、HEAD Commit、Base Commit、および関連Artifact等の対応関係を確認する。
+
+Critical Change Approvalでは、Approval Recordが現在のCritical Change Requestおよび対象Implementationに対応していることを確認する。
+
+### Validation Result
+
+`ApprovalValidationService`は、少なくとも以下の情報を返す。
+
+```text
+is_valid
+approval_id
+artifact_type
+validation_errors
+validation_warnings
+```
+
+`is_valid`は、Humanによる承認判断そのものを表すものではない。
+
+`is_valid = true`は、
+
+```text
+Humanによって記録されたApprovalが、
+現在の対象Artifactに対して有効である
+```
+
+ことを意味する。
+
+`is_valid = false`は、
+
+```text
+現在の対象Artifactについて、
+そのApproval Recordを有効なHuman Approvalとして使用できない
+```
+
+ことを意味する。
+
+### Common Use
+
+`ApprovalValidationService`は、特定のApproval UseCase専用とはせず、少なくとも以下のHuman Approvalの検証で共通して利用可能な仕組みとする。
+
+```text
+Specification Approval
+Implementation Plan Approval
+Critical Change Approval
+Final Approval
+```
+
+各Approvalで必要となる追加の検証条件は異なるが、保存されたApproval Recordと現在の承認対象Artifactとの同一性および整合性を確認する基本責務は共通とする。
+
+### Responsibility Boundary
+
+責務境界は、以下とする。
+
+```text
+Human
+= Artifactの内容を確認し、Approval Decisionを行う
+
+Application Layer
+= Approval Validationが必要な時点を制御し、
+  Validation Resultに基づいて後続工程への進行可否を制御する
+
+ApprovalRecordService
+= Humanの判断をApproval Recordとして構築する
+
+ApprovalRecordRepository
+= Approval Recordを保存・読み出しする
+
+ApprovalValidationService
+= 保存されたApproval Recordが
+  現在のArtifactに対して有効かを検証する
+```
+
+`ApprovalValidationService`は、承認対象Artifactの内容が要求として適切であるか、設計として妥当であるか、またはHumanが承認すべきかを判断してはならない。
+
+また、無効なApproval Recordを自動的に有効化したり、Human Approvalを推定または補完したりしてはならない。
+
+### Invalid Approval
+
+以下の場合、現在のArtifactに対する有効なApprovalとして扱ってはならない。
+
+```text
+Approval Recordが存在しない
+
+decisionが承認を示していない
+
+Approval Recordと対象Artifactの対応関係を確認できない
+
+現在のArtifact Hashを計算できない
+
+artifact_hashとcurrent_hashが一致しない
+
+Approval固有の追加検証条件を満たさない
+```
+
+Approval Validationに失敗した場合、Application Layerは、そのApprovalを前提とする後続工程へ進行させてはならない。
+
+必要な場合は、Humanへ再承認を求める工程または適切な修正工程へ処理を返す。
+
+### Separation of Decision and Validation
+
+Human Approvalの判断とApproval Validationは、明確に区別する。
+
+```text
+Human
+「このArtifactを承認する」
+        ↓
+Approval Record
+        ↓
+時間経過・工程進行
+        ↓
+ApprovalValidationService
+「この承認記録は、
+ 今のArtifactにも有効か？」
+```
+
+`ApprovalValidationService`が行うのはHuman Decisionの再評価ではなく、Humanが承認した対象と現在の対象が同一であることの検証である。
+
+この責務分離により、Humanによる意思決定を維持しながら、承認後にArtifactが変更された場合や、異なるArtifactに過去のApproval Recordが誤って使用されることを防止する。
+
+---
+
+## 15.18 Approval関連Service / Repositoryの配置
+
+**Status: Decided**
+
+Version 1では、Human Approvalに関する共通責務を、その性質に応じてCore、Application Layer、およびInfrastructure / Adapterへ分離して配置する。
+
+15.16および15.17で定義したApproval関連の共通責務について、基本的な配置は以下とする。
+
+```text
+Human
+    │
+    │ Approval Decision
+    ↓
+Application Layer
+    │
+    ├── ApprovalRecordService
+    │       → Core
+    │
+    ├── ApprovalValidationService
+    │       → Core
+    │
+    └── ApprovalRecordRepository
+            → Core
+                    ↑
+                    │ implements
+                    │
+        JsonApprovalRecordRepository
+            → Infrastructure / Adapter
+```
+
+### ApprovalRecordService
+
+`ApprovalRecordService`はCoreに配置する。
+
+`ApprovalRecordService`は、HumanによるApproval Decisionと承認対象Artifactに関する情報を受け取り、15.4および15.16で定義した規則に従ってApproval Recordを構築する。
+
+この責務は、特定のUseCaseやUI、JSONファイル等の保存方式に依存しない、Human Approvalに関する共通の業務規則として扱う。
+
+したがって、`ApprovalRecordService`はApplication LayerまたはInfrastructure / Adapterではなく、Coreに属するServiceとする。
+
+概念的には、以下とする。
+
+```text
+Human Approval Decision
+        +
+Approval Target Artifact
+        ↓
+ApprovalRecordService
+        ↓
+Approval Record
+```
+
+`ApprovalRecordService`は、HumanによるApproval Decisionを代替してはならない。
+
+また、Approval Recordをどのファイルまたは保存媒体へ保存するかを決定する責務を持たない。
+
+### ApprovalValidationService
+
+`ApprovalValidationService`はCoreに配置する。
+
+`ApprovalValidationService`は、15.17で定義した規則に従い、保存されたApproval Recordが現在の承認対象Artifactに対して有効であるかを検証する。
+
+この検証は、単なるファイル読み出しではなく、少なくとも以下の情報を基に、現在のArtifactに対して既存のHuman Approvalを使用できるかを判定する共通の業務規則である。
+
+```text
+decision
+artifact_type
+artifact_path
+artifact_hash
+current_hash
+Approval固有の追加検証条件
+```
+
+そのため、`ApprovalValidationService`はCoreに属するServiceとする。
+
+概念的には、以下とする。
+
+```text
+Approval Record
+        +
+Current Artifact
+        ↓
+ApprovalValidationService
+        ↓
+Validation Result
+```
+
+`ApprovalValidationService`は、HumanによるApproval Decisionそのものを再評価、変更、補完、または代替してはならない。
+
+また、Validation Resultに基づいて後続工程へ進むかどうかを最終的に制御する責務を持たない。
+
+### ApprovalRecordRepository
+
+`ApprovalRecordRepository`は、Approval Recordの永続化および読み出しに必要な抽象的な契約を定義する。
+
+実際の保存方式には依存せず、Application LayerまたはCoreから利用可能な内側のLayerに配置する。
+
+Version 1では、`ApprovalRecordRepository`の具体実装として`JsonApprovalRecordRepository`を使用する。
+
+`JsonApprovalRecordRepository`は、Approval Recordを`approvals/`配下のJSONファイルとして保存・読み出しするため、Infrastructure / Adapterに配置する。
+
+概念的には、以下とする。
+
+```text
+Approval Record
+        ↓
+ApprovalRecordRepository
+        ↓
+JsonApprovalRecordRepository
+        ↓
+approvals/*.json
+```
+
+読み出しについては、以下とする。
+
+```text
+approvals/*.json
+        ↓
+JsonApprovalRecordRepository
+        ↓
+ApprovalRecordRepository
+        ↓
+Approval Record
+```
+
+`ApprovalRecordRepository`は、Human Approvalの判断、Approval Recordの有効性判定、または後続工程への進行可否を判断してはならない。
+
+Approval Recordの保存および取得に必要な抽象的な契約の定義に責務を限定する。
+
+実際のJSONファイルへの永続化および読み出しは、`JsonApprovalRecordRepository`が担当する。
+
+### Application Layer
+
+Application Layerは、Approval関連ServiceおよびRepositoryそのものの専門責務を実装するのではなく、開発工程に応じてそれらを利用する。
+
+Application Layerは、少なくとも以下を制御する。
+
+```text
+いつHuman Approvalを要求するか
+
+いつApproval Recordを構築・保存するか
+
+いつApproval Validationを実行するか
+
+Validation Resultを受けて
+後続工程へ進行可能か
+
+再承認が必要か
+
+修正工程へ戻る必要があるか
+
+Stateをどのように遷移させるか
+```
+
+したがって、Application LayerはApprovalに関する各専門責務を直接抱え込むのではなく、それらを組み合わせて開発工程を進行する。
+
+### Responsibility Boundary
+
+Version 1における責務境界は、以下を基本とする。
+
+```text
+Human
+= Approval Decisionを行う
+
+Application Layer
+= Approvalが必要となる工程を制御し、
+  ServiceおよびRepositoryを利用して
+  後続工程とState Transitionを制御する
+
+Core
+├── ApprovalRecordService
+│   = Humanの判断をApproval Recordとして構築する
+│
+├── ApprovalValidationService
+│   = Approval Recordが現在のArtifactに対して
+│     有効であるかを検証する
+│
+└── ApprovalRecordRepository
+    = Approval Recordの保存・取得に必要な
+      抽象的な契約を定義する
+
+Infrastructure / Adapter
+└── JsonApprovalRecordRepository
+    = ApprovalRecordRepositoryの契約に従い、
+      JSONファイルを用いて
+      Approval Recordを永続化・読み出しする
+```
+
+### Dependency Direction
+
+Approval関連責務についても、Application Layer全体の依存方向に関する原則に従う。
+
+概念的には、以下とする。
+
+```text
+Human / UI
+     ↓
+Application Layer
+     ↓
+Core
+     ↑
+Infrastructure / Adapter
+```
+
+Coreは、Approval Recordの実際の保存場所、JSONファイル、UI、AI Runner等の外部実装詳細へ依存してはならない。
+
+Application LayerはCoreのApproval関連Serviceを利用し、必要な永続化処理についてはRepositoryを介してInfrastructure / Adapterの実装を利用する。
+
+これにより、Approvalに関する業務規則と、工程制御および保存方式を分離する。
+
+### Decision Reason
+
+Human ApprovalはSpecFlowの複数工程で共通して利用されるが、以下の責務は同一ではない。
+
+```text
+Humanが判断すること
+
+判断を正式な記録へ変換すること
+
+記録を保存すること
+
+保存された承認が現在も有効か検証すること
+
+検証結果に基づいて工程を進めること
+```
+
+これらをApplication Layerまたは単一のComponentへ集中させると、Human Decision、業務規則、工程制御、およびInfrastructureの責務が混在する。
+
+そのためVersion 1では、
+
+```text
+Decision
+Record Construction
+Validation
+Persistence
+Workflow Control
+```
+
+を分離し、それぞれを適切なLayerへ配置する。
+
+この構造により、Human Approvalの判断主体をHumanに維持したまま、Application Layerが工程を統括し、CoreがApprovalに関する共通業務規則を担い、Infrastructure / Adapterが保存方式を担当する構造とする。
+
+---
+
+## 15.19 ApprovalRecordRepositoryの抽象とJSON実装の分離
+
+**Status: Decided**
+
+Version 1では、Approval Recordの保存および読み出しに関する「必要な機能」と、「JSONファイルを用いた具体的な保存方法」を分離する。
+
+Approval Recordの永続化に関する責務は、以下の2つに分ける。
+
+```text
+ApprovalRecordRepository
+= Approval Recordを保存・取得するための抽象的な契約
+
+JsonApprovalRecordRepository
+= JSONファイルを用いて
+  Approval Recordを実際に保存・取得する実装
+```
+
+### ApprovalRecordRepository
+
+`ApprovalRecordRepository`は、Approval Recordの永続化に必要な操作を定義する抽象として扱う。
+
+少なくとも以下のような責務を持つ。
+
+```text
+Approval Recordを保存できる
+
+approval_id等を基に
+Approval Recordを取得できる
+
+必要に応じて対象Artifactに関連する
+Approval Recordを取得できる
+```
+
+`ApprovalRecordRepository`は、Approval Recordをどの形式または保存媒体へ保存するかを規定しない。
+
+したがって、以下のような具体的な実装詳細へ依存してはならない。
+
+```text
+JSON
+ファイルシステム
+SQLite
+PostgreSQL
+Cloud Storage
+その他の永続化技術
+```
+
+概念的には、以下とする。
+
+```text
+Application Layer / Core
+          ↓
+ApprovalRecordRepository
+          ↓
+  永続化方式には依存しない
+```
+
+Pythonでは、Version 1の実装時に必要に応じて`Protocol`、ABC、その他の適切な抽象化方法を使用できる。
+
+概念例：
+
+```python
+class ApprovalRecordRepository(Protocol):
+    def save(self, record):
+        ...
+
+    def get(self, approval_id):
+        ...
+```
+
+具体的なMethod名、引数、戻り値、型定義等は、実装時にApplication Layer Specificationおよび関連する型設計との整合性を確認して決定する。
+
+### JsonApprovalRecordRepository
+
+`JsonApprovalRecordRepository`は、`ApprovalRecordRepository`で定義された契約を、JSONファイルおよびファイルシステムを用いて実現する具体実装とする。
+
+Version 1では、Approval Recordを以下の場所へ保存する。
+
+```text
+projects/specflow/approvals/
+```
+
+概念的には、以下とする。
+
+```text
+ApprovalRecordRepository
+        ↑
+        │ implements
+        │
+JsonApprovalRecordRepository
+        ↓
+approvals/*.json
+```
+
+`JsonApprovalRecordRepository`は、少なくとも以下を担当する。
+
+```text
+Approval RecordをJSONへ変換する
+
+指定された保存先へ書き込む
+
+保存済みJSONを読み込む
+
+Approval Recordとして復元する
+
+ファイルが存在しない場合等の
+永続化上のErrorを返す
+```
+
+`JsonApprovalRecordRepository`は、Human Approvalの判断、Approval Recordの有効性判定、またはApplication LayerのState Transitionを担当してはならない。
+
+### Layer Placement
+
+`ApprovalRecordRepository`の抽象はCoreに配置する。
+
+`ApprovalRecordRepository`は、Approval Recordの保存・取得に必要な契約を定義するが、JSON、ファイルシステム、その他の具体的な永続化方式には依存しない。
+
+一方、`JsonApprovalRecordRepository`は、JSONおよびファイルシステムという具体的なInfrastructureへ依存するため、Infrastructure / Adapterに配置する。
+
+概念的な配置は、以下とする。
+
+```text
+Application Layer
+        ↓
+Core
+        │
+        └── ApprovalRecordRepository
+                    ↑
+                    │ implements
+                    │
+Infrastructure / Adapter
+        │
+        └── JsonApprovalRecordRepository
+```
+
+Infrastructure / Adapterは内側で定義されたRepository契約に従う。
+
+内側のLayerが、`JsonApprovalRecordRepository`、JSONファイル、または具体的な保存Pathへ直接依存する構造としてはならない。
+
+### Dependency Direction
+
+Repositoryに関する依存方向は、以下を基本とする。
+
+```text
+Application Layer
+        ↓
+ApprovalRecordRepository
+        ↑
+JsonApprovalRecordRepository
+```
+
+Application Layerは、
+
+```text
+JSONへ保存する
+```
+
+という具体的な操作ではなく、
+
+```text
+Approval Recordを保存する
+```
+
+という抽象的な能力へ依存する。
+
+これにより、将来永続化方式を変更する場合でも、Approval Recordを利用するApplication LayerおよびCoreへの影響を最小限に抑える。
+
+例えば、将来以下のような変更を行う場合でも、
+
+```text
+Version 1
+JsonApprovalRecordRepository
+        ↓
+
+Future Extension
+SqliteApprovalRecordRepository
+PostgreSQLApprovalRecordRepository
+その他のRepository実装
+```
+
+Repository契約を維持できる限り、上位の開発工程を大きく変更せずに永続化方式を交換可能とする。
+
+### Responsibility Boundary
+
+Version 1では、以下の責務分離を基本とする。
+
+```text
+ApprovalRecordService
+= Approval Recordを構築する
+
+ApprovalRecordRepository
+= Approval Recordの保存・取得に必要な
+  抽象的な契約を定義する
+
+JsonApprovalRecordRepository
+= Repository契約に従い、
+  JSONファイルを用いて
+  Approval Recordを保存・取得する
+
+ApprovalValidationService
+= Repositoryから取得されたApproval Recordが
+  現在のArtifactに対して有効かを検証する
+
+Application Layer
+= 必要なタイミングでこれらを利用し、
+  WorkflowおよびState Transitionを制御する
+```
+
+### Decision Reason
+
+Version 1ではApproval RecordをJSONファイルとして保存するが、JSONはHuman Approvalそのものの業務概念ではなく、永続化方式の一つにすぎない。
+
+Application LayerまたはCoreがJSONファイルへ直接依存した場合、将来保存方式を変更する際に、Approvalに関する業務処理まで変更する必要が生じる。
+
+そのため、
+
+```text
+何を保存・取得できる必要があるか
+```
+
+というRepositoryの契約と、
+
+```text
+実際にどのように保存・取得するか
+```
+
+というInfrastructure上の実装を分離する。
+
+これにより、Approvalに関する業務規則と永続化技術を分離し、Version 1の実装を単純に保ちながら、将来の保存方式変更にも対応可能な構造とする。
+
+---
+
+## 15.20 GitMergeServiceとGit CLI実装の責務分離
+
+**Status: Decided**
+
+Version 1では、UC-12 `Merge Approved Implementation`で必要となるGitによる統合作業について、Application Layerが必要とするGit操作の能力と、Git CLIを用いて実際にGit操作を行う具体実装を分離する。
+
+基本的な配置は、以下とする。
+
+```text
+Human
+    │
+    │ Final Approval
+    ↓
+Application Layer
+    │
+    ├── MergeApprovedImplementationUseCase
+    │
+    └── GitMergeService
+            → Application Layer
+                    ↑
+                    │ implements
+                    │
+            GitCliMergeService
+                    → Infrastructure / Adapter
+                            ↓
+                         Git CLI
+                            ↓
+                    Git Repository
+```
+
+Git固有ではないHuman Approval、Approval Validation、およびその他のSpecFlow固有の業務規則はCoreに保持する。
+
+---
+
+### GitMergeService
+
+`GitMergeService`はApplication Layerに配置する。
+
+`GitMergeService`は、Application Layerが承認済みImplementationを統合するために必要とするGit操作の能力を定義する。
+
+少なくとも、概念的には以下のような能力を扱う。
+
+```text
+Repositoryの現在状態を確認する
+
+現在のBranchを確認する
+
+対象Branchの存在を確認する
+
+現在のHEAD Commitを取得する
+
+merge実行に必要なGit上の状態を確認する
+
+指定されたImplementation Branchを
+指定されたBranchへmergeする
+
+merge結果を取得する
+
+merge後のCommitを確認する
+
+Git操作中に発生したErrorまたはConflictを取得する
+```
+
+具体的なMethod名、引数、戻り値、および型定義は、実装時にApplication Layer Specificationおよび関連する型設計との整合性を確認して決定する。
+
+`GitMergeService`は、
+
+```text
+git checkout
+git switch
+git status
+git rev-parse
+git merge
+```
+
+等の具体的なCLI Commandの実行方法を規定しない。
+
+Application Layerから見た場合、
+
+```text
+どのGit Commandを実行するか
+```
+
+ではなく、
+
+```text
+mergeに必要なGit上の操作を行う
+```
+
+という能力として扱う。
+
+---
+
+### GitCliMergeService
+
+`GitCliMergeService`はInfrastructure / Adapterに配置する。
+
+`GitCliMergeService`は、Application Layerで定義された`GitMergeService`の契約に従い、Git CLIを用いて具体的なGit操作を実行する。
+
+概念的には、以下とする。
+
+```text
+GitMergeService
+        ↑
+        │ implements
+        │
+GitCliMergeService
+        ↓
+     Git CLI
+        ↓
+Git Repository
+```
+
+`GitCliMergeService`は、必要に応じて以下のようなGit CLI操作を実行する。
+
+```text
+git status
+
+git branch
+
+git rev-parse
+
+git switch / git checkout
+
+git merge
+
+その他、UC-12の実行に必要なGit操作
+```
+
+ただし、具体的なCommand構成、Option、実行順序、およびError処理方法は、実装時に安全性および既存のGit関連Componentとの整合性を確認して決定する。
+
+`GitCliMergeService`は、Human Approvalの有効性、Implementationをmergeしてよいかという業務上の判断、またはState Transitionを決定してはならない。
+
+---
+
+### Merge Readinessの責務分離
+
+merge開始前の確認には、
+
+```text
+業務上の進行条件
+
+Git上の技術的な実行条件
+```
+
+の2種類が存在する。
+
+これらを同一の責務として扱ってはならない。
+
+#### 業務上の進行条件
+
+以下のような条件は、SpecFlowのWorkflowおよびHuman Approvalに関する規則として扱う。
+
+```text
+Review ResultがAPPROVEDである
+
+有効なFinal Approval Recordが存在する
+
+Final Approval Recordのdecisionが
+承認を示している
+
+Final Approval Target Artifactと
+現在の対象Implementationが一致する
+
+Approval Recordのartifact_hashと
+現在のArtifact Hashが一致する
+
+対象Implementation Branchおよび
+HEAD Commitが承認時点と一致する
+```
+
+Approval Recordそのものの有効性検証は、Coreに配置された`ApprovalValidationService`が担当する。
+
+Application Layerは、そのValidation Resultおよびその他のWorkflow条件を基に、merge工程へ進行可能かを制御する。
+
+#### Git上の技術的な実行条件
+
+以下のような確認は、Gitを安全に操作するための技術的な状態確認として扱う。
+
+```text
+Repositoryへアクセス可能である
+
+対象Branchが存在する
+
+現在のBranchを確認できる
+
+HEAD Commitを取得できる
+
+Git Repositoryがmerge操作可能な状態である
+
+未解決のConflict等、
+安全にmergeを開始できない状態が存在しない
+```
+
+これらのGit上の状態取得および操作は、`GitMergeService`を介してInfrastructure / Adapterの具体実装へ委譲する。
+
+技術的な問題が確認された場合、`GitCliMergeService`が独自判断で問題を解消し、mergeを継続してはならない。
+
+---
+
+### Application Layer
+
+Application Layerは、UC-12において、CoreのApproval関連Serviceおよび`GitMergeService`を組み合わせてmerge工程を制御する。
+
+概念的には、以下の流れとする。
+
+```text
+MergeApprovedImplementationUseCase
+        │
+        ├── Review Result確認
+        │
+        ├── ApprovalValidationService
+        │       ↓
+        │   Final Approvalの有効性確認
+        │
+        ├── 対象Implementationの同一性確認
+        │
+        ├── GitMergeService
+        │       ↓
+        │   Git上の状態確認
+        │
+        ├── merge実行依頼
+        │
+        ├── merge結果確認
+        │
+        └── State Transition
+```
+
+Application Layerは、具体的なGit CLI Commandを直接実行してはならない。
+
+また、Git操作の成功のみを根拠として`completed`へ遷移してはならない。
+
+UC-12で定義された業務上のPreconditionおよびmerge成功条件を満たした場合にのみ、`completed`へのState Transitionを行う。
+
+---
+
+### Core
+
+Coreは、Git CLI、Branch操作、Command実行等の具体的なGit技術へ依存しない。
+
+Coreに保持するのは、Gitそのものではなく、SpecFlowとして維持すべき業務規則である。
+
+例えば、以下を含む。
+
+```text
+Human ApprovalをAIが代替してはならない
+
+承認対象Artifactと現在のArtifactが
+一致しなければApprovalは有効ではない
+
+Critical Changeには
+Human Approvalを必要とする
+
+Final Approvalの有効性を確認せず
+後続工程へ進んではならない
+```
+
+これらの規則は、将来Git以外のバージョン管理または成果物統合方式を採用した場合でも維持されるSpecFlow固有の規則として扱う。
+
+---
+
+### Responsibility Boundary
+
+Version 1における責務境界は、以下を基本とする。
+
+```text
+Human
+= Final Approvalを行う
+
+Application Layer
+├── MergeApprovedImplementationUseCase
+│   = merge工程全体を制御する
+│
+└── GitMergeService
+    = Application Layerが必要とする
+      Git統合作業の能力を定義する
+
+Core
+└── ApprovalValidationService等
+    = Human Approvalおよび
+      SpecFlow固有の業務規則を扱う
+
+Infrastructure / Adapter
+└── GitCliMergeService
+    = GitMergeServiceの契約に従い、
+      Git CLIを用いて
+      具体的なGit操作を実行する
+
+External Tool
+└── Git CLI
+    = Git Repositoryに対する
+      実際のVersion Control操作を行う
+```
+
+---
+
+### Dependency Direction
+
+Git統合作業についても、Application Layer全体の依存方向に関する原則に従う。
+
+概念的には、以下とする。
+
+```text
+Human / UI
+     ↓
+Application Layer
+     │
+     ├────────→ Core
+     │
+     └── GitMergeService
+              ↑
+              │ implements
+              │
+     Infrastructure / Adapter
+              │
+              └── GitCliMergeService
+                        ↓
+                     Git CLI
+```
+
+Application Layerは`GitCliMergeService`や具体的なGit Commandへ直接依存せず、`GitMergeService`として定義された能力へ依存する。
+
+Infrastructure / Adapterは、Application Layerで定義された`GitMergeService`の契約に従う。
+
+CoreはGit CLIおよび具体的なGit操作へ依存しない。
+
+---
+
+### Failure Handling
+
+Git操作中に以下のような問題が発生した場合、`GitCliMergeService`はその事実をApplication Layerへ返す。
+
+```text
+Repositoryへアクセスできない
+
+対象Branchが存在しない
+
+HEAD Commitを取得できない
+
+Repository状態がmergeに適さない
+
+merge conflictが発生した
+
+merge Commandが失敗した
+
+merge後の状態を確認できない
+
+その他、安全な自動継続ができないGit上の問題
+```
+
+`GitCliMergeService`または`GitMergeService`が、これらの問題をHumanの判断なしに業務上解決したものとして扱ってはならない。
+
+Application Layerは返されたResultを確認し、安全に自動継続できない場合は`completed`へ遷移せず、必要な情報を保持してHumanへ判断を返す。
+
+---
+
+### Decision Reason
+
+Gitによるmergeには、以下の異なる責務が含まれる。
+
+```text
+mergeしてよいかを判断すること
+
+Human Approvalが現在も有効か確認すること
+
+Git上でmerge可能な状態か確認すること
+
+実際にGit操作を行うこと
+
+merge結果を確認すること
+
+結果に基づいてWorkflowを進めること
+```
+
+これらを単一のComponentへ集中させると、
+
+```text
+Human Decision
+
+SpecFlow固有の業務規則
+
+Workflow Control
+
+Git操作に必要な能力
+
+Git CLIという具体的な実装技術
+```
+
+が混在する。
+
+そのためVersion 1では、
+
+```text
+Human Decision
+        ↓
+Application Workflow Control
+        ↓
+Business Rule Validation
+        +
+Git Operation Abstraction
+        ↓
+Git CLI Implementation
+```
+
+として責務を分離する。
+
+会社組織の責務に置き換えると、概念的には以下に相当する。
+
+```text
+Human
+= CEO
+  最終的な意思決定を行う
+
+Application Layer
+= 執行責任者
+  承認された仕事をどの順序で進めるかを統括する
+
+Core
+= 社内規程・判断基準
+  組織として守るべきルールを保持する
+
+GitMergeService
+= 構成管理業務の窓口
+  統合作業に必要な能力を定義する
+
+GitCliMergeService
+= Git操作の実務担当
+  定められた依頼に従って具体的な操作を行う
+```
+
+この構造により、Gitという具体的な技術をSpecFlowの業務規則から分離しながら、Application LayerがUC-12のmerge工程を安全に統括できる構造とする。
+
+---
+
+## 15.21 Git操作Result / Errorの表現と責務境界
+
+**Status: Decided**
+
+Version 1では、Git操作の結果を単なる成功・失敗として扱うのではなく、Application Layerが後続工程を適切に制御するために必要な情報を、構造化されたResultとして返す。
+
+Git操作を実行するInfrastructure / Adapterは、Git上で発生した技術的事実を取得・報告する責務を持つ。
+
+一方、そのResultをどのように解釈し、Workflowを継続するか、停止するか、再実行するか、またはHumanへ判断を求めるかはApplication Layerの責務とする。
+
+基本的な責務の流れは、以下とする。
+
+```text
+Git Repository
+        ↓
+     Git CLI
+        ↓
+GitCliMergeService
+        │
+        │ 技術的事実を取得
+        ↓
+Git Operation Result
+        ↓
+GitMergeService
+        ↓
+Application Layer
+        │
+        │ Workflow上の意味を判断
+        ↓
+Continue / Stop / Technical Retry / Human Escalation
+```
+
+---
+
+### Git Operation Result
+
+Git操作の結果は、Application Layerが後続処理を判断できるよう、構造化されたResultとして表現する。
+
+Version 1では、少なくとも概念的に以下の情報を識別可能とする。
+
+```text
+操作が成功したか
+
+実行されたGit操作
+
+対象Repository
+
+source branch
+
+target branch
+
+操作前のCommit
+
+操作後のCommit
+
+Git操作中に発生したError
+
+Conflictの有無
+
+Warning
+
+必要に応じた追加の技術情報
+```
+
+概念的には、以下のような情報構造を想定する。
+
+```text
+GitOperationResult
+├── success
+├── operation
+├── repository_state
+├── source_branch
+├── target_branch
+├── before_commit
+├── after_commit
+├── error_type
+├── error_message
+├── conflict_detected
+├── warnings
+└── details
+```
+
+これは概念的な構造であり、具体的なClass名、Field名、型、必須・任意項目、およびResult型の分割方法については、Implementation Planおよび実装時の型設計で決定する。
+
+Specificationでは、Application LayerがGit操作の結果を単なるBoolean値または未分類の文字列として受け取るのではなく、後続工程の判断に必要な技術的事実を識別可能な形式で受け取れることを要求する。
+
+---
+
+### Success Result
+
+Git操作が正常に完了した場合、Resultには少なくとも以下を確認できる情報を含める。
+
+```text
+操作が成功したこと
+
+実行された操作
+
+対象Branch
+
+必要に応じて操作前のCommit
+
+操作後のCommit
+
+Git操作後のRepository状態
+
+Warningが存在する場合はその内容
+```
+
+merge操作の場合、単にGit Commandが終了したことだけをもって、Application LayerがUC-12のmerge成功条件を満たしたと判断してはならない。
+
+必要に応じて、merge後のBranch、Commit、およびRepository状態を確認し、その結果をApplication Layerへ返す。
+
+概念的には、以下とする。
+
+```text
+git merge実行
+        ↓
+Command終了
+        ↓
+merge後状態確認
+        ↓
+Git Operation Result
+        ↓
+Application Layer
+        ↓
+UC-12の成功条件を確認
+        ↓
+completedへの遷移可否を判断
+```
+
+---
+
+### Error Classification
+
+Git操作に失敗した場合、Application Layerが失敗原因を識別できるよう、Errorを可能な範囲で分類する。
+
+Version 1では、少なくとも以下のような技術的失敗を区別可能とする。
+
+```text
+REPOSITORY_UNAVAILABLE
+
+BRANCH_NOT_FOUND
+
+HEAD_MISMATCH
+
+DIRTY_WORKING_TREE
+
+MERGE_CONFLICT
+
+MERGE_COMMAND_FAILED
+
+VERIFICATION_FAILED
+
+UNKNOWN_GIT_ERROR
+```
+
+これらの名称は概念上の分類を示すものであり、具体的なEnum名、Exception型、Result型等は実装時に決定する。
+
+各Errorは、少なくとも以下を識別できることが望ましい。
+
+```text
+Errorの種類
+
+発生した操作
+
+発生した技術的事実
+
+対象BranchまたはCommit
+
+必要に応じてGitから得られた情報
+
+安全な自動継続が困難であることを示す情報
+```
+
+---
+
+### Technical ErrorとWorkflow Decisionの分離
+
+Git上のError分類は、Workflow上の判断そのものを表してはならない。
+
+例えば、
+
+```text
+MERGE_CONFLICT
+```
+
+は、
+
+```text
+Git merge中にConflictが発生した
+```
+
+という技術的事実を表す。
+
+これは、
+
+```text
+Specification修正へ戻る
+
+Implementation修正へ戻る
+
+Humanへ判断を求める
+
+自動的にConflictを修正する
+```
+
+といったWorkflow上の対応を直接意味するものではない。
+
+概念的には、以下とする。
+
+```text
+MERGE_CONFLICT
+        ↓
+GitCliMergeService
+        ↓
+技術的事実としてResultへ記録
+        ↓
+Application Layer
+        ↓
+Workflow Contextと照合
+        ↓
+次の処理を決定
+```
+
+これにより、Infrastructure / AdapterがSpecFlowのWorkflow判断を行うことを防止する。
+
+---
+
+### GitCliMergeService
+
+`GitCliMergeService`は、Git CLIを利用してGit操作を実行し、その結果として確認された技術的事実をResultとして返す。
+
+少なくとも以下を担当する。
+
+```text
+Git Commandを実行する
+
+Commandの終了状態を確認する
+
+必要なGit情報を取得する
+
+成功または失敗を識別する
+
+Conflict等の技術的状態を検出する
+
+Errorを可能な範囲で分類する
+
+Git操作結果を構造化して返す
+```
+
+`GitCliMergeService`は、Git上の問題を業務上解決したものとして独自に扱ってはならない。
+
+特に、以下のような処理をHumanまたはApplication Layerの判断なしに行ってはならない。
+
+```text
+merge conflictを独自に解消する
+
+承認対象外のファイルを変更する
+
+HEAD Commitの不一致を独自に修正する
+
+未追跡ファイルを削除する
+
+Working Treeの変更を破棄する
+
+承認済みImplementationを書き換える
+
+強制的なGit操作によって
+Repository状態を変更する
+```
+
+Git操作の実務担当は、問題を隠蔽または独自解決するのではなく、確認された技術的事実を上位Layerへ報告する。
+
+---
+
+### GitMergeService
+
+`GitMergeService`は、Application Layerが必要とするGit統合作業の能力を提供する。
+
+`GitMergeService`を介して取得されるResultは、具体的なGit CLIの標準出力や終了コードをApplication Layerへそのまま露出させることを目的としない。
+
+Application Layerが必要とする情報へ整理された形で、Git操作結果を受け取れる構造とする。
+
+概念的には、以下とする。
+
+```text
+Application Layer
+        ↓
+GitMergeService
+        ↓
+GitCliMergeService
+        ↓
+Git CLI
+        ↓
+Raw Result
+        ↓
+技術的事実の整理
+        ↓
+Git Operation Result
+        ↓
+Application Layer
+```
+
+Git CLI固有の詳細をどこまで`GitCliMergeService`内部へ閉じ込め、どこからを共通Resultとして扱うかについては、実装時に依存方向およびTestabilityを考慮して決定する。
+
+---
+
+### Application Layer
+
+Application Layerは、Git Operation Resultを受け取り、現在のWorkflow Contextと組み合わせて後続工程を制御する。
+
+Application Layerは、少なくとも以下を判断する。
+
+```text
+処理を継続可能か
+
+処理を停止すべきか
+
+安全に再実行可能か
+
+Humanの判断が必要か
+
+修正工程へ戻る必要があるか
+
+現在のStateを維持すべきか
+
+別のStateへ遷移すべきか
+
+completedへ遷移可能か
+```
+
+ただしApplication Layerも、Human Approvalが必要と定義された判断をHumanの代わりに行ってはならない。
+
+Git Operation Resultは、Human Decisionを代替するものではない。
+
+---
+
+### Technical Retry
+
+Git操作に失敗した場合、すべてのErrorについて自動的に再実行してはならない。
+
+Git操作を再実行する場合は、15.22で定義した`Technical Retry`の条件および制限に従う。
+
+Git操作におけるTechnical Retryは、少なくとも以下を満たさなければならない。
+
+```text
+同一の承認対象を変更しない
+
+Human Approval Scopeを超えない
+
+Repository状態を破壊しない
+
+成果物を変更しない
+
+同一のGit操作を再実行する
+
+失敗原因が安全に再実行可能である
+
+再実行によって新たな業務判断を必要としない
+```
+
+### Human Escalation
+
+Git操作の結果、Application Layerのみでは安全に後続工程を決定できない場合、Humanへ判断を返す。
+
+少なくとも以下のような状況では、Human Escalationの対象となり得る。
+
+```text
+merge conflict
+
+承認時点とのHEAD Commit不一致
+
+承認対象Implementationとの不一致
+
+Repository状態の予期しない変更
+
+承認済みImplementationの変更を必要とする問題
+
+Critical Changeに該当する可能性がある問題
+
+安全な自動復旧方法を決定できない問題
+```
+
+Human Escalationが必要な場合、問題を解消したものとしてWorkflowを自動継続してはならない。
+
+---
+
+### Responsibility Boundary
+
+Version 1では、以下の責務分離を基本とする。
+
+```text
+Git CLI
+= Git Repositoryに対する
+  実際のCommandを実行する
+
+GitCliMergeService
+= Git CLIを利用し、
+  Git上で発生した技術的事実を取得・分類する
+
+GitMergeService
+= Application Layerが必要とする
+  Git統合作業の能力を提供する
+
+Application Layer
+= Git Operation Resultを
+  Workflow Contextと組み合わせ、
+  後続工程を制御する
+
+Core
+= Approval Validation等の
+  SpecFlow固有の業務規則を提供する
+
+Human
+= Human Approvalおよび
+  自動判断を許可していない事項について
+  最終的な意思決定を行う
+```
+
+---
+
+### Company Organization Analogy
+
+会社組織の比喩では、以下に相当する。
+
+```text
+GitCliMergeService
+= 実務担当者
+
+「作業を実施しました」
+「Conflictが発生しました」
+「対象Branchがありません」
+「作業後のCommitはこれです」
+
+という事実を報告する。
+
+
+GitMergeService
+= 構成管理業務の窓口
+
+実務担当者のGit固有の作業を、
+組織が利用できる業務として提供する。
+
+
+Application Layer
+= 執行責任者
+
+報告された事実を、
+現在の業務状況と照らして
+次に何をするか決める。
+
+
+Human
+= CEO
+
+組織として自動判断してはならない事項について
+最終判断を行う。
+```
+
+実務担当者は、事故や問題が発生した場合に、それを独自判断で隠蔽または解消して業務を継続するのではなく、事実を正確に報告する。
+
+執行責任者は、その報告を基に組織としての次の行動を決定する。
+
+---
+
+### Decision Reason
+
+Git操作では、技術的な失敗と、Workflow上の判断を明確に分離する必要がある。
+
+例えばmerge conflictはGit上の技術的事実であり、
+
+```text
+そのConflictを修正してよいか
+
+どの工程へ戻るべきか
+
+Human Approvalが必要か
+
+Implementation自体を変更してよいか
+```
+
+は別の判断である。
+
+これらをGit操作Componentへ集中させると、Infrastructure / AdapterがHuman ApprovalやWorkflow Controlまで実質的に担うことになる。
+
+そのためVersion 1では、
+
+```text
+Git Operation
+        ↓
+Technical Fact
+        ↓
+Structured Result
+        ↓
+Workflow Interpretation
+        ↓
+Human Decision when required
+```
+
+という責務境界を採用する。
+
+これにより、Git実装の詳細とSpecFlowの業務判断を分離し、Infrastructure / Adapterが独自判断で承認範囲を超えて処理を継続することを防止する。
+
+---
+
+## 15.22 Retry / Correction / Critical Changeの境界
+
+**Status: Decided**
+
+Version 1では、処理失敗または問題発生後の再実行・修正・承認要求について、以下の3種類を明確に区別する。
+
+```text
+Technical Retry
+
+Correction
+
+Critical Change
+```
+
+これらは目的、許可される変更範囲、Human Approvalの要否、および後続工程が異なるため、同一の「再試行」または「修正」として扱ってはならない。
+
+基本的な分類は、以下とする。
+
+```text
+問題発生
+    ↓
+成果物の変更が必要か
+    │
+    ├── 不要
+    │      ↓
+    │  同一の技術操作を
+    │  安全に再実行可能か
+    │      │
+    │      ├── Yes
+    │      │     ↓
+    │      │ Technical Retry
+    │      │
+    │      └── No
+    │            ↓
+    │        Human判断または停止
+    │
+    └── 必要
+           ↓
+      既存の承認Scope内か
+           │
+           ├── Yes
+           │     ↓
+           │  Correction
+           │
+           └── No
+                 ↓
+            Critical Change
+                 ↓
+            Human Approval
+```
+
+---
+
+### Technical Retry
+
+Technical Retryは、承認対象Artifact、Source Code、Test Code、Specification、Approved Implementation Plan、Human Approval Scope等を変更せず、同一の技術操作を再実行することをいう。
+
+Technical Retryは、処理対象の内容を修正することを目的としない。
+
+例えば、以下のような状況を対象とし得る。
+
+```text
+一時的なGit操作失敗
+
+一時的な外部Service接続失敗
+
+一時的なFile I/O失敗
+
+同一入力および同一条件で
+安全に再実行可能な技術的失敗
+```
+
+Technical Retryでは、少なくとも以下を満たす必要がある。
+
+```text
+承認対象Artifactを変更しない
+
+Source CodeまたはTest Codeを変更しない
+
+Specificationを変更しない
+
+Approved Implementation Planを変更しない
+
+Human Approval Scopeを変更しない
+
+再実行によって新たな設計判断を必要としない
+
+再実行によって破壊的変更を発生させない
+
+同一操作を安全に再実行可能である
+```
+
+これらを確認できない場合、Technical Retryとして自動継続してはならない。
+
+Technical Retryは、Implementation Correction Loopの修正回数には含めない。
+
+Technical Retryによって成果物または承認対象の内容が変更された場合、それはTechnical Retryとして扱ってはならない。
+
+---
+
+### Correction
+
+Correctionは、Review、Test、Implementation Evidence、またはその他の検証結果によって問題が確認され、既存のSpecification、Approved Implementation Plan、およびHuman Approval Scopeの範囲内で成果物を修正することをいう。
+
+Correctionでは、Source Code、Test Code、Prompt、その他のImplementation Artifactが変更される場合がある。
+
+概念的には、以下とする。
+
+```text
+Implementation
+        ↓
+Review / Test
+        ↓
+問題検出
+        ↓
+承認済みScope内で修正可能
+        ↓
+Correction
+        ↓
+再Implementation
+        ↓
+新しいImplementation Evidence
+        ↓
+Re-Review
+```
+
+Correctionは、第8章および15.11で定義したCorrection Loopの規則に従う。
+
+特に、以下を適用する。
+
+```text
+Maximum Correction Count
+
+Early Stop Conditions
+
+Convergence Detection
+
+Correction History
+
+Human Escalation
+```
+
+Version 1では、自動Correctionの最大回数は15.11で定義した原則3回とする。
+
+Correctionによって以前のImplementation Evidenceを上書きしてはならない。
+
+修正後は、新しいImplementation Evidenceを生成し、再Reviewを行う。
+
+---
+
+### Critical Change
+
+Critical Changeは、既存のSpecification、Approved Implementation Plan、Codex Prompt、またはHuman Approval Scopeを超える変更を必要とする場合に適用する。
+
+Critical Changeに該当する場合、Application LayerまたはAI RunnerがCorrectionとして自動的に処理を継続してはならない。
+
+少なくとも、以下のような変更はUC-07で定義したCritical Changeとして扱う。
+
+```text
+DB変更
+
+認証変更
+
+権限変更
+
+外部API変更
+
+依存ライブラリ変更
+
+PKL互換性を損なう変更
+
+データ消失の可能性がある変更
+
+その他の破壊的変更
+
+Specificationまたは
+Approved Implementation Planに
+記載されていない変更
+
+既存のHuman Approval Scopeを
+超える変更
+```
+
+Critical Changeが必要となった場合は、Implementationを停止し、UC-07 `Request Critical Change Approval`へ処理を渡す。
+
+Humanによる有効なCritical Change Approvalが確認されるまで、当該変更を含むImplementationを実行してはならない。
+
+---
+
+### Boundary between Technical Retry and Correction
+
+Technical RetryとCorrectionの最も重要な違いは、成果物の内容を変更するかどうかである。
+
+```text
+Technical Retry
+= 成果物を変更せず
+  同じ技術操作を再実行する
+
+Correction
+= 成果物の問題を解消するため
+  承認範囲内で内容を修正する
+```
+
+例えば、
+
+```text
+git merge Commandが
+一時的な実行環境上の理由で失敗し、
+Repository状態を変更せず
+同じ操作を再実行可能
+```
+
+であればTechnical Retryとなり得る。
+
+一方、
+
+```text
+mergeを成立させるために
+Source Codeまたは承認済みImplementationを
+修正する必要がある
+```
+
+場合はTechnical Retryではない。
+
+その修正が既存のHuman Approval Scope内であればCorrection、Scopeを超える場合はCritical Changeとして扱う。
+
+---
+
+### Boundary between Correction and Critical Change
+
+CorrectionとCritical Changeの境界は、変更が既存の承認Scope内に収まるかどうかを基本とする。
+
+概念的には、以下とする。
+
+```text
+変更が必要
+    ↓
+Specification
++
+Approved Implementation Plan
++
+Human Approval Scope
+と比較
+    │
+    ├── Scope内
+    │      ↓
+    │  Correction
+    │
+    └── Scope外
+           ↓
+       Critical Change
+           ↓
+       Human Approval
+```
+
+Application LayerまたはAI Runnerが、承認Scopeを拡張解釈することでCorrectionとして処理してはならない。
+
+Scope内であることを安全に確認できない場合は、自動Correctionを継続せず、Human判断またはCritical Change Approval工程へ処理を返す。
+
+---
+
+### Retry Count and Correction Count
+
+Technical RetryとCorrectionの回数は、別に管理する。
+
+15.11で定義した最大修正回数はCorrectionに対するSafety Limitであり、Technical Retryの回数を意味しない。
+
+したがって、
+
+```text
+Technical Retry Count
+≠
+Correction Count
+```
+
+とする。
+
+Technical Retryについても無制限な自動再実行を許可してはならない。
+
+ただし、Technical Retryの具体的な最大回数、Backoff、待機時間、再実行対象Error等は、外部Service、Git操作、File I/O等の特性によって異なるため、Version 1の共通Correction Countとは分離して定義する。
+
+Technical Retryの具体的な上限が定義されていない場合、Application Layerは無制限に再実行してはならず、安全に自動継続できない時点で停止し、必要に応じてHumanへ判断を返す。
+
+---
+
+### Evidence and History
+
+Correctionでは、成果物そのものが変更されるため、第9章で定義した新しいImplementation Evidenceを生成する。
+
+一方、Technical Retryでは、成果物の内容を変更しないことを前提とするため、新しいImplementation Evidenceを必ず生成するとは限らない。
+
+ただし、Technical Retryを実施した事実は追跡可能でなければならない。
+
+少なくとも、必要に応じて以下を記録可能とする。
+
+```text
+retry対象Operation
+
+retry理由
+
+Error Type
+
+retry回数
+
+各retryの結果
+
+最終結果
+```
+
+Technical Retryの詳細な保存形式は、Implementation EvidenceまたはExecution Logとの整合性を確認してImplementation Planで決定する。
+
+Critical Changeについては、UC-07および15.4で定義したCritical Change RequestおよびApproval Recordによって追跡する。
+
+---
+
+### Application Layer Responsibility
+
+Application Layerは、発生した問題を現在のWorkflow Contextと照合し、
+
+```text
+Technical Retry
+
+Correction
+
+Critical Change
+
+Human Review
+
+Stop
+```
+
+のいずれとして扱うべきかを制御する。
+
+ただし、Application LayerがHuman Approvalを必要とする判断を独自に代替してはならない。
+
+概念的には、以下とする。
+
+```text
+Technical Result / Review Result
+        ↓
+Application Layer
+        ↓
+問題の種類を確認
+        │
+        ├── 同一操作を安全に再実行可能
+        │       ↓
+        │   Technical Retry
+        │
+        ├── 承認Scope内の修正
+        │       ↓
+        │   Correction
+        │
+        ├── 承認Scope外変更
+        │       ↓
+        │   Critical Change Approval
+        │
+        └── 自動判断不能
+                ↓
+            Human Review
+```
+
+---
+
+### Human Escalation
+
+以下の場合は、自動継続せずHumanへ判断を返す。
+
+```text
+Technical Retryが安全に実行可能か判断できない
+
+Technical Retryを繰り返しても
+同一Errorが解消しない
+
+Correctionが非収束または悪化している
+
+Correction Countの上限に到達した
+
+Correctionによって
+承認範囲外変更が必要になった
+
+Critical Changeが必要になった
+
+Specificationまたは
+Approved Implementation Planに
+不足・矛盾・不明確さがある
+
+自動的な分類または処理継続が
+安全に行えない
+```
+
+Humanへ判断を返す場合、問題の種類、現在のState、実行履歴、Error、Correction History、必要に応じてImplementation Evidence等を提示可能にする。
+
+---
+
+### Responsibility Boundary
+
+Version 1では、以下の責務境界を基本とする。
+
+```text
+Infrastructure / Adapter
+= 技術的な成功・失敗を
+  Resultとして報告する
+
+Application Layer
+= ResultおよびWorkflow Contextを基に
+  Retry / Correction / Critical Change等の
+  処理経路を制御する
+
+Core
+= Human Approval、
+  Approval Validation、
+  承認Scope等の
+  SpecFlow固有の業務規則を提供する
+
+AI Runner
+= 許可されたScope内で
+  指定された処理を実行する
+
+Human
+= 承認Scopeの変更、
+  Critical Change、
+  自動判断不能な事項等について
+  最終判断を行う
+```
+
+---
+
+### Company Organization Analogy
+
+会社組織の比喩では、以下に相当する。
+
+```text
+Technical Retry
+= コピー機や通信機器の一時的なエラー
+
+  書類そのものは変更せず、
+  同じ送信操作をもう一度行う。
+
+
+Correction
+= 提出書類の内容に誤りがある
+
+  既に承認された方針の範囲内で
+  担当部署が内容を修正し、
+  再提出する。
+
+
+Critical Change
+= 修正しようとした結果、
+  承認された事業計画そのものを
+  変更する必要が判明する
+
+  担当部署では決めず、
+  CEOへ再決裁を求める。
+```
+
+この区別により、現場担当が単なる技術的再実行と業務内容の変更を混同したり、承認された範囲を超える変更を自動修正として実行したりすることを防止する。
+
+---
+
+### Decision Reason
+
+SpecFlowでは、自律的な処理継続を可能にしながら、Human Approval Scopeを越えた変更をAIまたはApplication Layerが独自に実行しないことを基本原則とする。
+
+そのため、
+
+```text
+Technical Retry
+= 同じ仕事をもう一度試す
+
+Correction
+= 承認範囲内で仕事の内容を直す
+
+Critical Change
+= 承認された仕事そのものを変える
+```
+
+という境界を明確にする。
+
+これにより、
+
+```text
+安全な技術的再実行
+        ↓
+自動化可能
+
+承認範囲内の修正
+        ↓
+Correction Loopとして
+制限付きで自動化可能
+
+承認範囲外の変更
+        ↓
+Human Approval必須
+```
+
+という段階的な自律性を実現する。
+
+この責務分離は、Technical RetryをCorrection Countへ誤って含めること、CorrectionをCritical Changeとして扱わず自動継続すること、およびCritical Changeを単なる再試行として処理することを防止する。
+
+---
