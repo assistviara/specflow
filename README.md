@@ -79,27 +79,26 @@ constitution/implementation_guidelines.md
 
 ## 3. 現在の開発状況
 
-Version 0.1.0では、正式文書を安全に読み込む基盤処理まで実装しています。
+現在は、Application Layer実装開始前の設計ベースラインが`main`へMerge済みの状態です。
 
-実装済み：
-
-- MarkdownファイルのUTF-8読み込み
-- JSONファイルの読み込み
-- ファイル不存在、空ファイル、不正JSONの検知
-- 独自例外`DocumentLoadError`
-- Constitutionの読み込み
-- Principlesの読み込み
-- Specificationの読み込み
-- Decisionsの読み込み
-- Project Metadataの読み込み
-- Plan Prompt Templateの読み込み
-- pytestによるテスト
-
-テスト結果：
+現在の設計ベースライン：
 
 ```text
-8 passed
+d7df90d Merge pull request #32 from assistviara/developer
 ```
+
+完了済み：
+
+- Application Layer Specification v0.2.0-draftの設計作業
+- Application Layer Implementation Plan v0.1.0-draftの作成
+- Implementation PlanのPhase 1からPhase 7までの定義
+- Phase 7のPurpose、Scope、Implementation Targets 1-8、Tests 1-8、Completion Conditions 1-8の最終横断監査
+- Technical Retry、Correction、Human Approval、Evidence、Review、Final Approval、Merge、completedの責務境界の横断確認
+- Pull Request #32による`main`へのMerge
+
+次の主要作業は、承認済みImplementation Planに基づくApplication Layer Phase 1 Implementationの開始です。
+
+次セッションでは、実装開始前に`SESSION_CONTEXT.md`を確認してください。
 
 ---
 
@@ -251,34 +250,29 @@ python -m pytest -q
 
 ## 8. 現在の開発対象
 
-次の開発対象は`Template Engine`です。
+次の開発対象は`Application Layer Phase 1`です。
 
-目的は、以下をテンプレートへ差し込み、完成版のPlan Promptを生成することです。
+実装前に、以下を確認します。
 
-- Constitution
-- Principles
-- Specification
-- Decisions
-- Project Metadata
-- Plan Prompt Template
+- Constitution / Project Rules
+- 最新のSession Context
+- Application Layer Specification
+- Application Layer Implementation Plan
+- Gitの現在状態
 
-この段階では、まだCodex CLIは実行しません。
+Phase 1では、承認済みImplementation PlanのPurpose、Scope、Implementation Targets、Tests、Completion Conditionsに従って、TDDで実装を開始します。
 
 ---
 
 ## 9. 今後の予定
 
-- Template Engineの実装
-- 完成版Plan Promptの生成
-- Codex CLIの実行
-- Implementation Planの自動保存
-- 実行ログの保存
-- Plan承認UI
-- 実装実行
-- Review自動生成
-- Repair Prompt生成
-- Git差分確認
-- 複数プロジェクト管理
+- Application Layer Phase 1 Implementation
+- Application Layer Phase 2 Implementation
+- Application Layer Phase 3 Implementation
+- Application Layer Phase 4 Implementation
+- Application Layer Phase 5 Implementation
+- Application Layer Phase 6 Implementation
+- Application Layer Phase 7 Integration & MVP Completion
 
 ---
 
