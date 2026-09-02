@@ -33,3 +33,22 @@ class GenerateImplementationPlanOutput:
     implementation_plan_draft: str | None
     specification_path: Path
     error_message: str | None = None
+
+@dataclass(frozen=True)
+class RequestPlanApprovalInput:
+    implementation_plan_path: Path
+    human_decision: str
+    comment: str
+    approval_id: str
+    approved_at: str
+    state_file: Path
+    state_history_dir: Path
+
+
+@dataclass(frozen=True)
+class RequestPlanApprovalOutput:
+    decision: str
+    approval_record: dict
+    approval_valid: bool
+    revision_request: str | None
+    cancelled: bool
