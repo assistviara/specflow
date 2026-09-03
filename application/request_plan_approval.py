@@ -41,7 +41,48 @@ class RequestPlanApprovalUseCase:
             "implementation_plan",
         )
 
-        if approval_valid:
+        revision_request = None
+        cancelled = False
+
+        if input_dto.human_decision == "revision_requested":
+            current_state = load_current_state(
+                input_dto.state_file
+            )
+
+            transition_state(
+                input_dto.state_file,
+                input_dto.state_history_dir,
+                {
+                    "transition_id": str(uuid4()),
+                    "from_state": current_state["status"],
+                    "to_state": "plan_revision_requested",
+                    "occurred_at": datetime.now().astimezone().isoformat(),
+                    "reason": "Implementation Plan revision requested",
+                },
+            )
+
+            revision_request = input_dto.comment
+
+        elif input_dto.human_decision == "cancelled":
+            current_state = load_current_state(
+                input_dto.state_file
+            )
+
+            transition_state(
+                input_dto.state_file,
+                input_dto.state_history_dir,
+                {
+                    "transition_id": str(uuid4()),
+                    "from_state": current_state["status"],
+                    "to_state": "cancelled",
+                    "occurred_at": datetime.now().astimezone().isoformat(),
+                    "reason": "Implementation Plan approval cancelled",
+                },
+            )
+
+            cancelled = True
+
+        elif approval_valid:
             current_state = load_current_state(
                 input_dto.state_file
             )
@@ -62,6 +103,6 @@ class RequestPlanApprovalUseCase:
             decision=input_dto.human_decision,
             approval_record=approval_record,
             approval_valid=approval_valid,
-            revision_request=None,
-            cancelled=False,
+            revision_request=revision_request,
+            cancelled=cancelled,
         )

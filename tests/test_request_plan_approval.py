@@ -104,3 +104,145 @@ def test_request_plan_approval_moves_to_plan_approved_when_approval_is_valid(
 
     current_state = state_file.read_text(encoding="utf-8")
     assert '"status": "plan_approved"' in current_state
+
+def test_request_plan_approval_keeps_pending_when_validation_fails(
+    tmp_path,
+    monkeypatch,
+):
+    implementation_plan_path = tmp_path / "implementation_plan.md"
+    implementation_plan_path.write_text(
+        "approved implementation plan",
+        encoding="utf-8",
+    )
+
+    state_file = tmp_path / "state.json"
+    state_file.write_text(
+        '{"status": "plan_approval_pending"}',
+        encoding="utf-8",
+    )
+
+    state_history_dir = tmp_path / "state_history"
+
+    repository = FakeApprovalRecordRepository()
+
+    use_case = RequestPlanApprovalUseCase(
+        approval_repository=repository,
+    )
+
+    input_dto = RequestPlanApprovalInput(
+        implementation_plan_path=implementation_plan_path,
+        human_decision="approved",
+        comment="Human approved the plan.",
+        approval_id="plan-approval-001",
+        approved_at="2026-09-02T12:00:00+09:00",
+        state_file=state_file,
+        state_history_dir=state_history_dir,
+    )
+
+    monkeypatch.setattr(
+        "application.request_plan_approval.validate_approval",
+        lambda *args, **kwargs: False,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.approval_valid is False
+
+    current_state = state_file.read_text(encoding="utf-8")
+    assert '"status": "plan_approval_pending"' in current_state
+
+def test_request_plan_approval_moves_to_revision_requested(
+    tmp_path,
+):
+    implementation_plan_path = tmp_path / "implementation_plan.md"
+    implementation_plan_path.write_text(
+        "implementation plan needing revision",
+        encoding="utf-8",
+    )
+
+    state_file = tmp_path / "state.json"
+    state_file.write_text(
+        '{"status": "plan_approval_pending"}',
+        encoding="utf-8",
+    )
+
+    state_history_dir = tmp_path / "state_history"
+
+    repository = FakeApprovalRecordRepository()
+
+    use_case = RequestPlanApprovalUseCase(
+        approval_repository=repository,
+    )
+
+    input_dto = RequestPlanApprovalInput(
+        implementation_plan_path=implementation_plan_path,
+        human_decision="revision_requested",
+        comment="Please revise the implementation scope.",
+        approval_id="plan-approval-001",
+        approved_at="2026-09-03T19:00:00+09:00",
+        state_file=state_file,
+        state_history_dir=state_history_dir,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert repository.saved_record["decision"] == "revision_requested"
+    assert repository.saved_record["comment"] == (
+        "Please revise the implementation scope."
+    )
+
+    assert output.decision == "revision_requested"
+    assert output.approval_valid is False
+    assert output.revision_request == (
+        "Please revise the implementation scope."
+    )
+    assert output.cancelled is False
+
+    current_state = state_file.read_text(encoding="utf-8")
+    assert '"status": "plan_revision_requested"' in current_state
+
+def test_request_plan_approval_moves_to_cancelled(
+    tmp_path,
+):
+    implementation_plan_path = tmp_path / "implementation_plan.md"
+    implementation_plan_path.write_text(
+        "implementation plan",
+        encoding="utf-8",
+    )
+
+    state_file = tmp_path / "state.json"
+    state_file.write_text(
+        '{"status": "plan_approval_pending"}',
+        encoding="utf-8",
+    )
+
+    state_history_dir = tmp_path / "state_history"
+
+    repository = FakeApprovalRecordRepository()
+
+    use_case = RequestPlanApprovalUseCase(
+        approval_repository=repository,
+    )
+
+    input_dto = RequestPlanApprovalInput(
+        implementation_plan_path=implementation_plan_path,
+        human_decision="cancelled",
+        comment="Human cancelled the plan.",
+        approval_id="plan-approval-001",
+        approved_at="2026-09-03T19:00:00+09:00",
+        state_file=state_file,
+        state_history_dir=state_history_dir,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert repository.saved_record["decision"] == "cancelled"
+    assert repository.saved_record["comment"] == "Human cancelled the plan."
+
+    assert output.decision == "cancelled"
+    assert output.approval_valid is False
+    assert output.revision_request is None
+    assert output.cancelled is True
+
+    current_state = state_file.read_text(encoding="utf-8")
+    assert '"status": "cancelled"' in current_state

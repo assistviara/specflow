@@ -52,3 +52,4 @@ class RequestPlanApprovalOutput:
     approval_valid: bool
     revision_request: str | None
     cancelled: bool
+    
