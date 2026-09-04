@@ -10,7 +10,7 @@ from application.state_transition import transition_state
 from core.approval_record_service import (
     build_approval_record_from_artifact,
 )
-from core.approval_validation import validate_approval
+from core.approval_validation import validate_approval_result
 
 
 class RequestPlanApprovalUseCase:
@@ -35,11 +35,13 @@ class RequestPlanApprovalUseCase:
 
         self._approval_repository.save(approval_record)
 
-        approval_valid = validate_approval(
+        approval_validation_result = validate_approval_result(
             approval_record,
             str(input_dto.implementation_plan_path),
             "implementation_plan",
         )
+
+        approval_valid = approval_validation_result.is_valid
 
         revision_request = None
         cancelled = False
@@ -103,6 +105,7 @@ class RequestPlanApprovalUseCase:
             decision=input_dto.human_decision,
             approval_record=approval_record,
             approval_valid=approval_valid,
+            approval_validation_result=approval_validation_result,
             revision_request=revision_request,
             cancelled=cancelled,
         )

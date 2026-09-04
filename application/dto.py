@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from core.approval_validation import ApprovalValidationResult
+
 
 @dataclass(frozen=True)
 class InputDTO:
@@ -50,6 +52,6 @@ class RequestPlanApprovalOutput:
     decision: str
     approval_record: dict
     approval_valid: bool
+    approval_validation_result: ApprovalValidationResult
     revision_request: str | None
     cancelled: bool
-    

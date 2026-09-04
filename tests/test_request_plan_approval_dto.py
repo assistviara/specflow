@@ -8,6 +8,7 @@ from application.dto import (
     RequestPlanApprovalOutput,
 )
 
+from core.approval_validation import ApprovalValidationResult
 
 def test_request_plan_approval_input_keeps_boundary_data():
     input_dto = RequestPlanApprovalInput(
@@ -32,10 +33,19 @@ def test_request_plan_approval_input_keeps_boundary_data():
 def test_request_plan_approval_output_keeps_result_data():
     record = {"approval_id": "plan-approval-001"}
 
+    validation_result = ApprovalValidationResult(
+        is_valid=True,
+        approval_id="plan-approval-001",
+        artifact_type="implementation_plan",
+        validation_errors=[],
+        validation_warnings=[],
+    )
+
     output_dto = RequestPlanApprovalOutput(
         decision="approved",
         approval_record=record,
         approval_valid=True,
+        approval_validation_result=validation_result,
         revision_request=None,
         cancelled=False,
     )
@@ -43,9 +53,9 @@ def test_request_plan_approval_output_keeps_result_data():
     assert output_dto.decision == "approved"
     assert output_dto.approval_record == record
     assert output_dto.approval_valid is True
+    assert output_dto.approval_validation_result == validation_result
     assert output_dto.revision_request is None
     assert output_dto.cancelled is False
-
 
 def test_request_plan_approval_dtos_are_frozen():
     input_dto = RequestPlanApprovalInput(

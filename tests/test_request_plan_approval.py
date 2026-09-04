@@ -4,6 +4,7 @@ from application.dto import RequestPlanApprovalInput
 from application.request_plan_approval import RequestPlanApprovalUseCase
 from core.approval_record_repository import ApprovalRecordRepository
 
+from core.approval_validation import ApprovalValidationResult
 
 class FakeApprovalRecordRepository(ApprovalRecordRepository):
     def __init__(self):
@@ -102,6 +103,18 @@ def test_request_plan_approval_moves_to_plan_approved_when_approval_is_valid(
     assert output.approval_valid is True
     assert output.decision == "approved"
 
+    assert output.approval_validation_result.is_valid is True
+    assert (
+        output.approval_validation_result.approval_id
+        == "plan-approval-001"
+    )
+    assert (
+        output.approval_validation_result.artifact_type
+        == "implementation_plan"
+    )
+    assert output.approval_validation_result.validation_errors == []
+    assert output.approval_validation_result.validation_warnings == []
+
     current_state = state_file.read_text(encoding="utf-8")
     assert '"status": "plan_approved"' in current_state
 
@@ -139,11 +152,20 @@ def test_request_plan_approval_keeps_pending_when_validation_fails(
         state_history_dir=state_history_dir,
     )
 
-    monkeypatch.setattr(
-        "application.request_plan_approval.validate_approval",
-        lambda *args, **kwargs: False,
-    )
 
+
+    monkeypatch.setattr(
+        "application.request_plan_approval.validate_approval_result",
+        lambda *args, **kwargs: ApprovalValidationResult(
+            is_valid=False,
+            approval_id="plan-approval-001",
+            artifact_type="implementation_plan",
+            validation_errors=[
+                "artifact hash does not match"
+            ],
+            validation_warnings=[],
+        ),
+    )
     output = use_case.execute(input_dto)
 
     assert output.approval_valid is False
