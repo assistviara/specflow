@@ -55,3 +55,24 @@ class RequestPlanApprovalOutput:
     approval_validation_result: ApprovalValidationResult
     revision_request: str | None
     cancelled: bool
+
+@dataclass(frozen=True)
+class ReviseImplementationPlanInput:
+    current_implementation_plan_path: Path
+    revision_request: str
+    specification_path: Path
+    related_information: str | None
+    revision_template_path: Path
+    state_file: Path
+    state_history_dir: Path
+
+@dataclass(frozen=True)
+class ReviseImplementationPlanOutput:
+    success: bool
+    revised_implementation_plan_draft: str | None
+    previous_implementation_plan_path: Path
+    specification_path: Path
+    changes: str | None
+    previous_version_correspondence: str | None
+    error_message: str | None = None
+    

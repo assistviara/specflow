@@ -251,3 +251,65 @@ def test_generate_propagates_prompt_builder_error() -> None:
             },
             template_path=Path("plan_prompt_template.md"),
         )
+
+def test_generate_revision_builds_expected_context() -> None:
+    prompt_builder = FakePromptBuilder()
+
+    generator = PlanPromptGenerator(
+        document_loader=FakeDocumentLoader(),
+        prompt_builder=prompt_builder,
+    )
+
+    result = generator.generate_revision(
+        current_implementation_plan_path=Path("current_plan.md"),
+        revision_request="Please revise the implementation scope.",
+        specification_path=Path("specification.md"),
+        related_information="Related implementation information.",
+        template_path=Path("plan_revision_prompt_template.md"),
+    )
+
+    assert isinstance(result, PromptResult)
+    assert result.content == "PROMPT"
+
+    assert prompt_builder.template == (
+        "CONTENT:plan_revision_prompt_template.md"
+    )
+    assert prompt_builder.context is not None
+
+    assert prompt_builder.context[
+        "CURRENT_IMPLEMENTATION_PLAN"
+    ] == "CONTENT:current_plan.md"
+
+    assert prompt_builder.context[
+        "REVISION_REQUEST"
+    ] == "Please revise the implementation scope."
+
+    assert prompt_builder.context[
+        "SPECIFICATION"
+    ] == "CONTENT:specification.md"
+
+    assert prompt_builder.context[
+        "RELATED_INFORMATION"
+    ] == "Related implementation information."
+
+def test_generate_revision_loads_required_documents() -> None:
+    document_loader = FakeDocumentLoader()
+
+    generator = PlanPromptGenerator(
+        document_loader=document_loader,
+        prompt_builder=FakePromptBuilder(),
+    )
+
+    generator.generate_revision(
+        current_implementation_plan_path=Path("current_plan.md"),
+        revision_request="Please revise the implementation scope.",
+        specification_path=Path("specification.md"),
+        related_information="Related implementation information.",
+        template_path=Path("plan_revision_prompt_template.md"),
+    )
+
+    assert document_loader.loaded_paths == [
+        Path("current_plan.md"),
+        Path("specification.md"),
+        Path("plan_revision_prompt_template.md"),
+    ]

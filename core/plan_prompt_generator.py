@@ -98,3 +98,36 @@ class PlanPromptGenerator:
             template=template,
             context=context,
         )
+
+    def generate_revision(
+        self,
+        *,
+        current_implementation_plan_path: Path,
+        revision_request: str,
+        specification_path: Path,
+        related_information: str | None,
+        template_path: Path,
+    ) -> PromptResult:
+        current_implementation_plan = self._document_loader.load(
+            current_implementation_plan_path
+        )
+        specification = self._document_loader.load(
+            specification_path
+        )
+        template = self._document_loader.load(
+            template_path
+        )
+
+        context: dict[str, object] = {
+            "CURRENT_IMPLEMENTATION_PLAN": (
+                current_implementation_plan
+            ),
+            "REVISION_REQUEST": revision_request,
+            "SPECIFICATION": specification,
+            "RELATED_INFORMATION": related_information,
+        }
+
+        return self._prompt_builder.build(
+            template=template,
+            context=context,
+        )
