@@ -1,23 +1,63 @@
 import hashlib
 from pathlib import Path
 
+from dataclasses import dataclass
 
-def validate_approval(
+
+@dataclass(frozen=True)
+class ApprovalValidationResult:
+    is_valid: bool
+    approval_id: str | None
+    artifact_type: str | None
+    validation_errors: list[str]
+    validation_warnings: list[str]
+
+def validate_approval_result(
     approval_record: dict | None,
     current_artifact_path: str,
     current_artifact_type: str,
-) -> bool:
+) -> ApprovalValidationResult:
     if approval_record is None:
-        return False
+        return ApprovalValidationResult(
+            is_valid=False,
+            approval_id=None,
+            artifact_type=None,
+            validation_errors=["approval record not found"],
+            validation_warnings=[],
+        )
 
     if approval_record["decision"] != "approved":
-        return False
+        return ApprovalValidationResult(
+            is_valid=False,
+            approval_id=approval_record.get("approval_id"),
+            artifact_type=approval_record["artifact_type"],
+            validation_errors=[
+                "approval decision is not approved"
+            ],
+            validation_warnings=[],
+        )
 
     if approval_record["artifact_type"] != current_artifact_type:
-        return False
+        return ApprovalValidationResult(
+            is_valid=False,
+            approval_id=approval_record.get("approval_id"),
+            artifact_type=approval_record["artifact_type"],
+            validation_errors=[
+                "artifact type does not match"
+            ],
+            validation_warnings=[],
+        )
 
     if approval_record["artifact_path"] != current_artifact_path:
-        return False
+        return ApprovalValidationResult(
+            is_valid=False,
+            approval_id=approval_record.get("approval_id"),
+            artifact_type=approval_record["artifact_type"],
+            validation_errors=[
+                "artifact path does not match"
+            ],
+            validation_warnings=[],
+        )
 
     artifact_file = Path(current_artifact_path)
 
@@ -26,9 +66,43 @@ def validate_approval(
             artifact_file.read_bytes()
         ).hexdigest()
     except OSError:
-        return False
+        return ApprovalValidationResult(
+            is_valid=False,
+            approval_id=approval_record.get("approval_id"),
+            artifact_type=approval_record["artifact_type"],
+            validation_errors=[
+                "artifact hash could not be calculated"
+            ],
+            validation_warnings=[],
+        )
 
     if approval_record["artifact_hash"] != current_hash:
-        return False
+        return ApprovalValidationResult(
+            is_valid=False,
+            approval_id=approval_record.get("approval_id"),
+            artifact_type=approval_record["artifact_type"],
+            validation_errors=[
+                "artifact hash does not match"
+            ],
+            validation_warnings=[],
+        )
 
-    return True
+    return ApprovalValidationResult(
+        is_valid=True,
+        approval_id=approval_record.get("approval_id"),
+        artifact_type=approval_record["artifact_type"],
+        validation_errors=[],
+        validation_warnings=[],
+    )
+
+
+def validate_approval(
+    approval_record: dict | None,
+    current_artifact_path: str,
+    current_artifact_type: str,
+) -> bool:
+    return validate_approval_result(
+        approval_record,
+        current_artifact_path,
+        current_artifact_type,
+    ).is_valid
