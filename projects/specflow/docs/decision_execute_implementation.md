@@ -330,6 +330,52 @@ Human Approvalの最終決定権を与えない。
 
 ---
 
+### Decision 11：Technical Retry Metadata形式
+
+Technical Retryに関する候補情報は、
+既存10 Sectionのうち
+Test Execution Error Section内に
+固定Metadataとして記録する。
+
+Technical Error時に
+安全なTechnical Retry候補である場合は、
+以下の形式を使用する。
+
+TECHNICAL_RETRY_SAFE: YES
+TECHNICAL_RETRY_OPERATION: <operation>
+
+Technical Retryとして安全か判断できない場合は、
+以下の形式を使用する。
+
+TECHNICAL_RETRY_SAFE: UNKNOWN
+TECHNICAL_RETRY_OPERATION: NONE
+
+Technical Retry対象ではない場合は、
+以下の形式を使用する。
+
+TECHNICAL_RETRY_SAFE: NO
+TECHNICAL_RETRY_OPERATION: NONE
+
+ParserはTECHNICAL_RETRY_SAFEを
+以下のように構造化する。
+
+- YES → True
+- NO → False
+- UNKNOWN → None
+
+TECHNICAL_RETRY_OPERATIONは、
+具体的なOperationが存在する場合はその文字列を保持し、
+NONEの場合はNoneとして扱う。
+
+このMetadataはCodexによる候補情報であり、
+Technical Retry実行の最終判断ではない。
+
+Technical Retryの実行可否は、
+ExecuteImplementationUseCaseが
+Specification 15.22およびDEC-007 Decision 4に基づいて判断する。
+
+---
+
 # Closing
 
 本Decisionにより、
