@@ -56,3 +56,11 @@ Decision文書の索引である。
 - 対象：UC-05 Generate Codex Implementation Prompt
 - 判定：APPROVED
 - 正本文書：`decision_codex_implementation_prompt_generation.md`
+
+---
+
+## DEC-007 UC-06 Execute Implementation
+
+- 対象：UC-06 Execute Implementation
+- 判定：APPROVED
+- 正本文書：`decision_execute_implementation.md`
