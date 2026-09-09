@@ -184,3 +184,36 @@ UC-05 Generate Codex Implementation Promptの実装に必要な
 Implementationは、
 Specification、承認済みImplementation Plan、
 および本Decisionの範囲内でTDDにより進める。
+
+## Decision #13: Version 1におけるScope適合性の検証境界
+
+### Decision
+
+UC-05 Version 1では、生成されたCodex Implementation Promptについて、
+Approved SpecificationおよびApproved Implementation Planとの意味的対応、
+ならびにImplementation Scopeを拡張していないことを、
+UC-05内部で完全自動判定する仕組みは追加しない。
+
+UC-05では、以下を実施する。
+
+1. Specification ApprovalおよびImplementation Plan Approvalについて、
+   Approval Recordと現在のArtifact Hashを用いて有効性を検証する。
+2. Codex Implementation Prompt Generation Templateにより、
+   Approved SpecificationおよびApproved Implementation Planを
+   authoritative implementation basisとしてAIへ提示する。
+3. Template上で、Approved Implementation Scopeを拡張してはならないことを明示する。
+4. Scope外の変更が必要な場合はCodexに自律実行させず、
+   Human Approvalを要求するよう明示する。
+5. Application Layer Parserにより、
+   必須8 Sectionの存在、順序、非空を決定論的に検証する。
+
+UC-05の8 Section Parserは構造検証を担当し、
+自然言語上の意味的なScope適合性を完全判定する責任を持たない。
+
+実際にCodexが行った変更がApproved Scopeに適合しているかは、
+後続工程において、Implementation Evidence、実際のSource Code、
+Git Status、Git Diff、Test ResultおよびReviewを用いて検証する。
+
+このDecisionは、Approved SpecificationまたはApproved Implementation Planの
+要求を変更・削除・拡張するものではなく、
+Version 1における検証責任の配置を定めるものである。

@@ -76,3 +76,32 @@ class ReviseImplementationPlanOutput:
     previous_version_correspondence: str | None
     error_message: str | None = None
     
+
+@dataclass(frozen=True)
+class GenerateCodexPromptInput:
+    specification_path: Path
+    specification_approval_id: str
+    implementation_plan_path: Path
+    implementation_plan_approval_id: str
+    implementation_target_path: Path
+    tdd_rules: str
+    completion_conditions: str
+    stop_conditions: str
+    execution_result_reporting_requirements: str
+    template_path: Path
+    state_file: Path
+    state_history_dir: Path
+
+
+@dataclass(frozen=True)
+class GenerateCodexPromptOutput:
+    success: bool
+    codex_prompt: str | None
+    specification_path: Path
+    implementation_plan_path: Path
+    specification_approval_validation_result: ApprovalValidationResult
+    implementation_plan_approval_validation_result: ApprovalValidationResult
+    prompt_usable: bool
+    current_state: str
+    stop_reason: str | None = None
+    error_message: str | None = None
