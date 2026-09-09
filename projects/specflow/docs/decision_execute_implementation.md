@@ -376,6 +376,49 @@ Specification 15.22およびDEC-007 Decision 4に基づいて判断する。
 
 ---
 
+### Decision 12：Technical RetryのV1安全確認
+
+Technical Retryに関するCodexのMetadataは、
+Retry実行の候補情報として扱い、
+それだけを根拠にTechnical Retryを許可しない。
+
+V1では、
+ExecuteImplementationUseCaseが
+以下の条件をすべて確認できた場合に限り、
+Technical Retryを最大1回許可する。
+
+- TECHNICAL_RETRY_SAFEがYESである
+- TECHNICAL_RETRY_OPERATIONが具体的に存在する
+- Codex ResultのChanged FilesがNONEである
+- Applicationが実際のGit working treeを確認し、
+  artifact変更がないことを確認できる
+
+CodexはTechnical Retryの候補を報告するが、
+Technical Retry実行の最終決定は行わない。
+
+Applicationが実際のGit状態を確認できない場合、
+またはartifact変更の有無を確認できない場合は、
+Technical Retryとして自動継続しない。
+
+Technical Retryは最大1回とし、
+そのRetry自体がRunner Error、
+Parser Error、
+Test Execution Error等で完了できなかった場合、
+追加のTechnical Retryは行わない。
+
+この境界により、
+
+Codex = Technical Retry候補の報告者
+Application = 実状態を確認する決定者
+
+という責任分離を維持する。
+
+これはSpecification 15.22の
+Technical Retry条件をV1で実行可能な形に具体化するものであり、
+Codexの自己申告のみでWorkflowを進行させない。
+
+---
+
 # Closing
 
 本Decisionにより、
