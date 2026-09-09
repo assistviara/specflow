@@ -76,3 +76,65 @@ class ReviseImplementationPlanOutput:
     previous_version_correspondence: str | None
     error_message: str | None = None
     
+
+@dataclass(frozen=True)
+class GenerateCodexPromptInput:
+    specification_path: Path
+    specification_approval_id: str
+    implementation_plan_path: Path
+    implementation_plan_approval_id: str
+    implementation_target_path: Path
+    tdd_rules: str
+    completion_conditions: str
+    stop_conditions: str
+    execution_result_reporting_requirements: str
+    template_path: Path
+    state_file: Path
+    state_history_dir: Path
+
+
+@dataclass(frozen=True)
+class GenerateCodexPromptOutput:
+    success: bool
+    codex_prompt: str | None
+    specification_path: Path
+    implementation_plan_path: Path
+    specification_approval_validation_result: ApprovalValidationResult
+    implementation_plan_approval_validation_result: ApprovalValidationResult
+    prompt_usable: bool
+    current_state: str
+    stop_reason: str | None = None
+    error_message: str | None = None
+
+
+@dataclass(frozen=True)
+class ExecuteImplementationInput:
+    specification_path: Path
+    specification_approval_id: str
+    implementation_plan_path: Path
+    implementation_plan_approval_id: str
+    codex_prompt: str
+    codex_prompt_specification_path: Path
+    codex_prompt_implementation_plan_path: Path
+    implementation_branch: str
+    base_commit: str
+    working_directory: Path
+    state_file: Path
+    state_history_dir: Path
+
+
+@dataclass(frozen=True)
+class ExecuteImplementationOutput:
+    success: bool
+    implementation_result: Any | None
+    specification_path: Path
+    implementation_plan_path: Path
+    implementation_branch: str
+    base_commit: str
+    specification_approval_validation_result: ApprovalValidationResult
+    implementation_plan_approval_validation_result: ApprovalValidationResult
+    current_state: str
+    technical_retry_required: bool
+    critical_change_required: bool
+    stop_reason: str | None = None
+    error_message: str | None = None
