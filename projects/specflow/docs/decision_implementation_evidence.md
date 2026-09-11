@@ -416,3 +416,30 @@ Implementationは、
 Specification、
 承認済みImplementation Plan、
 および本Decisionの範囲内でTDDにより進める。
+
+
+---
+
+## Decision 9 — created_at の時刻表現
+
+Implementation Evidence の identity に含める created_at は、
+Application内部では timezone-aware な datetime として保持する。
+
+timezone 情報を持たない naive datetime は使用しない。
+
+JSONへ永続化する際は、
+ISO 8601形式の文字列へ変換する。
+
+例:
+
+    2026-09-12T08:30:00+09:00
+
+これにより、
+Evidence がいつ収集・構築されたかを
+タイムゾーンを失わずに追跡できるようにする。
+
+Human Decision #34:
+created_at は
+「timezone-aware datetime を内部保持し、
+JSON保存時は ISO 8601 文字列とする」
+方式を承認する。
