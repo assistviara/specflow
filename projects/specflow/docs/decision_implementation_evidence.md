@@ -986,3 +986,45 @@ Human Approval要否を意味しない。
 
 将来、Scope取得不能に複数の状態表現が必要になった場合は、
 専用型への拡張を別Decisionとして検討する。
+
+## Decision 27 — Evidence collection status rule
+
+**Human Decision #52**
+
+`EvidenceIdentity.status` の判定規則は、
+`missing_evidence` の有無のみを基準とする。
+
+- `missing_evidence` が空の場合:
+  `COLLECTED`
+- `missing_evidence` が1件以上ある場合:
+  `PARTIAL`
+
+`errors`、`warnings`、`inconsistencies`、
+`deviations` が存在すること自体は、
+`PARTIAL` 判定の理由としない。
+
+`COLLECTED` / `PARTIAL` は
+Implementationの成功・失敗、
+Test Result、
+Review Result、
+Correction / Reimplementation要否を表さない。
+
+これはPhase 4における
+Evidence収集状態のみを表す。
+
+例えば、
+Codex Runner Reportと実際のGit Diffに不一致が存在しても、
+必要なEvidenceが取得できており
+`missing_evidence` が空であれば
+statusは `COLLECTED` とする。
+
+一方、
+Approved Scope、Git Diff、Test Result等、
+収集対象Evidenceの一部を取得・確定できず
+`missing_evidence` に記録された場合は
+statusを `PARTIAL` とする。
+
+Phase 4はこのstatusから
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
