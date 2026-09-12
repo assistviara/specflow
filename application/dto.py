@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from application.implementation_evidence import EvidenceScope
 from uuid import UUID
 
 from core.approval_validation import ApprovalValidationResult
@@ -155,6 +157,7 @@ class CollectImplementationEvidenceInput:
     implementation_branch: str
     base_commit: str
     implementation_result: Any | None
+    approved_scope: "EvidenceScope | None"
 
 
 @dataclass(frozen=True)

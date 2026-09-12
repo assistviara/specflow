@@ -27,6 +27,7 @@ def test_collect_implementation_evidence_input_is_frozen_dataclass() -> None:
         implementation_branch="developer",
         base_commit="abc123",
         implementation_result=None,
+        approved_scope=None,
     )
 
     assert isinstance(dto.implementation_id, UUID)
@@ -85,7 +86,36 @@ def test_collect_implementation_evidence_input_preserves_codex_prompt_path() -> 
         implementation_branch="developer",
         base_commit="abc123",
         implementation_result=None,
+        approved_scope=None,
     )
 
     assert dto.codex_prompt_path == prompt_path
     assert dto.codex_prompt == "Implement approved scope."
+
+
+def test_collect_implementation_evidence_input_preserves_approved_scope() -> None:
+    from application.implementation_evidence import EvidenceScope
+
+    approved_scope = EvidenceScope(
+        target_paths=("application/",),
+        allowed_changes=("application/*.py",),
+        forbidden_changes=("core/",),
+    )
+
+    dto = CollectImplementationEvidenceInput(
+        implementation_id=uuid4(),
+        implementation_kind="INITIAL",
+        previous_evidence_id=None,
+        specification_path=Path("specification.md"),
+        specification_approval_id="spec-approval-001",
+        implementation_plan_path=Path("implementation_plan.md"),
+        implementation_plan_approval_id="plan-approval-001",
+        codex_prompt_path=Path("codex_prompt.md"),
+        codex_prompt="Implement approved scope.",
+        implementation_branch="developer",
+        base_commit="abc123",
+        implementation_result=None,
+        approved_scope=approved_scope,
+    )
+
+    assert dto.approved_scope == approved_scope

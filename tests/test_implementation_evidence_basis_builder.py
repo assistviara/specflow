@@ -40,6 +40,7 @@ def _make_input(
         implementation_branch="developer",
         base_commit="abc123",
         implementation_result=None,
+        approved_scope=None,
     )
 
 

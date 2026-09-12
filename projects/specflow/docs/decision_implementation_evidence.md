@@ -886,3 +886,70 @@ Builderは以下を判断しない。
 
 Specification / Planの取得不能時に、
 内容やhashを推測して補完してはならない。
+
+## Decision 24 — Approved Scope source
+
+**Human Decision #49**
+
+EvidenceScope の正本は
+Approved Implementation Plan とする。
+
+Phase 4はImplementation Plan本文を
+AIまたは曖昧な自然言語解析によって独自解釈せず、
+UC-08にはHuman承認済みPlanに由来する
+構造化Approved Scopeを入力として渡す。
+
+構造化Approved Scopeは少なくとも以下を保持する。
+
+- `target_paths`
+- `allowed_changes`
+- `forbidden_changes`
+
+構造化Approved Scopeは
+Approved Implementation Planを置き換える新たな正本ではなく、
+Phase 4で機械比較を行うための表現とする。
+
+Approved Scopeを取得・確定できない場合は、
+Codex Prompt、Implementation Result、Git Diff等から
+推測または逆算して補完してはならない。
+
+取得・確定できないScopeは `missing_evidence` として記録し、
+Evidenceは `PARTIAL` として保持可能とする。
+
+Phase 4はApproved Scopeと実際の変更との差異を
+機械的事実として記録するだけであり、
+Implementationの適合性、Review Result、
+Correction / Reimplementation要否を判断しない。
+
+## Decision 25 — Approved Scope unavailable representation
+
+**Human Decision #50**
+
+`CollectImplementationEvidenceInput` に
+`approved_scope: EvidenceScope | None`
+を保持する。
+
+`EvidenceScope` が与えられた場合、
+それはHuman承認済みApproved Implementation Planに由来する、
+Phase 4機械比較用の構造化Approved Scopeを表す。
+
+`approved_scope=None` は、
+Approved Scopeを取得・確定できなかったことを表す。
+
+`None` を空の `EvidenceScope` に置き換えてはならない。
+
+`EvidenceScope` 内の空タプルは、
+そのScope項目を確認した結果、対象なしであることを表し、
+不明を意味しない。
+
+`approved_scope=None` の場合、
+UC-08はCodex Prompt、Implementation Result、
+Git Diff等からScopeを推測または逆算して補完してはならない。
+
+取得・確定できないScopeは
+`missing_evidence` として扱い、
+Evidenceは `PARTIAL` として保持可能とする。
+
+`approved_scope=None` 自体は、
+Implementationの適合性、Review Result、
+Correction / Reimplementation要否を意味しない。
