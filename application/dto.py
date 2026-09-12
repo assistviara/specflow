@@ -150,6 +150,7 @@ class CollectImplementationEvidenceInput:
     specification_approval_id: str
     implementation_plan_path: Path
     implementation_plan_approval_id: str
+    codex_prompt_path: Path
     codex_prompt: str
     implementation_branch: str
     base_commit: str

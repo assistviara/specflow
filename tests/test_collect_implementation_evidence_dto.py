@@ -22,6 +22,7 @@ def test_collect_implementation_evidence_input_is_frozen_dataclass() -> None:
         specification_approval_id="spec-approval-1",
         implementation_plan_path=Path("plan.md"),
         implementation_plan_approval_id="plan-approval-1",
+        codex_prompt_path=Path("implementation_prompt.md"),
         codex_prompt="implement this",
         implementation_branch="developer",
         base_commit="abc123",
@@ -59,3 +60,32 @@ def test_collect_implementation_evidence_output_is_frozen_dataclass() -> None:
 
     with pytest.raises(FrozenInstanceError):
         dto.success = False
+
+
+def test_collect_implementation_evidence_input_preserves_codex_prompt_path() -> None:
+    from pathlib import Path
+    from uuid import uuid4
+
+    from application.dto import CollectImplementationEvidenceInput
+
+    prompt_path = Path(
+        "projects/specflow/prompts/implementation_prompt.md"
+    )
+
+    dto = CollectImplementationEvidenceInput(
+        implementation_id=uuid4(),
+        implementation_kind="INITIAL",
+        previous_evidence_id=None,
+        specification_path=Path("specification.md"),
+        specification_approval_id="spec-approval-001",
+        implementation_plan_path=Path("implementation_plan.md"),
+        implementation_plan_approval_id="plan-approval-001",
+        codex_prompt_path=prompt_path,
+        codex_prompt="Implement approved scope.",
+        implementation_branch="developer",
+        base_commit="abc123",
+        implementation_result=None,
+    )
+
+    assert dto.codex_prompt_path == prompt_path
+    assert dto.codex_prompt == "Implement approved scope."
