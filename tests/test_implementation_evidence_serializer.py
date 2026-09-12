@@ -223,3 +223,26 @@ def test_implementation_evidence_round_trip_preserves_none_implementation_result
 
     assert restored.codex_summary.implementation_result is None
     assert restored == evidence
+
+
+def test_implementation_evidence_round_trip_preserves_none_change_summary() -> None:
+    from dataclasses import replace
+
+    evidence = make_evidence()
+
+    evidence = replace(
+        evidence,
+        changes=replace(
+            evidence.changes,
+            change_summary=None,
+        ),
+    )
+
+    data = implementation_evidence_to_dict(evidence)
+
+    assert data["changes"]["change_summary"] is None
+
+    restored = implementation_evidence_from_dict(data)
+
+    assert restored.changes.change_summary is None
+    assert restored == evidence

@@ -112,7 +112,7 @@ class EvidenceChanges:
     modified_files: tuple[str, ...]
     deleted_files: tuple[str, ...]
     git_diff_path: Path | None
-    change_summary: str
+    change_summary: str | None
 
 
 

@@ -1172,3 +1172,46 @@ Correction / Reimplementation要否を判断しない。
 
 Phase 4は取得不能状態をEvidenceとして保持し、
 その意味評価をPhase 5へ委ねる。
+
+## Decision 31 — Change Summary unavailable representation
+
+**Human Decision #56**
+
+`EvidenceChanges.change_summary` は、
+`str | None` とする。
+
+文字列が存在する場合は、
+Decision 29に従い、
+Phase 3 `ImplementationResult.implementation_summary`
+をそのまま保持する。
+
+`None` は、
+Phase 3 Implementation Resultを取得・確定できないため、
+`change_summary` も取得できないことを表す。
+
+`change_summary=None` のためだけに、
+追加の `missing_evidence` は生成しない。
+
+根本原因はDecision 30に従い、
+
+`"implementation result unavailable"`
+
+として `missing_evidence` に記録する。
+
+Git Diff、Repository State、Test State、
+Codex Promptその他のEvidenceから、
+`change_summary` を推測、逆算、再生成してはならない。
+
+空文字列、`"UNKNOWN"`、`"NONE"` 等を
+取得不能状態の代替表現として使用してはならない。
+
+JSONでは `null` として保存し、
+復元時も `None` とする。
+
+`change_summary=None` そのものから、
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+Phase 4は取得不能状態を保持し、
+その意味評価をPhase 5へ委ねる。

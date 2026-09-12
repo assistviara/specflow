@@ -58,3 +58,21 @@ def test_evidence_changes_allows_missing_git_diff() -> None:
     assert changes.deleted_files == ()
     assert changes.git_diff_path is None
     assert changes.change_summary == ""
+
+
+def test_evidence_changes_allows_none_change_summary() -> None:
+    from typing import get_type_hints
+
+    hints = get_type_hints(EvidenceChanges)
+
+    assert hints["change_summary"] == str | None
+
+    changes = EvidenceChanges(
+        created_files=(),
+        modified_files=(),
+        deleted_files=(),
+        git_diff_path=None,
+        change_summary=None,
+    )
+
+    assert changes.change_summary is None
