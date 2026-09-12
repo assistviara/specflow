@@ -543,3 +543,293 @@ Test StatusとTest Resultの組み合わせを以下に限定する。
 
 Human Decision #38:
 EvidenceVerificationに上記組み合わせ制約を適用する方式を承認する。
+
+
+---
+
+## Decision 14 — EvidenceDeviations の表現
+
+EvidenceDeviations は以下の4項目を持つ。
+
+- out_of_scope_changes: tuple[str, ...]
+- unplanned_changes: tuple[str, ...]
+- unfinished_items: tuple[str, ...]
+- human_approval_required: tuple[str, ...]
+
+各項目は immutable な tuple[str, ...] とし、
+該当項目がない場合は空tupleを使用する。
+
+Phase 4ではDeviationを記録するが、
+それ自体をImplementation失敗、
+REVISION_REQUIRED等のReview結果として評価しない。
+
+Human Decision #39:
+EvidenceDeviationsを上記構造とする方式を承認する。
+
+
+---
+
+## Decision 15 — Codex自己申告の保持方法
+
+Phase 3で構築されたImplementationResultは、
+Phase 4で再解釈して別表現へ変換せず、
+Codex自己申告として独立して保持する。
+
+構造:
+
+    EvidenceCodexSummary
+        implementation_result: ImplementationResult
+
+これにより、
+Codex自己申告と、
+Repository/Testから取得した実際の状態を
+Evidence内で明確に区別する。
+
+Human Decision #40:
+ImplementationResultをEvidenceCodexSummaryとして
+そのまま保持する方式を承認する。
+
+
+---
+
+## Decision 16 — RepositoryStateProvider
+
+Repositoryの実状態取得は
+Application LayerのPortとして抽象化する。
+
+構造:
+
+    RepositoryState
+        branch: str
+        base_commit: str
+        git_status: str
+        git_diff: str
+        created_files: tuple[str, ...]
+        modified_files: tuple[str, ...]
+        deleted_files: tuple[str, ...]
+
+    RepositoryStateProvider
+        get_state(base_commit: str) -> RepositoryState
+
+Providerの責務は事実の取得のみとする。
+
+Provider自身は、
+Deviation、Review結果、
+Implementationの適否を判断しない。
+
+Human Decision #41:
+RepositoryStateProviderを上記Application Portとして
+定義する方式を承認する。
+
+
+---
+
+## Decision 17 — TestStateProvider
+
+Testの実状態取得は
+Application LayerのPortとして抽象化する。
+
+TestStateは以下を保持する。
+
+- tests_created_or_modified
+- test_commands
+- initial_test_status
+- initial_test_result
+- target_test_status
+- target_test_result
+- full_test_status
+- full_test_result
+- errors
+- warnings
+
+Test Status / Resultは
+EvidenceVerificationと同じ組み合わせ制約を使用する。
+
+また、
+現在のpytestを再実行した結果を
+過去のRED実行記録として扱ってはならない。
+
+過去の実行記録を取得できない場合は、
+取得不能として保持し、
+推測によって補完しない。
+
+Human Decision #42:
+TestStateProviderを上記Application Portとして
+定義する方式を承認する。
+
+
+---
+
+## Decision 18 — Evidence比較結果の機械的分類
+
+Phase 4では以下を機械的に区別する。
+
+### missing_evidence
+
+本来取得すべきEvidenceを取得できない場合。
+
+例:
+
+- Git Diff取得不能
+- Test実行記録取得不能
+- Specification / Plan / Promptを特定不能
+
+### inconsistencies
+
+同じ事実について、
+異なるEvidence sourceが一致しない場合。
+
+例:
+
+- Codexが変更したと報告したファイルが
+  実際のGit変更に存在しない
+- 実際のGit変更がCodex報告に存在しない
+
+### deviations
+
+実際の状態が、
+Approved Scope / Planから
+客観的に外れている場合。
+
+例:
+
+- forbidden_changesに該当する変更
+- allowed_changes外の変更
+
+### human_approval_required
+
+V1では以下の場合に限定して追加する。
+
+1. Codexが明示的にHuman Approvalを要求している
+2. Evidence取得不能により、
+   deterministic factsだけでは
+   安全に次処理を確定できない
+
+inconsistencyまたはdeviationが存在することだけを理由に、
+Human Approvalへ自動昇格してはならない。
+
+Phase 4は事実を検出・分類するが、
+PASS、REVISION_REQUIRED、
+HUMAN_REVIEW_REQUIRED等の評価は行わない。
+
+Human Decision #43:
+上記の機械的分類ルールを承認する。
+
+
+---
+
+## Decision 19 — 「空」と「取得不能」の区別
+
+RepositoryStateおよびTestStateに、
+以下を追加する。
+
+    unavailable_evidence: tuple[str, ...]
+
+これにより、
+
+    git_diff == ""
+
+が、
+
+- 差分取得に成功し、実際に差分がなかった
+- Git Diffを取得できなかった
+
+のどちらであるかを区別する。
+
+同様に、
+Test Status / ResultがNOT_RUN / NONEであることと、
+過去の実行記録そのものを取得できないことを区別する。
+
+Providerのunavailable_evidenceは、
+Applicationによってmissing_evidenceへ反映する。
+
+Human Decision #44:
+取得結果の空値と取得不能を区別するため、
+RepositoryState / TestStateに
+unavailable_evidenceを持たせる方式を承認する。
+
+
+---
+
+## Decision 20 — Codex changed_files のV1解釈
+
+Phase 3のImplementationResult.changed_filesは
+strであるため、
+Phase 4 V1では以下の規則でのみ構造化する。
+
+- 1行につき1ファイルパスとして扱う
+- 行頭・行末の空白を除去する
+- 空行を除外する
+- それ以上の自然言語解釈は行わない
+
+例:
+
+    application/foo.py
+    tests/test_foo.py
+
+は2ファイルとして扱う。
+
+一方、
+
+    application周辺を3ファイル修正しました
+
+のような自然言語から
+具体的なファイル名を推測してはならない。
+
+このような記述は原文を保持したまま、
+実際のGit変更とのinconsistencyとして記録する。
+
+V1ではCodex報告上の
+created / modified / deleted種別までは推測しない。
+
+比較対象は、
+
+    Codexが変更したと報告したファイル集合
+    vs
+    実際のGit変更ファイル集合
+
+までとする。
+
+Human Decision #45:
+changed_filesを上記の限定的規則で解釈し、
+自然言語からファイルパスを推測しない方式を承認する。
+
+
+---
+
+## Decision 21 — Codex Promptの識別とHash
+
+CollectImplementationEvidenceInputは、
+Codex Promptについて以下の両方を保持する。
+
+- codex_prompt_path: Path
+- codex_prompt: str
+
+codex_prompt_pathは
+Promptの出所・identityを示す。
+
+codex_prompt本文は、
+Phase 3で実際にCodexへ渡した内容を表す。
+
+EvidenceBasisのhashは以下の規則とする。
+
+- Specification:
+  specification_pathの実ファイル内容からSHA-256
+- Approved Implementation Plan:
+  implementation_plan_pathの実ファイル内容からSHA-256
+- Codex Prompt:
+  Inputとして渡されたcodex_prompt本文からSHA-256
+
+Codex Promptについては、
+後からPath上のファイル内容が変更されても、
+実行時にCodexへ渡したPrompt内容を
+Evidenceとして識別できるようにする。
+
+SpecificationまたはPlanを取得できない場合は、
+内容を推測して補完せず、
+missing_evidenceとして扱い、
+必要に応じてEvidenceをPARTIALとする。
+
+Human Decision #46:
+Codex PromptについてPathと実行時本文の両方を保持し、
+上記規則でSHA-256を算出する方式を承認する。

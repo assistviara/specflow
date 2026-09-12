@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 from pathlib import Path
 from uuid import UUID
+
+from application.implementation_result_parser import ImplementationResult
 
 
 @dataclass(frozen=True)
@@ -171,12 +172,27 @@ class EvidenceVerification:
                 )
 
 
+
+@dataclass(frozen=True)
+class EvidenceDeviations:
+    out_of_scope_changes: tuple[str, ...]
+    unplanned_changes: tuple[str, ...]
+    unfinished_items: tuple[str, ...]
+    human_approval_required: tuple[str, ...]
+
+
+
+@dataclass(frozen=True)
+class EvidenceCodexSummary:
+    implementation_result: ImplementationResult
+
+
 @dataclass(frozen=True)
 class ImplementationEvidence:
-    identity: dict[str, Any]
-    basis: dict[str, Any]
-    scope: dict[str, Any]
-    changes: dict[str, Any]
-    verification: dict[str, Any]
-    deviations: dict[str, Any]
-    codex_summary: dict[str, Any]
+    identity: EvidenceIdentity
+    basis: EvidenceBasis
+    scope: EvidenceScope
+    changes: EvidenceChanges
+    verification: EvidenceVerification
+    deviations: EvidenceDeviations
+    codex_summary: EvidenceCodexSummary
