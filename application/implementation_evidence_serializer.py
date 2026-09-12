@@ -125,33 +125,37 @@ def implementation_evidence_to_dict(
             ),
         },
         "codex_summary": {
-            "implementation_result": {
-                "implementation_summary": (
-                    result.implementation_summary
-                ),
-                "changed_files": result.changed_files,
-                "executed_commands": result.executed_commands,
-                "test_execution_status": (
-                    result.test_execution_status
-                ),
-                "test_result": result.test_result,
-                "test_execution_error": (
-                    result.test_execution_error
-                ),
-                "errors": result.errors,
-                "warnings": result.warnings,
-                "incomplete_items": result.incomplete_items,
-                "human_approval_required": (
-                    result.human_approval_required
-                ),
-                "test_required": result.test_required,
-                "technical_retry_safe": (
-                    result.technical_retry_safe
-                ),
-                "technical_retry_operation": (
-                    result.technical_retry_operation
-                ),
-            },
+            "implementation_result": (
+                {
+                    "implementation_summary": (
+                        result.implementation_summary
+                    ),
+                    "changed_files": result.changed_files,
+                    "executed_commands": result.executed_commands,
+                    "test_execution_status": (
+                        result.test_execution_status
+                    ),
+                    "test_result": result.test_result,
+                    "test_execution_error": (
+                        result.test_execution_error
+                    ),
+                    "errors": result.errors,
+                    "warnings": result.warnings,
+                    "incomplete_items": result.incomplete_items,
+                    "human_approval_required": (
+                        result.human_approval_required
+                    ),
+                    "test_required": result.test_required,
+                    "technical_retry_safe": (
+                        result.technical_retry_safe
+                    ),
+                    "technical_retry_operation": (
+                        result.technical_retry_operation
+                    ),
+                }
+                if result is not None
+                else None
+            ),
         },
     }
 
@@ -290,8 +294,10 @@ def implementation_evidence_from_dict(
             ),
         ),
         codex_summary=EvidenceCodexSummary(
-            implementation_result=ImplementationResult(
-                **result
+            implementation_result=(
+                ImplementationResult(**result)
+                if result is not None
+                else None
             ),
         ),
     )

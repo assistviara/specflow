@@ -45,3 +45,17 @@ def test_evidence_codex_summary_is_frozen_dataclass() -> None:
 
     with pytest.raises(FrozenInstanceError):
         summary.implementation_result = make_implementation_result()
+
+
+def test_evidence_codex_summary_allows_none_implementation_result() -> None:
+    from typing import get_type_hints
+
+    hints = get_type_hints(EvidenceCodexSummary)
+
+    assert hints["implementation_result"] == ImplementationResult | None
+
+    summary = EvidenceCodexSummary(
+        implementation_result=None,
+    )
+
+    assert summary.implementation_result is None

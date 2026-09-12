@@ -1086,3 +1086,89 @@ Phase 4はこの状態から
 Implementationの適合性、
 Review Result、
 Correction / Reimplementation要否を判断しない。
+
+## Decision 29 — EvidenceChanges change_summary source
+
+**Human Decision #54**
+
+V1における `EvidenceChanges.change_summary` は、
+`ImplementationResult.implementation_summary` を
+そのまま使用する。
+
+Phase 4は、
+Git Diffやactual repository changesから
+独自の文章要約を生成しない。
+
+`change_summary` は
+Codex Runner Report由来の情報として扱う。
+
+actual repository changesの事実は、
+
+- `created_files`
+- `modified_files`
+- `deleted_files`
+- `git_diff_path`
+
+によって保持する。
+
+Runner Report由来の説明とactual repository stateは
+区別してEvidenceへ保持する。
+
+Phase 4は、
+`change_summary` の内容について
+Implementationの適合性、完全性、成功を判断しない。
+
+Runner Reportとactual repository stateの不一致は、
+既存の機械比較規則に従って
+`inconsistencies` または該当するEvidence分類へ記録する。
+
+Phase 4はactual changesから新たな意味解釈を生成せず、
+Evidenceの意味評価はPhase 5へ委ねる。
+
+## Decision 30 — Implementation Result unavailable representation
+
+**Human Decision #55**
+
+`EvidenceCodexSummary.implementation_result` は、
+`ImplementationResult | None` とする。
+
+`implementation_result=None` は、
+Phase 3のImplementation Resultを
+取得・確定できなかったことを表す。
+
+この場合は、
+
+`"implementation result unavailable"`
+
+を `missing_evidence` に記録する。
+
+その結果、
+Decision 27の規則に従い
+`EvidenceIdentity.status` は `PARTIAL` となる。
+
+Implementation Resultが取得不能な場合、
+空値やダミーの `ImplementationResult` を生成してはならない。
+
+Codex Prompt、Git Diff、Repository State、
+Test State等からImplementation Resultの内容を
+推測または逆算して補完してはならない。
+
+Implementation Resultを必要とする
+Codex Runner Reportとactual stateの比較は行わない。
+
+ただし、
+
+- Evidence Basisの取得
+- Repository Stateの取得
+- Test Stateの取得
+- その他Implementation Resultを必要としないEvidence収集
+
+は継続する。
+
+Implementation Result取得不能そのものから、
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+Phase 4は取得不能状態をEvidenceとして保持し、
+その意味評価をPhase 5へ委ねる。

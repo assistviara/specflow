@@ -201,3 +201,25 @@ def test_implementation_evidence_round_trip_preserves_none_scope() -> None:
 
     assert restored.scope is None
     assert restored == evidence
+
+
+def test_implementation_evidence_round_trip_preserves_none_implementation_result() -> None:
+    from dataclasses import replace
+
+    evidence = make_evidence()
+
+    evidence = replace(
+        evidence,
+        codex_summary=EvidenceCodexSummary(
+            implementation_result=None,
+        ),
+    )
+
+    data = implementation_evidence_to_dict(evidence)
+
+    assert data["codex_summary"]["implementation_result"] is None
+
+    restored = implementation_evidence_from_dict(data)
+
+    assert restored.codex_summary.implementation_result is None
+    assert restored == evidence

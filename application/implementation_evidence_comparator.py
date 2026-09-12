@@ -20,7 +20,7 @@ class ImplementationEvidenceComparator:
     def compare(
         self,
         *,
-        implementation_result: ImplementationResult,
+        implementation_result: ImplementationResult | None,
         repository_state: RepositoryState,
         test_state: TestState,
         scope: EvidenceScope | None,
@@ -36,9 +36,16 @@ class ImplementationEvidenceComparator:
                 + ("approved scope unavailable",)
             )
 
-        reported_files = self._reported_files(
-            implementation_result.changed_files
-        )
+        if implementation_result is None:
+            missing_evidence = (
+                missing_evidence
+                + ("implementation result unavailable",)
+            )
+            reported_files = None
+        else:
+            reported_files = self._reported_files(
+                implementation_result.changed_files
+            )
 
         actual_files = tuple(
             dict.fromkeys(
@@ -50,22 +57,23 @@ class ImplementationEvidenceComparator:
 
         inconsistencies: list[str] = []
 
-        actual_set = set(actual_files)
-        reported_set = set(reported_files)
+        if reported_files is not None:
+            actual_set = set(actual_files)
+            reported_set = set(reported_files)
 
-        for path in reported_files:
-            if path not in actual_set:
-                inconsistencies.append(
-                    "reported change not found in actual changes: "
-                    f"{path}"
-                )
+            for path in reported_files:
+                if path not in actual_set:
+                    inconsistencies.append(
+                        "reported change not found in actual changes: "
+                        f"{path}"
+                    )
 
-        for path in actual_files:
-            if path not in reported_set:
-                inconsistencies.append(
-                    "actual change not reported by Codex: "
-                    f"{path}"
-                )
+            for path in actual_files:
+                if path not in reported_set:
+                    inconsistencies.append(
+                        "actual change not reported by Codex: "
+                        f"{path}"
+                    )
 
         if scope is None:
             out_of_scope_changes = ()
@@ -96,17 +104,18 @@ class ImplementationEvidenceComparator:
 
         human_approval_required: list[str] = []
 
-        codex_human_approval = (
-            implementation_result.human_approval_required.strip()
-        )
-
-        if (
-            codex_human_approval
-            and codex_human_approval != "NONE"
-        ):
-            human_approval_required.append(
-                codex_human_approval
+        if implementation_result is not None:
+            codex_human_approval = (
+                implementation_result.human_approval_required.strip()
             )
+
+            if (
+                codex_human_approval
+                and codex_human_approval != "NONE"
+            ):
+                human_approval_required.append(
+                    codex_human_approval
+                )
 
         for item in missing_evidence:
             human_approval_required.append(

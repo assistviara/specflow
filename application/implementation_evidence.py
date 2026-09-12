@@ -193,7 +193,7 @@ class EvidenceDeviations:
 
 @dataclass(frozen=True)
 class EvidenceCodexSummary:
-    implementation_result: ImplementationResult
+    implementation_result: ImplementationResult | None
 
 
 @dataclass(frozen=True)

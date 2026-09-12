@@ -370,3 +370,52 @@ def test_compare_records_missing_evidence_when_scope_is_unavailable() -> None:
         "missing evidence requires human judgment: approved scope unavailable"
         in comparison.human_approval_required
     )
+
+
+def test_missing_implementation_result_is_recorded_as_missing_evidence() -> None:
+    comparison = ImplementationEvidenceComparator().compare(
+        implementation_result=None,
+        repository_state=make_repository_state(),
+        test_state=make_test_state(),
+        scope=make_scope(),
+    )
+
+    assert (
+        "implementation result unavailable"
+        in comparison.missing_evidence
+    )
+    assert comparison.inconsistencies == ()
+    assert (
+        "missing evidence requires human judgment: "
+        "implementation result unavailable"
+        in comparison.human_approval_required
+    )
+
+
+def test_missing_implementation_result_preserves_independent_scope_comparison() -> None:
+    comparison = ImplementationEvidenceComparator().compare(
+        implementation_result=None,
+        repository_state=make_repository_state(
+            created_files=("application/foo.py",),
+            modified_files=(
+                "core/forbidden.py",
+                "docs/unplanned.md",
+            ),
+        ),
+        test_state=make_test_state(
+            unavailable_evidence=("full_test_result",),
+        ),
+        scope=make_scope(),
+    )
+
+    assert comparison.out_of_scope_changes == (
+        "core/forbidden.py",
+    )
+    assert comparison.unplanned_changes == (
+        "docs/unplanned.md",
+    )
+    assert comparison.inconsistencies == ()
+    assert comparison.missing_evidence == (
+        "full_test_result",
+        "implementation result unavailable",
+    )
