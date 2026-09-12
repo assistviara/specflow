@@ -1028,3 +1028,61 @@ Phase 4はこのstatusから
 Implementationの適合性、
 Review Result、
 Correction / Reimplementation要否を判断しない。
+
+## Decision 28 — Comparator behavior when Approved Scope is unavailable
+
+**Human Decision #53**
+
+`ImplementationEvidenceComparator.compare()` の
+`scope` は `EvidenceScope | None` とする。
+
+`scope=None` の場合、
+Approved Scopeを取得・確定できなかったことを表す。
+
+この場合もComparatorは、
+Scopeを必要としない機械比較を継続する。
+
+継続する処理:
+
+- Repository / Test の unavailable evidence収集
+- Codex Runner Reportのchanged filesと
+  actual repository changesの比較
+- inconsistenciesの記録
+- Codexが明示したHuman Approval要求の継承
+- missing evidenceに基づくHuman judgment要求の生成
+
+一方、Scopeを必要とする以下の判定は行わない。
+
+- `out_of_scope_changes`
+- `unplanned_changes`
+
+`scope=None` の場合は
+`"approved scope unavailable"` を
+`missing_evidence` に追加する。
+
+この場合の
+
+- `out_of_scope_changes`
+- `unplanned_changes`
+
+は空タプルとして保持する。
+
+この空タプルは
+「該当変更なし」という意味ではなく、
+Approved Scope不明のため判定を行っていないことを表す。
+
+その事実は、
+
+- `scope=None`
+- `missing_evidence`
+- `EvidenceIdentity.status=PARTIAL`
+
+によって区別する。
+
+Codex Prompt、Implementation Result、Git Diff等から
+Scopeを推測または逆算して補完してはならない。
+
+Phase 4はこの状態から
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。

@@ -5,6 +5,7 @@ from application.implementation_evidence_comparator import (
 from application.implementation_result_parser import ImplementationResult
 from application.repository_state_provider import RepositoryState
 from application.execution_state_provider import TestState as State
+from application.execution_state_provider import TestState as ExecutionTestState
 
 
 def make_result(
@@ -312,3 +313,60 @@ def test_inconsistency_and_deviation_alone_do_not_require_human_approval() -> No
         "core/forbidden.py",
     )
     assert comparison.human_approval_required == ()
+
+
+def test_compare_records_missing_evidence_when_scope_is_unavailable() -> None:
+    implementation_result = ImplementationResult(
+        implementation_summary="done",
+        changed_files="application/example.py",
+        executed_commands="python -m pytest",
+        test_execution_status="COMPLETED",
+        test_result="PASS",
+        test_execution_error="NONE",
+        errors="NONE",
+        warnings="NONE",
+        incomplete_items="NONE",
+        human_approval_required="NONE",
+        test_required=True,
+        technical_retry_safe=False,
+        technical_retry_operation=None,
+    )
+
+    repository_state = RepositoryState(
+        branch="developer",
+        base_commit="abc123",
+        git_status="",
+        git_diff="diff content",
+        created_files=("application/example.py",),
+        modified_files=(),
+        deleted_files=(),
+    )
+
+    test_state = ExecutionTestState(
+        tests_created_or_modified=("tests/test_example.py",),
+        test_commands=("python -m pytest",),
+        initial_test_status="COMPLETED",
+        initial_test_result="FAIL",
+        target_test_status="COMPLETED",
+        target_test_result="PASS",
+        full_test_status="COMPLETED",
+        full_test_result="PASS",
+        errors=(),
+        warnings=(),
+    )
+
+    comparison = ImplementationEvidenceComparator().compare(
+        implementation_result=implementation_result,
+        repository_state=repository_state,
+        test_state=test_state,
+        scope=None,
+    )
+
+    assert "approved scope unavailable" in comparison.missing_evidence
+    assert comparison.out_of_scope_changes == ()
+    assert comparison.unplanned_changes == ()
+    assert comparison.inconsistencies == ()
+    assert (
+        "missing evidence requires human judgment: approved scope unavailable"
+        in comparison.human_approval_required
+    )

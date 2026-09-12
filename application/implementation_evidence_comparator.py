@@ -23,12 +23,18 @@ class ImplementationEvidenceComparator:
         implementation_result: ImplementationResult,
         repository_state: RepositoryState,
         test_state: TestState,
-        scope: EvidenceScope,
+        scope: EvidenceScope | None,
     ) -> EvidenceComparison:
         missing_evidence = (
             repository_state.unavailable_evidence
             + test_state.unavailable_evidence
         )
+
+        if scope is None:
+            missing_evidence = (
+                missing_evidence
+                + ("approved scope unavailable",)
+            )
 
         reported_files = self._reported_files(
             implementation_result.changed_files
@@ -61,24 +67,28 @@ class ImplementationEvidenceComparator:
                     f"{path}"
                 )
 
-        out_of_scope_changes = tuple(
-            path
-            for path in actual_files
-            if self._matches_any(
-                path,
-                scope.forbidden_changes,
+        if scope is None:
+            out_of_scope_changes = ()
+            unplanned_changes = ()
+        else:
+            out_of_scope_changes = tuple(
+                path
+                for path in actual_files
+                if self._matches_any(
+                    path,
+                    scope.forbidden_changes,
+                )
             )
-        )
 
-        unplanned_changes = tuple(
-            path
-            for path in actual_files
-            if not self._matches_any(
-                path,
-                scope.allowed_changes,
+            unplanned_changes = tuple(
+                path
+                for path in actual_files
+                if not self._matches_any(
+                    path,
+                    scope.allowed_changes,
+                )
+                and path not in out_of_scope_changes
             )
-            and path not in out_of_scope_changes
-        )
 
         missing_evidence = tuple(
             dict.fromkeys(missing_evidence)
