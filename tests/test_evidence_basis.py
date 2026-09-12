@@ -61,3 +61,24 @@ def test_evidence_basis_rejects_empty_required_strings(
 
     with pytest.raises(ValueError):
         EvidenceBasis(**values)
+
+
+def test_evidence_basis_allows_unavailable_hashes_as_none() -> None:
+    from pathlib import Path
+
+    from application.implementation_evidence import EvidenceBasis
+
+    basis = EvidenceBasis(
+        specification_path=Path("specification.md"),
+        specification_hash=None,
+        specification_approval_id="spec-approval-001",
+        implementation_plan_path=Path("implementation_plan.md"),
+        implementation_plan_hash=None,
+        implementation_plan_approval_id="plan-approval-001",
+        codex_prompt_path=Path("codex_prompt.md"),
+        codex_prompt_hash=None,
+    )
+
+    assert basis.specification_hash is None
+    assert basis.implementation_plan_hash is None
+    assert basis.codex_prompt_hash is None

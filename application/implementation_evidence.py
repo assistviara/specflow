@@ -72,19 +72,28 @@ class EvidenceBasis:
 
     def __post_init__(self) -> None:
         required_strings = {
-            "specification_hash": self.specification_hash,
             "specification_approval_id": self.specification_approval_id,
-            "implementation_plan_hash": self.implementation_plan_hash,
             "implementation_plan_approval_id": (
                 self.implementation_plan_approval_id
             ),
-            "codex_prompt_hash": self.codex_prompt_hash,
         }
 
         for field_name, value in required_strings.items():
             if not value.strip():
                 raise ValueError(
                     f"{field_name} must not be empty"
+                )
+
+        optional_hashes = {
+            "specification_hash": self.specification_hash,
+            "implementation_plan_hash": self.implementation_plan_hash,
+            "codex_prompt_hash": self.codex_prompt_hash,
+        }
+
+        for field_name, value in optional_hashes.items():
+            if value is not None and not value.strip():
+                raise ValueError(
+                    f"{field_name} must not be empty when provided"
                 )
 
 

@@ -48,7 +48,8 @@ def test_build_hashes_specification_from_actual_file_bytes(
 ) -> None:
     input_dto = _make_input(tmp_path)
 
-    basis = ImplementationEvidenceBasisBuilder().build(input_dto)
+    result = ImplementationEvidenceBasisBuilder().build(input_dto)
+    basis = result.basis
 
     expected = hashlib.sha256(
         b"specification bytes"
@@ -62,7 +63,8 @@ def test_build_hashes_plan_from_actual_file_bytes(
 ) -> None:
     input_dto = _make_input(tmp_path)
 
-    basis = ImplementationEvidenceBasisBuilder().build(input_dto)
+    result = ImplementationEvidenceBasisBuilder().build(input_dto)
+    basis = result.basis
 
     expected = hashlib.sha256(
         b"implementation plan bytes"
@@ -80,7 +82,8 @@ def test_build_hashes_prompt_from_exact_sent_body_not_current_file(
         codex_prompt=sent_prompt,
     )
 
-    basis = ImplementationEvidenceBasisBuilder().build(input_dto)
+    result = ImplementationEvidenceBasisBuilder().build(input_dto)
+    basis = result.basis
 
     expected = hashlib.sha256(
         sent_prompt.encode("utf-8")
@@ -99,7 +102,8 @@ def test_build_preserves_basis_identity(
 ) -> None:
     input_dto = _make_input(tmp_path)
 
-    basis = ImplementationEvidenceBasisBuilder().build(input_dto)
+    result = ImplementationEvidenceBasisBuilder().build(input_dto)
+    basis = result.basis
 
     assert basis.specification_path == input_dto.specification_path
     assert (
@@ -115,3 +119,35 @@ def test_build_preserves_basis_identity(
         == input_dto.implementation_plan_approval_id
     )
     assert basis.codex_prompt_path == input_dto.codex_prompt_path
+
+
+def test_build_returns_missing_evidence_when_specification_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    input_dto = _make_input(tmp_path)
+
+    input_dto.specification_path.unlink()
+
+    result = ImplementationEvidenceBasisBuilder().build(input_dto)
+
+    assert result.basis.specification_hash is None
+    assert result.basis.implementation_plan_hash is not None
+    assert result.basis.codex_prompt_hash is not None
+    assert "specification hash unavailable" in result.missing_evidence
+    assert "failed to read specification for hashing" in result.errors
+
+
+def test_build_returns_missing_evidence_when_plan_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    input_dto = _make_input(tmp_path)
+
+    input_dto.implementation_plan_path.unlink()
+
+    result = ImplementationEvidenceBasisBuilder().build(input_dto)
+
+    assert result.basis.specification_hash is not None
+    assert result.basis.implementation_plan_hash is None
+    assert result.basis.codex_prompt_hash is not None
+    assert "implementation plan hash unavailable" in result.missing_evidence
+    assert "failed to read implementation plan for hashing" in result.errors

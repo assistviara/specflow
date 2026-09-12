@@ -833,3 +833,56 @@ missing_evidenceとして扱い、
 Human Decision #46:
 Codex PromptについてPathと実行時本文の両方を保持し、
 上記規則でSHA-256を算出する方式を承認する。
+
+## Decision 22 — EvidenceBasis hash unavailable representation
+
+**Human Decision #47**
+
+EvidenceBasis の各 hash は `str | None` とする。
+
+- SHA-256文字列:
+  Phase 4で対象Evidenceを取得し、hashを確定できたことを表す。
+- `None`:
+  Phase 4で対象hashを取得・確定できなかったことを表す。
+- `None` はEvidenceそのものが存在しないことを意味しない。
+- 取得不能・検証不能の理由は `missing_evidence` に記録する。
+- hashを確定できないEvidenceは `PARTIAL` として保持可能とする。
+- `"UNKNOWN"`、`"UNAVAILABLE"` 等の代替文字列で欠損を補完しない。
+- 不明なEvidenceを推測によって補完しない。
+
+このDecisionはEvidence取得可否の表現方法のみを定める。
+Implementationの適合性、Review Result、Correction要否を判定するものではない。
+
+## Decision 23 — EvidenceBasis acquisition failure handling
+
+**Human Decision #48**
+
+ImplementationEvidenceBasisBuilder は、
+Specification / Approved Implementation Plan の取得と
+hash算出を担当する。
+
+個別の取得失敗ではBasis構築全体を中断せず、
+該当するhashを `None` とする。
+
+Builderは取得結果を
+`EvidenceBasisBuildResult` として返し、
+少なくとも以下を保持する。
+
+- `basis`
+- `missing_evidence`
+- `errors`
+
+Builderが扱うのは取得・算出に関する機械的事実のみとする。
+
+Builderは以下を判断しない。
+
+- Evidence全体の `PARTIAL` 判定
+- Review Result
+- Correction / Reimplementation要否
+- Human Approval要否
+- Implementationの適合性・完全性
+
+これらはUC-08 Orchestrator以降の責務とする。
+
+Specification / Planの取得不能時に、
+内容やhashを推測して補完してはならない。
