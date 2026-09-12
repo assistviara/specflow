@@ -443,3 +443,103 @@ created_at は
 「timezone-aware datetime を内部保持し、
 JSON保存時は ISO 8601 文字列とする」
 方式を承認する。
+
+
+---
+
+## Decision 10 — EvidenceScope の表現
+
+EvidenceScope は以下の3項目を持つ。
+
+- target_paths
+- allowed_changes
+- forbidden_changes
+
+各項目は immutable な tuple[str, ...] とする。
+
+Path型ではなく文字列とすることで、
+実ファイルパスだけでなく、
+application/** や tests/** のような
+glob・パターン表現も保持できるようにする。
+
+Human Decision #35:
+EvidenceScope の3項目を
+tuple[str, ...] とする方式を承認する。
+
+---
+
+## Decision 11 — EvidenceChanges の表現
+
+EvidenceChanges は以下を持つ。
+
+- created_files: tuple[str, ...]
+- modified_files: tuple[str, ...]
+- deleted_files: tuple[str, ...]
+- git_diff_path: Path | None
+- change_summary: str
+
+git_diff_path は None を許可する。
+
+Git Diffを取得できない場合でも、
+Evidence自体をPARTIALとして構築・保存できるようにするためである。
+
+Human Decision #36:
+EvidenceChanges を上記構造とし、
+git_diff_path は Path | None とする方式を承認する。
+
+---
+
+## Decision 12 — EvidenceVerification のテスト表現
+
+EvidenceVerification は、
+Phase 3で使用しているTest Status / Test Resultの語彙を再利用する。
+
+Test Status:
+
+- COMPLETED
+- ERROR
+- NOT_RUN
+
+Test Result:
+
+- PASS
+- FAIL
+- NONE
+
+また、以下を保持する。
+
+- commands
+- tests_created_or_modified
+- test_commands
+- initial_test_status
+- initial_test_result
+- target_test_status
+- target_test_result
+- full_test_status
+- full_test_result
+- errors
+- warnings
+- no_tdd_reason
+
+Human Decision #37:
+EvidenceVerificationは上記構造とし、
+Phase 3のTest Status / Test Result語彙を再利用する方式を承認する。
+
+---
+
+## Decision 13 — Test Status / Result の組み合わせ制約
+
+EvidenceVerificationでは、
+Test StatusとTest Resultの組み合わせを以下に限定する。
+
+- COMPLETED -> PASS または FAIL
+- ERROR -> NONE
+- NOT_RUN -> NONE
+
+これにより、
+テスト失敗、
+テスト実行エラー、
+未実行をEvidence上で区別する。
+
+Human Decision #38:
+EvidenceVerificationに上記組み合わせ制約を適用する方式を承認する。
