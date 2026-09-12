@@ -120,3 +120,74 @@ def test_implementation_evidence_is_frozen_dataclass_with_typed_blocks() -> None
             allowed_changes=(),
             forbidden_changes=(),
         )
+
+
+def test_implementation_evidence_scope_allows_none() -> None:
+    from typing import get_type_hints
+
+    hints = get_type_hints(ImplementationEvidence)
+
+    assert hints["scope"] == EvidenceScope | None
+
+
+def test_implementation_evidence_preserves_unavailable_scope_as_none() -> None:
+    evidence = ImplementationEvidence(
+        identity=EvidenceIdentity(
+            evidence_id=uuid4(),
+            implementation_id=uuid4(),
+            implementation_kind="INITIAL",
+            previous_evidence_id=None,
+            status="PARTIAL",
+            created_at=datetime(
+                2026,
+                9,
+                12,
+                8,
+                30,
+                tzinfo=timezone.utc,
+            ),
+        ),
+        basis=EvidenceBasis(
+            specification_path=Path("spec.md"),
+            specification_hash="spec-hash",
+            specification_approval_id="spec-approval-1",
+            implementation_plan_path=Path("plan.md"),
+            implementation_plan_hash="plan-hash",
+            implementation_plan_approval_id="plan-approval-1",
+            codex_prompt_path=Path("prompt.md"),
+            codex_prompt_hash="prompt-hash",
+        ),
+        scope=None,
+        changes=EvidenceChanges(
+            created_files=(),
+            modified_files=(),
+            deleted_files=(),
+            git_diff_path=None,
+            change_summary="scope unavailable",
+        ),
+        verification=EvidenceVerification(
+            commands=(),
+            tests_created_or_modified=(),
+            test_commands=(),
+            initial_test_status="NOT_RUN",
+            initial_test_result="NONE",
+            target_test_status="NOT_RUN",
+            target_test_result="NONE",
+            full_test_status="NOT_RUN",
+            full_test_result="NONE",
+            errors=(),
+            warnings=(),
+            no_tdd_reason="scope unavailable test fixture",
+        ),
+        deviations=EvidenceDeviations(
+            out_of_scope_changes=(),
+            unplanned_changes=(),
+            unfinished_items=(),
+            human_approval_required=(),
+        ),
+        codex_summary=EvidenceCodexSummary(
+            implementation_result=make_implementation_result(),
+        ),
+    )
+
+    assert evidence.scope is None

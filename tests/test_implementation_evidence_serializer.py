@@ -183,3 +183,21 @@ def test_implementation_evidence_round_trip_restores_types() -> None:
         restored.codex_summary.implementation_result,
         ImplementationResult,
     )
+
+
+def test_implementation_evidence_round_trip_preserves_none_scope() -> None:
+    from dataclasses import replace
+
+    evidence = replace(
+        make_evidence(),
+        scope=None,
+    )
+
+    data = implementation_evidence_to_dict(evidence)
+
+    assert data["scope"] is None
+
+    restored = implementation_evidence_from_dict(data)
+
+    assert restored.scope is None
+    assert restored == evidence

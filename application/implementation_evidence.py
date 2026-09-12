@@ -200,7 +200,7 @@ class EvidenceCodexSummary:
 class ImplementationEvidence:
     identity: EvidenceIdentity
     basis: EvidenceBasis
-    scope: EvidenceScope
+    scope: EvidenceScope | None
     changes: EvidenceChanges
     verification: EvidenceVerification
     deviations: EvidenceDeviations

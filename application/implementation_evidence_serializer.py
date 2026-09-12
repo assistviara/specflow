@@ -54,15 +54,19 @@ def implementation_evidence_to_dict(
             "codex_prompt_path": evidence.basis.codex_prompt_path.as_posix(),
             "codex_prompt_hash": evidence.basis.codex_prompt_hash,
         },
-        "scope": {
-            "target_paths": list(evidence.scope.target_paths),
-            "allowed_changes": list(
-                evidence.scope.allowed_changes
-            ),
-            "forbidden_changes": list(
-                evidence.scope.forbidden_changes
-            ),
-        },
+        "scope": (
+            {
+                "target_paths": list(evidence.scope.target_paths),
+                "allowed_changes": list(
+                    evidence.scope.allowed_changes
+                ),
+                "forbidden_changes": list(
+                    evidence.scope.forbidden_changes
+                ),
+            }
+            if evidence.scope is not None
+            else None
+        ),
         "changes": {
             "created_files": list(evidence.changes.created_files),
             "modified_files": list(
@@ -207,14 +211,18 @@ def implementation_evidence_from_dict(
             ),
             codex_prompt_hash=basis["codex_prompt_hash"],
         ),
-        scope=EvidenceScope(
-            target_paths=tuple(scope["target_paths"]),
-            allowed_changes=tuple(
-                scope["allowed_changes"]
-            ),
-            forbidden_changes=tuple(
-                scope["forbidden_changes"]
-            ),
+        scope=(
+            EvidenceScope(
+                target_paths=tuple(scope["target_paths"]),
+                allowed_changes=tuple(
+                    scope["allowed_changes"]
+                ),
+                forbidden_changes=tuple(
+                    scope["forbidden_changes"]
+                ),
+            )
+            if scope is not None
+            else None
         ),
         changes=EvidenceChanges(
             created_files=tuple(

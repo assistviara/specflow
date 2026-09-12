@@ -953,3 +953,36 @@ Evidenceは `PARTIAL` として保持可能とする。
 `approved_scope=None` 自体は、
 Implementationの適合性、Review Result、
 Correction / Reimplementation要否を意味しない。
+
+## Decision 26 — ImplementationEvidence scope unavailable representation
+
+**Human Decision #51**
+
+`ImplementationEvidence.scope` は
+`EvidenceScope | None` とする。
+
+`EvidenceScope` が保持されている場合、
+Human承認済みApproved Implementation Planに由来する
+構造化Approved Scopeが取得・確定できていることを表す。
+
+`scope=None` は、
+Approved Scopeを取得・確定できなかったことを表す。
+
+`None` を空の `EvidenceScope` に置き換えてはならない。
+
+空の `EvidenceScope` は、
+各Scope項目を確認した結果、対象なしであることを表し、
+Scope不明を意味しない。
+
+Scope取得不能の理由は `missing_evidence` に記録し、
+Evidence全体の収集状態は
+`EvidenceIdentity.status` の `COLLECTED` / `PARTIAL`
+によって別途表現する。
+
+`scope=None` 自体は、
+Implementationの適合性、Review Result、
+Correction / Reimplementation要否、
+Human Approval要否を意味しない。
+
+将来、Scope取得不能に複数の状態表現が必要になった場合は、
+専用型への拡張を別Decisionとして検討する。
