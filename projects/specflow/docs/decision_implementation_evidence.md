@@ -2260,3 +2260,112 @@ V1 UC-08の責務へ追加しない。
   → UC-08 failure
 
 とする。
+
+
+## Decision 47 — Pre-Evidence persistence failure diagnostics
+
+**Human Decision #72**
+
+V1では、
+取得済みGit Diffの永続化に失敗した場合も、
+永続化処理より前に実際に成立した
+機械的比較結果を失わずOutputへ保持する。
+
+### Git Diff persistence failure
+
+Git Diff自体を取得できているが、
+
+`ImplementationEvidenceRepository.save_diff()`
+
+が例外によって失敗した場合、
+Decision 43に従い、
+UC-08は `success=False` で終了する。
+
+保存されていないGit Diffについて、
+架空の `git_diff_path` を生成または返してはならない。
+
+### Artifact fields
+
+`save_diff()` は
+Implementation Evidence object構築前に実行される。
+
+したがって、
+`save_diff()`失敗時は次の値とする。
+
+- `implementation_evidence`
+  - `None`
+- `evidence_path`
+  - `None`
+- `git_diff_path`
+  - `None`
+- `status`
+  - `None`
+
+この状態を、
+Implementation Evidenceが成立した状態として扱わない。
+
+### Established diagnostics
+
+`save_diff()`実行前に、
+Evidence収集および機械的比較が完了している場合、
+その時点で実際に確定した以下の診断情報を
+Outputへ保持する。
+
+- `missing_evidence`
+- `inconsistencies`
+- `human_approval_required`
+
+これらの値を、
+永続化失敗を理由として空値へ置き換えたり、
+隠したりしてはならない。
+
+一方、
+比較処理そのものが完了していない場合は、
+未成立の比較結果を生成または推測してはならない。
+
+### Failure output
+
+取得済みGit Diffの
+`save_diff()`失敗時は、
+少なくとも以下を返す。
+
+- `evidence_id`
+  - UC-08開始時に発行したID
+- `implementation_id`
+  - InputのImplementation ID
+- `implementation_evidence`
+  - `None`
+- `evidence_path`
+  - `None`
+- `git_diff_path`
+  - `None`
+- `status`
+  - `None`
+- `missing_evidence`
+  - 比較完了時点で確定済みの値
+- `inconsistencies`
+  - 比較完了時点で確定済みの値
+- `human_approval_required`
+  - 比較完了時点で確定済みの値
+- `success`
+  - `False`
+- `error_message`
+  - `Git Diff persistence failed: <例外内容>`
+
+### Responsibility boundary
+
+`save_diff()`失敗前に成立した診断情報を返すことを、
+
+- Implementation Evidenceの成立
+- Evidence statusの確定
+- Persistence成功
+- Phase 5 Reviewへの進行可能
+- Implementationの適合性
+- Review Result
+
+の意味として扱わない。
+
+V1では、
+成立済みの診断情報と、
+成立していないEvidence Artifactを
+明確に区別してOutputへ保持する。
