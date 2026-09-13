@@ -34,6 +34,8 @@ def make_result(
 
 def make_repository_state(
     *,
+    branch: str = "developer",
+    base_commit: str = "abc123",
     created_files: tuple[str, ...] = (
         "application/foo.py",
     ),
@@ -44,8 +46,8 @@ def make_repository_state(
     unavailable_evidence: tuple[str, ...] = (),
 ) -> RepositoryState:
     return RepositoryState(
-        branch="developer",
-        base_commit="abc123",
+        branch=branch,
+        base_commit=base_commit,
         git_status="",
         git_diff="diff",
         created_files=created_files,
@@ -106,6 +108,8 @@ def test_unavailable_evidence_becomes_missing_evidence() -> None:
             ),
         ),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.missing_evidence == (
@@ -120,6 +124,8 @@ def test_matching_reported_and_actual_files_has_no_inconsistency() -> None:
         repository_state=make_repository_state(),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.inconsistencies == ()
@@ -134,6 +140,8 @@ def test_reported_file_missing_from_actual_changes_is_inconsistency() -> None:
         repository_state=make_repository_state(),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert (
@@ -150,6 +158,8 @@ def test_unreported_actual_change_is_inconsistency() -> None:
         repository_state=make_repository_state(),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert (
@@ -169,6 +179,8 @@ def test_forbidden_actual_change_is_out_of_scope_deviation() -> None:
         ),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.out_of_scope_changes == (
@@ -187,6 +199,8 @@ def test_change_outside_allowed_patterns_is_unplanned() -> None:
         ),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.unplanned_changes == (
@@ -204,6 +218,8 @@ def test_blank_lines_and_surrounding_whitespace_are_ignored() -> None:
         repository_state=make_repository_state(),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.inconsistencies == ()
@@ -220,6 +236,8 @@ def test_unstructured_report_item_is_not_interpreted_as_file_path() -> None:
         ),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert (
@@ -259,6 +277,8 @@ def test_codex_human_approval_request_is_preserved() -> None:
         repository_state=make_repository_state(),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.human_approval_required == (
@@ -272,6 +292,8 @@ def test_codex_none_does_not_create_human_approval_request() -> None:
         repository_state=make_repository_state(),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.human_approval_required == ()
@@ -287,6 +309,8 @@ def test_missing_evidence_creates_human_approval_request() -> None:
             unavailable_evidence=("initial_test_result",),
         ),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.human_approval_required == (
@@ -307,6 +331,8 @@ def test_inconsistency_and_deviation_alone_do_not_require_human_approval() -> No
         ),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.inconsistencies != ()
@@ -361,6 +387,8 @@ def test_compare_records_missing_evidence_when_scope_is_unavailable() -> None:
         repository_state=repository_state,
         test_state=test_state,
         scope=None,
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert "approved scope unavailable" in comparison.missing_evidence
@@ -379,6 +407,8 @@ def test_missing_implementation_result_is_recorded_as_missing_evidence() -> None
         repository_state=make_repository_state(),
         test_state=make_test_state(),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert (
@@ -407,6 +437,8 @@ def test_missing_implementation_result_preserves_independent_scope_comparison() 
             unavailable_evidence=("full_test_result",),
         ),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert comparison.out_of_scope_changes == (
@@ -435,6 +467,8 @@ def test_compare_records_missing_no_tdd_reason_when_initial_test_not_run() -> No
             no_tdd_reason=None,
         ),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert "no TDD reason unavailable" in result.missing_evidence
@@ -457,6 +491,8 @@ def test_compare_does_not_record_missing_no_tdd_reason_when_reason_is_explicit()
             no_tdd_reason="TDD was explicitly not performed",
         ),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert "no TDD reason unavailable" not in result.missing_evidence
@@ -475,6 +511,62 @@ def test_compare_does_not_require_no_tdd_reason_when_initial_test_errored() -> N
             no_tdd_reason=None,
         ),
         scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
     )
 
     assert "no TDD reason unavailable" not in result.missing_evidence
+
+
+
+def test_branch_mismatch_is_inconsistency() -> None:
+    comparison = ImplementationEvidenceComparator().compare(
+        implementation_result=make_result(),
+        repository_state=make_repository_state(
+            branch="main",
+        ),
+        test_state=make_test_state(),
+        scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
+    )
+
+    assert (
+        "implementation branch mismatch: "
+        "expected=developer actual=main"
+    ) in comparison.inconsistencies
+    assert comparison.missing_evidence == ()
+    assert comparison.human_approval_required == ()
+
+
+def test_base_commit_mismatch_is_inconsistency() -> None:
+    comparison = ImplementationEvidenceComparator().compare(
+        implementation_result=make_result(),
+        repository_state=make_repository_state(
+            base_commit="def456",
+        ),
+        test_state=make_test_state(),
+        scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
+    )
+
+    assert (
+        "base commit mismatch: "
+        "expected=abc123 actual=def456"
+    ) in comparison.inconsistencies
+    assert comparison.missing_evidence == ()
+    assert comparison.human_approval_required == ()
+
+
+def test_matching_branch_and_base_commit_add_no_inconsistency() -> None:
+    comparison = ImplementationEvidenceComparator().compare(
+        implementation_result=make_result(),
+        repository_state=make_repository_state(),
+        test_state=make_test_state(),
+        scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
+    )
+
+    assert comparison.inconsistencies == ()

@@ -1369,3 +1369,100 @@ UC-08の失敗理由は `error_message` に保持する。
 Implementationの適合性、
 Review Result、
 Correction / Reimplementation要否を判断しない。
+
+
+## Decision 35 — Basis acquisition errors in final Evidence
+
+**Human Decision #60**
+
+`ImplementationEvidenceBasisBuilder` が返すBasis取得エラーは、
+最終 `ImplementationEvidence` の
+`EvidenceVerification.errors` に統合する。
+
+V1では、Basis取得エラー専用のトップレベルブロックや
+`EvidenceBasis.errors` は追加しない。
+
+`EvidenceBasisBuildResult.missing_evidence` は、
+Reviewに必要なEvidenceのうち何が取得できなかったかを表す。
+
+`EvidenceBasisBuildResult.errors` は、
+Evidence取得・検証処理で実際に発生した失敗事実を表す。
+
+UC-08はBasis取得エラーを
+`EvidenceVerification.errors` に統合する。
+
+`TestState.errors` 等の他のVerification Errorと併存する場合は、
+双方を保持する。
+
+同一Errorが複数経路から得られた場合は、
+重複のみ除去する。
+
+`missing_evidence` と `verification.errors` は
+別の意味を持つため、一方を他方の代用にはしない。
+
+Specification hashを取得できなかった場合の例:
+
+    missing_evidence:
+      - specification hash unavailable
+
+    verification.errors:
+      - failed to read specification for hashing
+
+Basis取得エラーから、
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断してはならない。
+
+このDecisionのためだけに8番目のEvidence blockは追加しない。
+既存の7-block V1 Evidence structureを維持する。
+
+
+## Decision 36 — Branch and base commit mismatch
+
+**Human Decision #61**
+
+UC-08 Inputで指定された期待Repository Stateと、
+実際に取得したRepository Stateの
+branch / base commitが一致するかを機械的に比較する。
+
+比較対象は以下とする。
+
+- expected branch:
+  `CollectImplementationEvidenceInput.implementation_branch`
+- actual branch:
+  `RepositoryState.branch`
+- expected base commit:
+  `CollectImplementationEvidenceInput.base_commit`
+- actual base commit:
+  `RepositoryState.base_commit`
+
+branchまたはbase commitが一致しない場合は、
+`inconsistencies` に記録する。
+
+これはEvidence不足ではなく、
+取得済みの2つの事実が同一対象について
+食い違っている状態であるため、
+`missing_evidence` には記録しない。
+
+また、Approved Scopeからの変更逸脱そのものではないため、
+`deviations` にも分類しない。
+
+記録例:
+
+    implementation branch mismatch:
+      expected=developer
+      actual=main
+
+    base commit mismatch:
+      expected=abc123
+      actual=def456
+
+branch / base commit mismatchのみを理由として、
+`human_approval_required` を自動設定しない。
+
+Phase 4は、この不一致から
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+これらの意味評価はPhase 5へ委ねる。

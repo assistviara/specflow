@@ -24,6 +24,8 @@ class ImplementationEvidenceComparator:
         repository_state: RepositoryState,
         test_state: TestState,
         scope: EvidenceScope | None,
+        expected_branch: str,
+        expected_base_commit: str,
     ) -> EvidenceComparison:
         missing_evidence = (
             repository_state.unavailable_evidence
@@ -65,6 +67,20 @@ class ImplementationEvidenceComparator:
         )
 
         inconsistencies: list[str] = []
+
+        if repository_state.branch != expected_branch:
+            inconsistencies.append(
+                "implementation branch mismatch: "
+                f"expected={expected_branch} "
+                f"actual={repository_state.branch}"
+            )
+
+        if repository_state.base_commit != expected_base_commit:
+            inconsistencies.append(
+                "base commit mismatch: "
+                f"expected={expected_base_commit} "
+                f"actual={repository_state.base_commit}"
+            )
 
         if reported_files is not None:
             actual_set = set(actual_files)
