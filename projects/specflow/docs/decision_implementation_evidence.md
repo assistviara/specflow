@@ -1605,3 +1605,538 @@ Review Result、
 Correction / Reimplementation要否を判断しない。
 
 意味評価はPhase 5へ委ねる。
+
+
+## Decision 39 — Evidence Verification command sources
+
+**Human Decision #64**
+
+`EvidenceVerification.commands` と
+`EvidenceVerification.test_commands` のSourceを明確に分離する。
+
+### commands
+
+`EvidenceVerification.commands` は、
+Phase 3 Codex Runner Reportである
+`ImplementationResult.executed_commands` をSourceとする。
+
+`executed_commands` は1行ごとのCommandとして扱う。
+
+各行について前後の空白を除去し、
+空行を無視して、
+順序を保持したtupleとして格納する。
+
+Phase 4はCommandの意味を解釈せず、
+Test Commandか否かによって分類しない。
+
+### test_commands
+
+`EvidenceVerification.test_commands` は、
+Phase 4で独立取得した
+`TestState.test_commands` をSourceとする。
+
+したがって、
+
+- `commands`
+  = Codex Runner Report由来
+- `test_commands`
+  = actual Test State由来
+
+として区別する。
+
+両者を混同または統合しない。
+
+### Implementation Result unavailable
+
+`ImplementationResult` が取得不能または確認不能の場合、
+`EvidenceVerification.commands` は空tuple `()` とする。
+
+この場合、
+Commandが存在しなかったと推測するのではなく、
+既存ルールに従って
+
+`implementation result unavailable`
+
+を `missing_evidence` に記録する。
+
+`commands=()` だけを理由として、
+追加のmissing evidenceを生成しない。
+
+Phase 4は、
+Command内容からImplementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+意味評価はPhase 5へ委ねる。
+
+
+## Decision 40 — Unfinished items source and normalization
+
+**Human Decision #65**
+
+`EvidenceDeviations.unfinished_items` のSourceは、
+Phase 3 Codex Runner Reportである
+`ImplementationResult.incomplete_items` とする。
+
+`incomplete_items` は1行ごとの項目として扱う。
+
+各行について前後の空白を除去し、
+空行を無視して、
+順序を保持したtupleとして格納する。
+
+### NONE normalization
+
+Phase 3で明示的に使用される `NONE` は、
+未完了項目が存在しないことを表す。
+
+したがって、
+
+`ImplementationResult.incomplete_items == "NONE"`
+
+の場合、
+
+`EvidenceDeviations.unfinished_items`
+
+は空tuple `()` とする。
+
+`NONE` を `("NONE",)` として
+unfinished itemそのものとして保持しない。
+
+### Implementation Result unavailable
+
+`ImplementationResult` が取得不能または確認不能の場合も、
+`EvidenceDeviations.unfinished_items` は空tuple `()` とする。
+
+ただし、この空tupleは
+「未完了項目が存在しないことを確認した」
+という意味ではない。
+
+取得不能であることは既存ルールに従って、
+
+`implementation result unavailable`
+
+を `missing_evidence` に記録することで区別する。
+
+Phase 4は、
+`incomplete_items` の記載内容から
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+意味評価はPhase 5へ委ねる。
+
+
+## Decision 41 — Verification errors and warnings sources
+
+**Human Decision #66**
+
+`EvidenceVerification.errors` と
+`EvidenceVerification.warnings` は、
+Phase 4で独立取得・検証したEvidence側の事実を保持する。
+
+Codex Runner Reportの自己申告とは混同しない。
+
+### Verification errors
+
+`EvidenceVerification.errors` のSourceは、
+
+1. `ImplementationEvidenceBasisBuilder.errors`
+2. `TestState.errors`
+
+とする。
+
+両Sourceをこの順序で結合し、
+同一文字列が複数存在する場合は、
+最初の出現順を保持して重複を除去する。
+
+### Verification warnings
+
+`EvidenceVerification.warnings` のSourceは、
+
+`TestState.warnings`
+
+とする。
+
+同一文字列が複数存在する場合は、
+最初の出現順を保持して重複を除去する。
+
+### Codex Runner Reportとの分離
+
+以下のPhase 3 Codex Runner Report由来の値は、
+
+- `ImplementationResult.errors`
+- `ImplementationResult.warnings`
+- `ImplementationResult.test_execution_error`
+
+`EvidenceVerification.errors` または
+`EvidenceVerification.warnings` へ統合しない。
+
+これらは、
+
+`EvidenceCodexSummary.implementation_result`
+
+の中にRunner Reportの自己申告としてそのまま保持する。
+
+したがってV1では、
+
+- `EvidenceVerification.errors / warnings`
+  = Phase 4で独立取得・検証したEvidence
+- `EvidenceCodexSummary.implementation_result`
+  = Phase 3 Codex Runner Reportの自己申告
+
+として区別する。
+
+Phase 4は両者の内容から
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+意味評価はPhase 5へ委ねる。
+
+
+## Decision 42 — Codex Prompt correspondence by traceability
+
+**Human Decision #67**
+
+V1のPhase 4では、
+Codex PromptとSpecification /
+Human-approved Implementation Planとの対応を、
+意味的な再評価ではなくtraceabilityによって確認する。
+
+### Phase 4 responsibility
+
+Phase 4は、
+
+- Specification
+- Human-approved Implementation Plan
+- 実際にCodexへ渡されたPrompt
+
+を、それぞれ識別可能かつ追跡可能なEvidenceとして保持する。
+
+V1では、既存のBasis情報である、
+
+- Specification path / hash / Approval ID
+- Implementation Plan path / hash / Approval ID
+- Codex Prompt path / hash
+
+を用いてtraceabilityを確保する。
+
+Codex Prompt hashは既存Decisionに従い、
+Phase 4へ入力された実際のPrompt bodyを
+UTF-8でSHA-256した値とする。
+
+### No semantic re-evaluation in Phase 4
+
+Phase 4自身はAIを追加実行して、
+
+「Codex PromptがSpecificationまたは
+Approved Implementation Planを
+意味的に正しく反映しているか」
+
+を判定しない。
+
+Phase 4はEvidenceの収集・識別・固定を担当し、
+意味的適合性のReviewを担当しない。
+
+### Missing traceability evidence
+
+必要なtraceability Evidenceを取得または確認できない場合、
+Phase 4は他のEvidenceから推測して補完しない。
+
+既存ルールに従って
+該当項目を `missing_evidence` に記録し、
+Evidenceは `PARTIAL` になり得る。
+
+### Phase 5 responsibility
+
+Codex Promptの内容が
+Specificationおよび
+Human-approved Implementation Planを
+意味的に適切に反映しているかの評価は、
+Phase 5 Reviewの責務とする。
+
+したがってV1では、
+
+Phase 4
+= Prompt correspondenceのtraceability確保
+
+Phase 5
+= Prompt correspondenceの意味的評価
+
+として責務を分離する。
+
+
+## Decision 43 — Git Diff acquisition and persistence failure
+
+**Human Decision #68**
+
+V1では、
+Git Diffの取得不能と、
+取得済みGit Diffの永続化失敗を区別する。
+
+### Git Diff unavailable
+
+`RepositoryState.git_diff` を取得または確認できない場合は、
+Evidence acquisition failureとして扱う。
+
+この場合、
+
+- 該当する取得不能を `missing_evidence` に記録する
+- `EvidenceChanges.git_diff_path` は `None` とする
+- Evidenceは既存のstatus ruleに従って `PARTIAL` になり得る
+
+Phase 4は、
+他のRepository情報やCodex Runner Reportから
+Git Diffの内容を推測して補完しない。
+
+### Git Diff persistence failure
+
+Git Diff自体は取得できているが、
+
+`ImplementationEvidenceRepository.save_diff()`
+
+による永続化に失敗した場合は、
+Evidence persistence failureとして扱う。
+
+この場合、
+UC-08は `success=False` で終了する。
+
+保存されていないDiffについて、
+架空の `git_diff_path` を生成または返却しない。
+
+### Empty Git Diff
+
+Git Diffを正常に取得でき、
+その内容が空文字列 `""` である場合は、
+取得不能とは扱わない。
+
+空文字列は、
+
+「Git Diffを取得した結果、差分が存在しなかった」
+
+という取得済みEvidenceとして扱う。
+
+したがって、
+正常に取得された空のGit Diffも
+`.diff` Evidenceとして保存する。
+
+Phase 4は、
+Git Diffが空であることから
+Implementationの適合性、
+実装未実施、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+意味評価はPhase 5へ委ねる。
+
+### Responsibility boundary
+
+V1では、
+
+- Git Diff取得不能
+  = Evidence acquisition failure
+- 取得済みGit Diffの保存失敗
+  = Evidence persistence failure / UC-08 failure
+- 正常取得された空Git Diff
+  = 有効な取得済みEvidence
+
+として明確に区別する。
+
+
+## Decision 44 — Implementation generation traceability
+
+**Human Decision #69**
+
+V1では、
+`implementation_kind` と
+`previous_evidence_id` の組み合わせについて、
+Evidence世代関係の機械的整合性を要求する。
+
+### INITIAL
+
+`implementation_kind == "INITIAL"` の場合、
+
+`previous_evidence_id`
+
+は必ず `None` とする。
+
+INITIAL Evidenceは、
+先行するImplementation Evidenceを持たない。
+
+### CORRECTION
+
+`implementation_kind == "CORRECTION"` の場合、
+
+`previous_evidence_id`
+
+を必須とする。
+
+指定された `previous_evidence_id` は、
+既存のImplementation Evidenceを参照しなければならない。
+
+### REIMPLEMENTATION
+
+`implementation_kind == "REIMPLEMENTATION"` の場合も、
+
+`previous_evidence_id`
+
+を必須とする。
+
+指定された `previous_evidence_id` は、
+既存のImplementation Evidenceを参照しなければならない。
+
+### Previous Evidence existence
+
+`previous_evidence_id` が指定された場合、
+UC-08は `ImplementationEvidenceRepository` を通じて、
+参照先Evidenceが存在することを確認する。
+
+参照先Evidenceが存在しない場合、
+Evidence世代関係のtraceabilityを成立させられないため、
+UC-08は `success=False` で終了する。
+
+この状態を `PARTIAL` Evidenceとして補完しない。
+
+### Self-reference
+
+新たに発行された `evidence_id` と
+`previous_evidence_id` が同一であることを許可しない。
+
+同一である場合、
+世代関係が成立しないため、
+UC-08は `success=False` で終了する。
+
+### Responsibility boundary
+
+Phase 4は、
+
+- `INITIAL`
+- `CORRECTION`
+- `REIMPLEMENTATION`
+
+のどのkindが意味的に妥当であるかを判断しない。
+
+Humanまたは前段Workflowによって指定された
+`implementation_kind` を前提として、
+Phase 4は世代関係の機械的整合性だけを確認する。
+
+したがって、
+
+- INITIAL + previous Evidenceあり
+- CORRECTION + previous Evidenceなし
+- REIMPLEMENTATION + previous Evidenceなし
+- previous Evidence不存在
+- current Evidenceへのself-reference
+
+はUC-08 failureとする。
+
+これらをImplementationの適合性、
+Review Result、
+Correction / Reimplementation要否の判断として扱わない。
+
+
+## Decision 45 — Evidence persistence order and partial persistence failure
+
+**Human Decision #70**
+
+V1では、
+Git Diff EvidenceとImplementation Evidence JSONの保存を
+原子的Transactionとして扱わない。
+
+Phase 4は、
+実際に成立したArtifactと成立していないArtifactを区別して保持する。
+
+### Persistence order
+
+UC-08は、原則として次の順序で処理する。
+
+1. `evidence_id` を発行する
+2. Repository / Test / Basis等のEvidenceを収集する
+3. Evidenceを機械的に比較する
+4. 取得済みGit Diffがある場合は `save_diff()` で保存する
+5. 返された実在するDiff pathを
+   `EvidenceChanges.git_diff_path` に設定する
+6. `ImplementationEvidence` を構築する
+7. `ImplementationEvidenceRepository.save()` で
+   JSON Evidenceを保存する
+
+### save_diff failure
+
+取得済みGit Diffについて、
+
+`ImplementationEvidenceRepository.save_diff()`
+
+が失敗した場合は、
+既存Decision 43に従い、
+Evidence persistence failureとして
+UC-08を `success=False` で終了する。
+
+保存されていないDiffについて、
+架空の `git_diff_path` を返さない。
+
+### JSON persistence failure after Diff persistence
+
+`save_diff()` が成功した後に、
+
+`ImplementationEvidenceRepository.save()`
+
+によるJSON Evidenceの保存が失敗した場合も、
+UC-08は `success=False` で終了する。
+
+ただしV1では、
+保存済み `.diff` に対する
+rollback / delete / transaction処理を要求しない。
+
+そのため、
+JSON Evidenceが保存されず、
+`.diff` のみが孤立Artifactとして残ることを許容する。
+
+孤立した `.diff` が存在することを理由として、
+UC-08成功とは扱わない。
+
+### Failure output
+
+JSON Evidence保存失敗時のOutputは、
+Decision 34の
+「実際に成立したArtifactだけを返す」
+というルールに従う。
+
+したがって、
+
+- `evidence_id`
+  = UC-08開始時に発行したID
+- `implementation_id`
+  = InputのImplementation ID
+- `implementation_evidence`
+  = すでに構築済みであれば、そのobject
+- `git_diff_path`
+  = Diffが実際に保存済みであれば、そのpath
+- `evidence_path`
+  = `None`
+- `status`
+  = Evidence objectが構築済みであれば
+    その `COLLECTED` または `PARTIAL`
+  = Evidence object構築前であれば `None`
+- `success`
+  = `False`
+- `error_message`
+  = JSON Evidence persistence failureの事実
+
+とする。
+
+Phase 4は、
+孤立Artifactに対する自動cleanupやrollbackを実行しない。
+
+### Responsibility boundary
+
+V1では、
+
+- Artifact persistenceの成否を正確に記録する
+- 成立していないArtifactのpathを捏造しない
+- 部分的に成立したArtifactを隠さない
+- Persistence failureをReview Resultへ変換しない
+
+ことを責務とする。
+
+Transaction / rollback機構は、
+V1 UC-08のCompletion Conditionには含めない。
