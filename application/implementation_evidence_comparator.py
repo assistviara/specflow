@@ -82,6 +82,25 @@ class ImplementationEvidenceComparator:
                 f"actual={repository_state.base_commit}"
             )
 
+        if implementation_result is not None:
+            reported_commands = {
+                line.strip()
+                for line in implementation_result.executed_commands.splitlines()
+                if line.strip()
+            }
+
+            for actual_test_command in test_state.test_commands:
+                normalized_command = actual_test_command.strip()
+
+                if (
+                    normalized_command
+                    and normalized_command not in reported_commands
+                ):
+                    inconsistencies.append(
+                        "actual test command missing from reported commands: "
+                        f"{normalized_command}"
+                    )
+
         if reported_files is not None:
             actual_set = set(actual_files)
             reported_set = set(reported_files)

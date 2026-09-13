@@ -18,7 +18,7 @@ def make_result(
     return ImplementationResult(
         implementation_summary="completed",
         changed_files=changed_files,
-        executed_commands="python -m pytest",
+        executed_commands="python -m pytest tests/test_foo.py",
         test_execution_status="COMPLETED",
         test_result="PASS",
         test_execution_error="NONE",
@@ -570,3 +570,79 @@ def test_matching_branch_and_base_commit_add_no_inconsistency() -> None:
     )
 
     assert comparison.inconsistencies == ()
+
+
+def test_compare_accepts_actual_test_command_when_reported_commands_contain_exact_match() -> None:
+    result = ImplementationEvidenceComparator().compare(
+        implementation_result=replace(
+            make_result(),
+            executed_commands=(
+                "python script.py\n"
+                "python -m pytest tests/test_x.py\n"
+                "git status"
+            ),
+        ),
+        repository_state=make_repository_state(),
+        test_state=replace(
+            make_test_state(),
+            test_commands=("python -m pytest tests/test_x.py",),
+        ),
+        scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
+    )
+
+    assert not any(
+        "actual test command missing from reported commands:"
+        in item
+        for item in result.inconsistencies
+    )
+
+
+def test_compare_records_actual_test_command_missing_from_reported_commands() -> None:
+    result = ImplementationEvidenceComparator().compare(
+        implementation_result=replace(
+            make_result(),
+            executed_commands=(
+                "python script.py\n"
+                "git status"
+            ),
+        ),
+        repository_state=make_repository_state(),
+        test_state=replace(
+            make_test_state(),
+            test_commands=("python -m pytest tests/test_x.py",),
+        ),
+        scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
+    )
+
+    assert (
+        "actual test command missing from reported commands: "
+        "python -m pytest tests/test_x.py"
+        in result.inconsistencies
+    )
+    assert result.human_approval_required == ()
+
+
+def test_compare_does_not_treat_extra_reported_non_test_command_as_inconsistency() -> None:
+    result = ImplementationEvidenceComparator().compare(
+        implementation_result=replace(
+            make_result(),
+            executed_commands=(
+                "python -m pytest tests/test_x.py\n"
+                "git status"
+            ),
+        ),
+        repository_state=make_repository_state(),
+        test_state=replace(
+            make_test_state(),
+            test_commands=("python -m pytest tests/test_x.py",),
+        ),
+        scope=make_scope(),
+        expected_branch="developer",
+        expected_base_commit="abc123",
+    )
+
+    assert "git status" not in "\n".join(result.inconsistencies)

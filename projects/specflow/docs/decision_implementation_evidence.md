@@ -1466,3 +1466,142 @@ Review Result、
 Correction / Reimplementation要否を判断しない。
 
 これらの意味評価はPhase 5へ委ねる。
+
+
+## Decision 37 — Reported and actual test command comparison
+
+**Human Decision #62**
+
+Phase 4は、
+Codex Runner Reportである `ImplementationResult` と、
+独立取得した実際の `TestState` のうち、
+機械的に対応関係を確認できるTest Commandを比較する。
+
+比較対象は以下とする。
+
+- reported:
+  `ImplementationResult.executed_commands`
+- actual:
+  `TestState.test_commands`
+
+`ImplementationResult.executed_commands` は、
+1行ごとのCommandとして扱う。
+
+各行について前後の空白を除去し、
+空行は無視する。
+
+Phase 4は、
+reported commandsとactual test commandsの
+集合的な対応を機械的に比較する。
+
+reported側に存在するTest Commandが
+actual側に存在しない場合、
+`inconsistencies` に記録する。
+
+actual側に存在するTest Commandが
+reported側に存在しない場合も、
+`inconsistencies` に記録する。
+
+V1では、
+`ImplementationResult.test_execution_status`
+および `ImplementationResult.test_result` と、
+
+- `TestState.initial_test_status / result`
+- `TestState.target_test_status / result`
+- `TestState.full_test_status / result`
+
+との意味的な対応関係を推測して比較しない。
+
+Phase 3側は単一の総括値であり、
+Phase 4側はinitial / target / fullの
+複数段階Evidenceであるため、
+Specificationで一意に対応関係が定義されていない状態では
+Phase 4が対応関係を補完してはならない。
+
+同様に、
+`ImplementationResult.test_execution_error` と
+`TestState.errors` の意味的同一性も推測しない。
+
+これらはそれぞれ独立したEvidenceとして保持する。
+
+Test Commandの不一致は
+`inconsistencies` として記録する。
+
+この不一致のみを理由として、
+`human_approval_required` を自動設定しない。
+
+Phase 4は、この不一致から
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+意味評価はPhase 5へ委ねる。
+
+
+## Decision 38 — V1 test command comparison direction
+
+**Human Decision #63**
+
+Decision 37をV1で実装可能な機械比較として補足する。
+
+`ImplementationResult.executed_commands` には、
+Test Command以外のCommandも含まれ得る。
+
+例:
+
+- `git status`
+- `python script.py`
+- `cat file.txt`
+- Test Command
+
+Phase 4は、
+Command文字列の内容から、
+どのCommandがTest Commandであるかを意味的に推測しない。
+
+特に、
+`pytest` 等の特定文字列を含むかどうかによって
+Test Commandを判定するルールをV1では導入しない。
+
+したがってV1では、
+Test Command比較を次の一方向に限定する。
+
+- actual:
+  `TestState.test_commands`
+- reported:
+  `ImplementationResult.executed_commands` の各非空行
+
+各actual Test Commandについて、
+前後空白を除去した完全一致Commandが
+reported commandsに存在するかを確認する。
+
+actual Test Commandがreported commandsに存在しない場合、
+`inconsistencies` に記録する。
+
+一方、
+reported commandsに存在するCommandが
+actual `TestState.test_commands` に存在しないことだけでは、
+`inconsistencies` としない。
+
+これは、
+reported commandがTest Commandではない可能性があり、
+Phase 4がその意味を推測してはならないためである。
+
+Decision 37で定義した
+reported側からactual側への比較については、
+V1では構造化されたreported Test Commandsが存在しないため、
+実施しない。
+
+将来、
+Phase 3がreported Test Commandsを
+独立した構造化フィールドとして提供する場合には、
+双方向比較を再検討できる。
+
+この一方向比較の不一致のみを理由として、
+`human_approval_required` を自動設定しない。
+
+Phase 4は、
+この不一致からImplementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+意味評価はPhase 5へ委ねる。
