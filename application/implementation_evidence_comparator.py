@@ -30,6 +30,15 @@ class ImplementationEvidenceComparator:
             + test_state.unavailable_evidence
         )
 
+        if (
+            test_state.initial_test_status == "NOT_RUN"
+            and test_state.no_tdd_reason is None
+        ):
+            missing_evidence = (
+                missing_evidence
+                + ("no TDD reason unavailable",)
+            )
+
         if scope is None:
             missing_evidence = (
                 missing_evidence

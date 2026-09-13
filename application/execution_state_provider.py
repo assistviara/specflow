@@ -15,6 +15,7 @@ class TestState:
     errors: tuple[str, ...]
     warnings: tuple[str, ...]
     unavailable_evidence: tuple[str, ...] = ()
+    no_tdd_reason: str | None = None
 
     def __post_init__(self) -> None:
         pairs = (

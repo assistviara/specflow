@@ -152,3 +152,46 @@ def test_test_state_preserves_unavailable_evidence() -> None:
     assert state.unavailable_evidence == (
         "initial_test_result",
     )
+
+
+def test_test_state_has_optional_no_tdd_reason() -> None:
+    from typing import get_type_hints
+
+    hints = get_type_hints(State)
+
+    assert hints["no_tdd_reason"] == str | None
+
+
+def test_test_state_defaults_no_tdd_reason_to_none() -> None:
+    state = State(
+        tests_created_or_modified=(),
+        test_commands=(),
+        initial_test_status="NOT_RUN",
+        initial_test_result="NONE",
+        target_test_status="NOT_RUN",
+        target_test_result="NONE",
+        full_test_status="NOT_RUN",
+        full_test_result="NONE",
+        errors=(),
+        warnings=(),
+    )
+
+    assert state.no_tdd_reason is None
+
+
+def test_test_state_preserves_explicit_no_tdd_reason() -> None:
+    state = State(
+        tests_created_or_modified=(),
+        test_commands=(),
+        initial_test_status="NOT_RUN",
+        initial_test_result="NONE",
+        target_test_status="NOT_RUN",
+        target_test_result="NONE",
+        full_test_status="NOT_RUN",
+        full_test_result="NONE",
+        errors=(),
+        warnings=(),
+        no_tdd_reason="TDD was explicitly not performed",
+    )
+
+    assert state.no_tdd_reason == "TDD was explicitly not performed"

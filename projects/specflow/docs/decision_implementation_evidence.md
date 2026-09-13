@@ -1215,3 +1215,91 @@ Correction / Reimplementation要否を判断しない。
 
 Phase 4は取得不能状態を保持し、
 その意味評価をPhase 5へ委ねる。
+
+## Decision 32 — No-TDD Reason source and unavailable representation
+
+**Human Decision #57**
+
+`EvidenceVerification.no_tdd_reason` は、
+TDDを実施しなかった理由が明示的に取得できた場合のみ、
+その理由を文字列として保持する。
+
+V1では、その情報源を `TestState` とする。
+
+`TestState.no_tdd_reason` は `str | None` とする。
+
+TDDを実施済みの場合は `None` とする。
+
+TDDを実施しておらず、
+その理由が明示的に取得できた場合は、
+その理由を文字列として保持する。
+
+TDDを実施していないが理由を取得・確認できない場合は、
+`None` とし、
+
+`"no TDD reason unavailable"`
+
+を `missing_evidence` に記録する。
+
+`test_required`、Git Diff、Codex Prompt、
+Test Resultその他のEvidenceから、
+TDDを実施しなかった理由を推測、逆算、生成してはならない。
+
+空文字列、`"UNKNOWN"` 等を
+理由取得不能の代替表現として使用してはならない。
+
+`no_tdd_reason=None` そのものから、
+TDD実施済みか理由取得不能かを判断しない。
+
+TDD実施有無の判定は、
+actual Test Stateとして取得された事実に基づき、
+Application Layerが機械的に行う。
+
+`no_tdd_reason=None` または
+`"no TDD reason unavailable"` から、
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+Phase 4は取得事実と取得不能状態をEvidenceとして保持し、
+その意味評価をPhase 5へ委ねる。
+
+## Decision 33 — Mechanical determination of No-TDD state
+
+**Human Decision #58**
+
+V1では、
+actual Test Stateの `initial_test_status` を、
+TDD開始Evidenceの機械的判定に使用する。
+
+`initial_test_status != "NOT_RUN"` の場合、
+TDD開始Evidenceが存在するものとして扱い、
+`no_tdd_reason` を要求しない。
+
+`initial_test_status == "NOT_RUN"` かつ
+`no_tdd_reason is not None` の場合、
+TDD未実施理由が明示的に取得されているものとして扱い、
+No-TDD Reasonに関する `missing_evidence` は追加しない。
+
+`initial_test_status == "NOT_RUN"` かつ
+`no_tdd_reason is None` の場合、
+TDD未実施理由を取得・確認できないものとして、
+
+`"no TDD reason unavailable"`
+
+を `missing_evidence` に追加する。
+
+`initial_test_status == "ERROR"` は、
+TDD開始Evidenceの取得または実行を試みた結果、
+Technical Errorが発生した事実として扱う。
+
+したがって `"ERROR"` を
+TDD未実施とは扱わず、
+No-TDD Reasonを要求しない。
+
+Phase 4は、
+この機械的判定からImplementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。
+
+意味評価はPhase 5へ委ねる。

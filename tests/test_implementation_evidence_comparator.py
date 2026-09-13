@@ -1,3 +1,4 @@
+from dataclasses import replace
 from application.implementation_evidence import EvidenceScope
 from application.implementation_evidence_comparator import (
     ImplementationEvidenceComparator,
@@ -419,3 +420,61 @@ def test_missing_implementation_result_preserves_independent_scope_comparison() 
         "full_test_result",
         "implementation result unavailable",
     )
+
+
+def test_compare_records_missing_no_tdd_reason_when_initial_test_not_run() -> None:
+    comparator = ImplementationEvidenceComparator()
+
+    result = comparator.compare(
+        implementation_result=make_result(),
+        repository_state=make_repository_state(),
+        test_state=replace(
+            make_test_state(),
+            initial_test_status="NOT_RUN",
+            initial_test_result="NONE",
+            no_tdd_reason=None,
+        ),
+        scope=make_scope(),
+    )
+
+    assert "no TDD reason unavailable" in result.missing_evidence
+    assert (
+        "missing evidence requires human judgment: no TDD reason unavailable"
+        in result.human_approval_required
+    )
+
+
+def test_compare_does_not_record_missing_no_tdd_reason_when_reason_is_explicit() -> None:
+    comparator = ImplementationEvidenceComparator()
+
+    result = comparator.compare(
+        implementation_result=make_result(),
+        repository_state=make_repository_state(),
+        test_state=replace(
+            make_test_state(),
+            initial_test_status="NOT_RUN",
+            initial_test_result="NONE",
+            no_tdd_reason="TDD was explicitly not performed",
+        ),
+        scope=make_scope(),
+    )
+
+    assert "no TDD reason unavailable" not in result.missing_evidence
+
+
+def test_compare_does_not_require_no_tdd_reason_when_initial_test_errored() -> None:
+    comparator = ImplementationEvidenceComparator()
+
+    result = comparator.compare(
+        implementation_result=make_result(),
+        repository_state=make_repository_state(),
+        test_state=replace(
+            make_test_state(),
+            initial_test_status="ERROR",
+            initial_test_result="NONE",
+            no_tdd_reason=None,
+        ),
+        scope=make_scope(),
+    )
+
+    assert "no TDD reason unavailable" not in result.missing_evidence
