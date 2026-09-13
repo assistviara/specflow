@@ -2140,3 +2140,123 @@ V1では、
 
 Transaction / rollback機構は、
 V1 UC-08のCompletion Conditionには含めない。
+
+
+## Decision 46 — Provider failure boundary
+
+**Human Decision #71**
+
+V1では、
+RepositoryおよびTestの個別Evidenceを取得できない状態と、
+Provider処理そのものが例外によって成立しない状態を区別する。
+
+### State with unavailable evidence
+
+`RepositoryStateProvider`または
+`TestStateProvider`が、
+取得できた事実と取得不能項目を含む
+有効なStateを返した場合、
+UC-08はEvidence構築を継続する。
+
+Providerが返した
+
+`unavailable_evidence`
+
+は、
+既存Decisionに従って
+`missing_evidence`へ反映する。
+
+`missing_evidence`が存在する場合、
+Decision 27に従い、
+Evidence statusを `PARTIAL` とする。
+
+この状態は、
+Evidence収集処理そのものの失敗とは扱わない。
+
+### Provider exception
+
+以下のProvider呼び出しが
+Stateを返さず例外を送出した場合、
+
+- `RepositoryStateProvider.get_state(base_commit)`
+- `TestStateProvider.get_state()`
+
+UC-08は、
+欠損したRepositoryStateまたはTestStateを
+生成、推測、または補完しない。
+
+UC-08は通常の `Exception` を捕捉し、
+`BaseException` までは捕捉しない。
+
+Provider例外が発生した場合、
+Evidence収集処理そのものが成立していないため、
+UC-08は `success=False` で終了する。
+
+Provider例外を、
+`PARTIAL` Implementation Evidenceとして保存しない。
+
+### Failure output
+
+Provider例外は、
+Evidence persistence前に発生するものとして扱う。
+
+Outputは、実際に成立した情報だけを返す。
+
+- `evidence_id`
+  - UC-08開始時に発行済みのID
+- `implementation_id`
+  - InputのImplementation ID
+- `implementation_evidence`
+  - `None`
+- `evidence_path`
+  - `None`
+- `git_diff_path`
+  - `None`
+- `status`
+  - `None`
+- `missing_evidence`
+  - `()`
+- `inconsistencies`
+  - `()`
+- `human_approval_required`
+  - `()`
+- `success`
+  - `False`
+- `error_message`
+  - 失敗したProviderと例外内容を識別可能な文字列
+
+有効なStateが成立していないため、
+Provider例外を特定の
+`missing_evidence`項目へ変換しない。
+
+### Responsibility boundary
+
+想定される個別Evidence取得不能を、
+有効なStateと `unavailable_evidence` によって
+構造化する責務はProviderに置く。
+
+UC-08は、
+Provider例外から空または仮のStateを生成しない。
+
+Provider例外を、
+
+- Implementationの不適合
+- Review Result
+- CorrectionまたはReimplementationの要否
+- Human Approvalの代替判断
+
+へ変換しない。
+
+Technical Retryは、
+V1 UC-08の責務へ追加しない。
+
+したがってV1では、
+
+- Evidenceの一部が取得不能であり、
+  Providerが有効なStateを返せる場合
+  → `PARTIAL` Evidence
+- Provider処理そのものが成立せず、
+  Stateを返せない場合
+  → UC-08 failure
+
+とする。
