@@ -1303,3 +1303,69 @@ Review Result、
 Correction / Reimplementation要否を判断しない。
 
 意味評価はPhase 5へ委ねる。
+
+## Decision 34 — UC-08 failure output representation
+
+**Human Decision #59**
+
+UC-08では、
+試行の識別子と、
+実際に成立したEvidence成果物を区別する。
+
+`evidence_id` と `implementation_id` は、
+UC-08の試行を識別するため、
+失敗時も保持する。
+
+したがって、
+
+`evidence_id: UUID`
+`implementation_id: UUID`
+
+は非Optionalのままとする。
+
+一方、
+
+`implementation_evidence`
+`evidence_path`
+`git_diff_path`
+`status`
+
+は、実際に成立した事実だけを保持する。
+
+型は以下とする。
+
+`implementation_evidence: ImplementationEvidence | None`
+`evidence_path: Path | None`
+`git_diff_path: Path | None`
+`status: str | None`
+
+`implementation_evidence=None` は、
+Implementation Evidenceの構築まで到達していないことを表す。
+
+`evidence_path=None` は、
+Evidence JSONが永続化されていないことを表す。
+
+`git_diff_path=None` は、
+Git Diffが永続化されていないことを表す。
+
+`status=None` は、
+Evidence自体が成立しておらず、
+Evidence収集状態を確定できないことを表す。
+
+Evidenceが成立した場合の `status` は、
+既存Decisionに従い、
+`"COLLECTED"` または `"PARTIAL"` とする。
+
+UC-08 failureを表すために、
+Evidence statusへ `"ERROR"` を追加しない。
+
+`success=False` の場合も、
+実際に成立した成果物だけをOutputへ保持し、
+存在しないPathやEvidence statusを生成・推測してはならない。
+
+UC-08の失敗理由は `error_message` に保持する。
+
+これらの `None` そのものから、
+Implementationの適合性、
+Review Result、
+Correction / Reimplementation要否を判断しない。

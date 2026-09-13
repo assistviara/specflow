@@ -4,6 +4,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from application.implementation_evidence import ImplementationEvidence
+
 from application.dto import (
     CollectImplementationEvidenceInput,
     CollectImplementationEvidenceOutput,
@@ -119,3 +121,42 @@ def test_collect_implementation_evidence_input_preserves_approved_scope() -> Non
     )
 
     assert dto.approved_scope == approved_scope
+
+
+def test_collect_implementation_evidence_output_allows_unavailable_artifacts_on_failure() -> None:
+    from typing import get_type_hints
+
+    hints = get_type_hints(CollectImplementationEvidenceOutput)
+
+    assert hints["implementation_evidence"] == ImplementationEvidence | None
+    assert hints["evidence_path"] == Path | None
+    assert hints["git_diff_path"] == Path | None
+    assert hints["status"] == str | None
+
+
+def test_collect_implementation_evidence_output_preserves_failure_without_fake_artifacts() -> None:
+    evidence_id = uuid4()
+    implementation_id = uuid4()
+
+    output = CollectImplementationEvidenceOutput(
+        success=False,
+        evidence_id=evidence_id,
+        implementation_id=implementation_id,
+        implementation_evidence=None,
+        evidence_path=None,
+        git_diff_path=None,
+        status=None,
+        missing_evidence=(),
+        inconsistencies=(),
+        human_approval_required=(),
+        error_message="evidence persistence failed",
+    )
+
+    assert output.success is False
+    assert output.evidence_id == evidence_id
+    assert output.implementation_id == implementation_id
+    assert output.implementation_evidence is None
+    assert output.evidence_path is None
+    assert output.git_diff_path is None
+    assert output.status is None
+    assert output.error_message == "evidence persistence failed"

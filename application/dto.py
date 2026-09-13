@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from application.implementation_evidence import ImplementationEvidence
 from typing import Any
 
 from application.implementation_evidence import EvidenceScope
@@ -165,10 +166,10 @@ class CollectImplementationEvidenceOutput:
     success: bool
     evidence_id: UUID
     implementation_id: UUID
-    implementation_evidence: Any | None
-    evidence_path: Path
-    git_diff_path: Path
-    status: str
+    implementation_evidence: ImplementationEvidence | None
+    evidence_path: Path | None
+    git_diff_path: Path | None
+    status: str | None
     missing_evidence: tuple[str, ...]
     inconsistencies: tuple[str, ...]
     human_approval_required: tuple[str, ...]
