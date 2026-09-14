@@ -199,10 +199,39 @@ class CollectImplementationEvidenceUseCase:
         )
         status = resolve_evidence_status(missing_evidence)
 
-        git_diff_path = self._evidence_repository.save_diff(
-            evidence_id,
-            repository_state.git_diff,
-        )
+        if "git_diff" in repository_state.unavailable_evidence:
+            git_diff_path = None
+        else:
+            try:
+                git_diff_path = (
+                    self._evidence_repository.save_diff(
+                        evidence_id,
+                        repository_state.git_diff,
+                    )
+                )
+            except Exception as exc:
+                return CollectImplementationEvidenceOutput(
+                    success=False,
+                    evidence_id=evidence_id,
+                    implementation_id=(
+                        input_dto.implementation_id
+                    ),
+                    implementation_evidence=None,
+                    evidence_path=None,
+                    git_diff_path=None,
+                    status=None,
+                    missing_evidence=missing_evidence,
+                    inconsistencies=(
+                        comparison.inconsistencies
+                    ),
+                    human_approval_required=(
+                        comparison.human_approval_required
+                    ),
+                    error_message=(
+                        "Git Diff persistence failed: "
+                        f"{exc}"
+                    ),
+                )
 
         implementation_result = input_dto.implementation_result
 
@@ -288,7 +317,29 @@ class CollectImplementationEvidenceUseCase:
             ),
         )
 
-        evidence_path = self._evidence_repository.save(evidence)
+        try:
+            evidence_path = self._evidence_repository.save(
+                evidence
+            )
+        except Exception as exc:
+            return CollectImplementationEvidenceOutput(
+                success=False,
+                evidence_id=evidence_id,
+                implementation_id=input_dto.implementation_id,
+                implementation_evidence=evidence,
+                evidence_path=None,
+                git_diff_path=git_diff_path,
+                status=status,
+                missing_evidence=missing_evidence,
+                inconsistencies=comparison.inconsistencies,
+                human_approval_required=(
+                    comparison.human_approval_required
+                ),
+                error_message=(
+                    "Implementation Evidence persistence "
+                    f"failed: {exc}"
+                ),
+            )
 
         return CollectImplementationEvidenceOutput(
             success=True,

@@ -555,3 +555,182 @@ def test_current_evidence_self_reference_returns_failure(
     )
     assert evidence_repository.checked_ids == []
     assert evidence_repository.calls == []
+
+
+
+def make_complete_test_state():
+    return ExecutionTestState(
+        tests_created_or_modified=("tests/test_foo.py",),
+        test_commands=(
+            "python -m pytest tests/test_foo.py",
+        ),
+        initial_test_status="COMPLETED",
+        initial_test_result="FAIL",
+        target_test_status="COMPLETED",
+        target_test_result="PASS",
+        full_test_status="COMPLETED",
+        full_test_result="PASS",
+        errors=(),
+        warnings=(),
+        unavailable_evidence=(),
+        no_tdd_reason=None,
+    )
+
+
+def make_complete_repository_state(
+    *,
+    base_commit="abc123",
+    git_diff="diff --git a/foo.py b/foo.py\\n",
+    unavailable_evidence=(),
+):
+    return RepositoryState(
+        branch="developer",
+        base_commit=base_commit,
+        git_status=" M application/foo.py",
+        git_diff=git_diff,
+        created_files=("application/foo.py",),
+        modified_files=("tests/test_foo.py",),
+        deleted_files=(),
+        unavailable_evidence=unavailable_evidence,
+    )
+
+
+def test_unavailable_git_diff_skips_diff_persistence(
+    tmp_path,
+):
+    repository_state = make_complete_repository_state(
+        git_diff="",
+        unavailable_evidence=("git_diff",),
+    )
+    evidence_repository = RecordingEvidenceRepository()
+    input_dto = make_failure_input(tmp_path)
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            repository_state
+        ),
+        test_state_provider=FakeTestStateProvider(
+            make_complete_test_state()
+        ),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is True
+    assert output.status == "PARTIAL"
+    assert output.missing_evidence == ("git_diff",)
+    assert output.git_diff_path is None
+    assert output.evidence_path is not None
+    assert output.implementation_evidence is not None
+    assert (
+        output.implementation_evidence.changes.git_diff_path
+        is None
+    )
+    assert evidence_repository.calls == ["save"]
+    assert evidence_repository.saved_diff is None
+    assert output.human_approval_required == (
+        "missing evidence requires human judgment: git_diff",
+    )
+
+
+
+class DiffSavingEvidenceRepository(
+    RecordingEvidenceRepository
+):
+    def save_diff(self, evidence_id, diff):
+        self.calls.append("save_diff")
+        raise OSError("diff save failed")
+
+
+def test_save_diff_failure_returns_established_diagnostics(
+    tmp_path,
+):
+    repository_state = make_complete_repository_state(
+        base_commit="different-base",
+    )
+    evidence_repository = DiffSavingEvidenceRepository()
+    input_dto = make_failure_input(tmp_path)
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            repository_state
+        ),
+        test_state_provider=FakeTestStateProvider(
+            make_complete_test_state()
+        ),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is False
+    assert output.implementation_evidence is None
+    assert output.evidence_path is None
+    assert output.git_diff_path is None
+    assert output.status is None
+    assert output.missing_evidence == ()
+    assert output.inconsistencies == (
+        "base commit mismatch: "
+        "expected=abc123 actual=different-base",
+    )
+    assert output.human_approval_required == ()
+    assert output.error_message == (
+        "Git Diff persistence failed: diff save failed"
+    )
+    assert evidence_repository.calls == ["save_diff"]
+
+
+
+class JsonSavingEvidenceRepository(
+    RecordingEvidenceRepository
+):
+    def save(self, evidence):
+        self.calls.append("save")
+        self.saved_evidence = evidence
+        raise OSError("json save failed")
+
+
+def test_json_save_failure_returns_built_evidence_and_saved_diff(
+    tmp_path,
+):
+    evidence_repository = JsonSavingEvidenceRepository()
+    input_dto = make_failure_input(tmp_path)
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            make_complete_repository_state()
+        ),
+        test_state_provider=FakeTestStateProvider(
+            make_complete_test_state()
+        ),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is False
+    assert output.implementation_evidence is not None
+    assert output.status == "COLLECTED"
+    assert output.git_diff_path is not None
+    assert (
+        output.implementation_evidence.changes.git_diff_path
+        == output.git_diff_path
+    )
+    assert output.evidence_path is None
+    assert output.missing_evidence == ()
+    assert output.inconsistencies == ()
+    assert output.human_approval_required == ()
+    assert output.error_message == (
+        "Implementation Evidence persistence failed: "
+        "json save failed"
+    )
+    assert evidence_repository.calls == [
+        "save_diff",
+        "save",
+    ]
+    assert evidence_repository.saved_diff is not None
+    assert (
+        evidence_repository.saved_evidence
+        is output.implementation_evidence
+    )
