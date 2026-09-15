@@ -734,3 +734,347 @@ def test_json_save_failure_returns_built_evidence_and_saved_diff(
         evidence_repository.saved_evidence
         is output.implementation_evidence
     )
+
+
+
+def test_basis_acquisition_failure_is_preserved_in_partial_evidence(
+    tmp_path,
+):
+    input_dto = make_failure_input(tmp_path)
+    input_dto.specification_path.unlink()
+
+    evidence_repository = RecordingEvidenceRepository()
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            make_complete_repository_state()
+        ),
+        test_state_provider=FakeTestStateProvider(
+            make_complete_test_state()
+        ),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is True
+    assert output.status == "PARTIAL"
+    assert output.missing_evidence == (
+        "specification hash unavailable",
+    )
+    assert output.inconsistencies == ()
+    assert output.human_approval_required == (
+        "missing evidence requires human judgment: "
+        "specification hash unavailable",
+    )
+    assert output.evidence_path is not None
+    assert output.git_diff_path is not None
+
+    evidence = output.implementation_evidence
+    assert evidence is not None
+    assert evidence.identity.status == "PARTIAL"
+    assert evidence.basis.specification_hash is None
+    assert evidence.basis.implementation_plan_hash is not None
+    assert evidence.basis.codex_prompt_hash is not None
+    assert evidence.verification.errors == (
+        "failed to read specification for hashing",
+    )
+    assert evidence.deviations.human_approval_required == (
+        "missing evidence requires human judgment: "
+        "specification hash unavailable",
+    )
+
+    assert evidence_repository.calls == [
+        "save_diff",
+        "save",
+    ]
+    assert evidence_repository.saved_evidence is evidence
+
+
+
+@pytest.mark.parametrize(
+    "implementation_kind",
+    ("CORRECTION", "REIMPLEMENTATION"),
+)
+def test_valid_later_generation_preserves_previous_evidence(
+    tmp_path,
+    implementation_kind,
+):
+    previous_evidence_id = uuid4()
+    original_input = make_failure_input(tmp_path)
+
+    input_dto = CollectImplementationEvidenceInput(
+        implementation_id=original_input.implementation_id,
+        implementation_kind=implementation_kind,
+        previous_evidence_id=previous_evidence_id,
+        specification_path=original_input.specification_path,
+        specification_approval_id=(
+            original_input.specification_approval_id
+        ),
+        implementation_plan_path=(
+            original_input.implementation_plan_path
+        ),
+        implementation_plan_approval_id=(
+            original_input.implementation_plan_approval_id
+        ),
+        codex_prompt_path=original_input.codex_prompt_path,
+        codex_prompt=original_input.codex_prompt,
+        implementation_branch=original_input.implementation_branch,
+        base_commit=original_input.base_commit,
+        implementation_result=original_input.implementation_result,
+        approved_scope=original_input.approved_scope,
+    )
+
+    evidence_repository = TrackingEvidenceRepository(
+        existing_ids=(previous_evidence_id,)
+    )
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            make_complete_repository_state()
+        ),
+        test_state_provider=FakeTestStateProvider(
+            make_complete_test_state()
+        ),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is True
+    assert output.status == "COLLECTED"
+    assert output.implementation_evidence is not None
+    assert (
+        output.implementation_evidence.identity.implementation_kind
+        == implementation_kind
+    )
+    assert (
+        output.implementation_evidence.identity.previous_evidence_id
+        == previous_evidence_id
+    )
+    assert evidence_repository.checked_ids == [
+        previous_evidence_id
+    ]
+    assert evidence_repository.calls == [
+        "save_diff",
+        "save",
+    ]
+
+
+
+def test_missing_result_and_scope_are_preserved_as_partial_evidence(
+    tmp_path,
+):
+    original_input = make_failure_input(tmp_path)
+
+    input_dto = CollectImplementationEvidenceInput(
+        implementation_id=original_input.implementation_id,
+        implementation_kind="INITIAL",
+        previous_evidence_id=None,
+        specification_path=original_input.specification_path,
+        specification_approval_id=(
+            original_input.specification_approval_id
+        ),
+        implementation_plan_path=(
+            original_input.implementation_plan_path
+        ),
+        implementation_plan_approval_id=(
+            original_input.implementation_plan_approval_id
+        ),
+        codex_prompt_path=original_input.codex_prompt_path,
+        codex_prompt=original_input.codex_prompt,
+        implementation_branch=original_input.implementation_branch,
+        base_commit=original_input.base_commit,
+        implementation_result=None,
+        approved_scope=None,
+    )
+
+    evidence_repository = RecordingEvidenceRepository()
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            make_complete_repository_state()
+        ),
+        test_state_provider=FakeTestStateProvider(
+            make_complete_test_state()
+        ),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is True
+    assert output.status == "PARTIAL"
+    assert output.missing_evidence == (
+        "approved scope unavailable",
+        "implementation result unavailable",
+    )
+    assert output.human_approval_required == (
+        "missing evidence requires human judgment: "
+        "approved scope unavailable",
+        "missing evidence requires human judgment: "
+        "implementation result unavailable",
+    )
+
+    evidence = output.implementation_evidence
+    assert evidence is not None
+    assert evidence.identity.status == "PARTIAL"
+    assert evidence.scope is None
+    assert evidence.changes.change_summary is None
+    assert evidence.verification.commands == ()
+    assert evidence.deviations.unfinished_items == ()
+    assert evidence.codex_summary.implementation_result is None
+
+    assert output.git_diff_path is not None
+    assert output.evidence_path is not None
+    assert evidence_repository.calls == [
+        "save_diff",
+        "save",
+    ]
+
+
+
+def test_verification_errors_and_warnings_are_deduplicated(
+    tmp_path,
+):
+    input_dto = make_failure_input(tmp_path)
+    input_dto.specification_path.unlink()
+
+    test_state = make_complete_test_state()
+    test_state = ExecutionTestState(
+        tests_created_or_modified=(
+            test_state.tests_created_or_modified
+        ),
+        test_commands=test_state.test_commands,
+        initial_test_status=test_state.initial_test_status,
+        initial_test_result=test_state.initial_test_result,
+        target_test_status=test_state.target_test_status,
+        target_test_result=test_state.target_test_result,
+        full_test_status=test_state.full_test_status,
+        full_test_result=test_state.full_test_result,
+        errors=(
+            "failed to read specification for hashing",
+            "test environment error",
+            "test environment error",
+        ),
+        warnings=(
+            "slow test",
+            "slow test",
+            "deprecated fixture",
+        ),
+        unavailable_evidence=test_state.unavailable_evidence,
+        no_tdd_reason=test_state.no_tdd_reason,
+    )
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            make_complete_repository_state()
+        ),
+        test_state_provider=FakeTestStateProvider(test_state),
+        evidence_repository=RecordingEvidenceRepository(),
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is True
+    assert output.status == "PARTIAL"
+    assert output.implementation_evidence is not None
+    assert output.implementation_evidence.verification.errors == (
+        "failed to read specification for hashing",
+        "test environment error",
+    )
+    assert output.implementation_evidence.verification.warnings == (
+        "slow test",
+        "deprecated fixture",
+    )
+
+
+
+def test_acquired_empty_git_diff_is_persisted(
+    tmp_path,
+):
+    repository_state = make_complete_repository_state(
+        git_diff="",
+        unavailable_evidence=(),
+    )
+    evidence_repository = RecordingEvidenceRepository()
+    input_dto = make_failure_input(tmp_path)
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            repository_state
+        ),
+        test_state_provider=FakeTestStateProvider(
+            make_complete_test_state()
+        ),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is True
+    assert output.status == "COLLECTED"
+    assert output.missing_evidence == ()
+    assert output.git_diff_path is not None
+    assert evidence_repository.saved_diff == (
+        output.evidence_id,
+        "",
+    )
+    assert evidence_repository.calls == [
+        "save_diff",
+        "save",
+    ]
+
+
+
+def test_collects_persists_and_restores_with_json_repository(
+    tmp_path,
+):
+    from infrastructure.json_implementation_evidence_repository import (
+        JsonImplementationEvidenceRepository,
+    )
+
+    repository_state = make_complete_repository_state()
+    evidence_dir = tmp_path / "evidence"
+    evidence_repository = JsonImplementationEvidenceRepository(
+        evidence_dir
+    )
+    input_dto = make_failure_input(tmp_path)
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(
+            repository_state
+        ),
+        test_state_provider=FakeTestStateProvider(
+            make_complete_test_state()
+        ),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is True
+    assert output.status == "COLLECTED"
+    assert output.implementation_evidence is not None
+    assert output.evidence_path is not None
+    assert output.git_diff_path is not None
+    assert output.evidence_path.exists()
+    assert output.git_diff_path.exists()
+
+    assert output.evidence_path == (
+        evidence_dir
+        / f"implementation_{output.evidence_id}.json"
+    )
+    assert output.git_diff_path == (
+        evidence_dir
+        / f"implementation_{output.evidence_id}.diff"
+    )
+    assert output.git_diff_path.read_text(
+        encoding="utf-8"
+    ) == repository_state.git_diff
+
+    restored = evidence_repository.load(
+        output.evidence_id
+    )
+
+    assert restored == output.implementation_evidence

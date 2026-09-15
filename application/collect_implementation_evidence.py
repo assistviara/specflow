@@ -199,6 +199,16 @@ class CollectImplementationEvidenceUseCase:
         )
         status = resolve_evidence_status(missing_evidence)
 
+        basis_human_approval_required = tuple(
+            "missing evidence requires human judgment: "
+            f"{item}"
+            for item in basis_result.missing_evidence
+        )
+        human_approval_required = _deduplicated(
+            comparison.human_approval_required,
+            basis_human_approval_required,
+        )
+
         if "git_diff" in repository_state.unavailable_evidence:
             git_diff_path = None
         else:
@@ -225,7 +235,7 @@ class CollectImplementationEvidenceUseCase:
                         comparison.inconsistencies
                     ),
                     human_approval_required=(
-                        comparison.human_approval_required
+                        human_approval_required
                     ),
                     error_message=(
                         "Git Diff persistence failed: "
@@ -309,7 +319,7 @@ class CollectImplementationEvidenceUseCase:
                 unplanned_changes=comparison.unplanned_changes,
                 unfinished_items=unfinished_items,
                 human_approval_required=(
-                    comparison.human_approval_required
+                    human_approval_required
                 ),
             ),
             codex_summary=EvidenceCodexSummary(
@@ -333,7 +343,7 @@ class CollectImplementationEvidenceUseCase:
                 missing_evidence=missing_evidence,
                 inconsistencies=comparison.inconsistencies,
                 human_approval_required=(
-                    comparison.human_approval_required
+                    human_approval_required
                 ),
                 error_message=(
                     "Implementation Evidence persistence "
@@ -352,7 +362,7 @@ class CollectImplementationEvidenceUseCase:
             missing_evidence=missing_evidence,
             inconsistencies=comparison.inconsistencies,
             human_approval_required=(
-                comparison.human_approval_required
+                human_approval_required
             ),
             error_message=None,
         )
