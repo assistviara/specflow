@@ -51,3 +51,6 @@ projects/*/state.json
 projects/*/logs/*
 !projects/*/logs/.gitkeep
 projects/*/reviews/latest_review.json
+
+projects/*/evidence/*
+!projects/*/evidence/.gitkeep
