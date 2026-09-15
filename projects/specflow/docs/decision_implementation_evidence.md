@@ -2680,3 +2680,203 @@ Providerは以下を行わない。
 これらは、
 既存のApplication Layer責務および
 後続Phaseの責務に従う。
+
+
+
+## Decision 50 — Test Execution Record source
+
+**Human Decision #75**
+
+V1では、
+UC-08が参照する実際のTest状態を、
+Codex Runnerの最終的な自己申告だけから生成しない。
+
+Phase 3のImplementation実行時点で成立した
+Test実行事実を構造化した、
+
+`TestExecutionRecord`
+
+を正式なTest Evidence sourceとして使用する。
+
+### Current boundary
+
+現在の `ImplementationResult` が保持する、
+
+- `executed_commands`
+- `test_execution_status`
+- `test_result`
+- `test_execution_error`
+
+は、
+Codex Runnerから返されたImplementation Resultの一部である。
+
+これらは、
+Codex Runner Reportとの比較対象として使用できるが、
+実際のTest状態を表す
+独立した `TestState` の代替にはしない。
+
+特に、
+
+- Initial Test
+- Target Test
+- Full Test Suite
+
+の各実行時点を、
+最終的な集約結果だけから推測または復元しない。
+
+### Test execution timing
+
+UC-08および具象 `TestStateProvider` は、
+Implementation Evidence収集のために
+Testを再実行しない。
+
+Phase 4でTestを再実行した結果は、
+Phase 3のImplementation実行時点で成立した
+Test履歴と同一ではない。
+
+また、
+Phase 4での再実行によって、
+
+- Initial REDを復元する
+- 過去のTarget Test Resultを生成する
+- 過去のFull Test Suite Resultを生成する
+- 欠けたTest Evidenceを補完する
+
+ことを許可しない。
+
+### Test Execution Record
+
+Phase 3のImplementation実行時点で、
+少なくとも以下を区別可能な
+構造化Test Execution Recordを生成・保存する。
+
+- 作成または変更されたTest
+- 実際に実行されたTest Command
+- Initial Testの実行状態および結果
+- Target Testの実行状態および結果
+- Full Test Suiteの実行状態および結果
+- Test実行中に成立したError
+- Test実行中に成立したWarning
+- TDDを実施しなかった場合の理由
+- 取得または記録できなかったTest Evidence
+
+Test Execution Recordは、
+後からCodex Runnerの最終報告だけを用いて
+再構成しない。
+
+Test実行時点で成立した事実を、
+実行経路から構造化して保持する。
+
+### Concrete provider
+
+Infrastructure Layerへ、
+
+`JsonTestStateProvider`
+
+を実装する。
+
+`JsonTestStateProvider` は、
+指定されたTest Execution Record JSONを読み取り、
+Application Layerで定義された、
+
+`TestState`
+
+へ変換する。
+
+Application Layerは、
+Infrastructure固有のJSON形式へ直接依存せず、
+既存の `TestStateProvider` Protocolを介して利用する。
+
+### Valid record
+
+Test Execution Recordが存在し、
+必要な構造を読み取ることができる場合、
+`JsonTestStateProvider` は有効な `TestState` を返す。
+
+個別のTest Evidenceが取得または記録されていない場合、
+値を推測して補完しない。
+
+取得不能項目を、
+
+`unavailable_evidence`
+
+へ反映した有効な `TestState` を返す。
+
+UC-08は、
+Decision 46に従ってEvidence構築を継続し、
+取得不能項目を `missing_evidence` へ反映する。
+
+### Invalid or unavailable record
+
+以下の理由により、
+有効な `TestState` 自体を構築できない場合、
+`JsonTestStateProvider` は例外を送出する。
+
+- Test Execution Recordが存在しない
+- JSONとして読み取れない
+- Required Structureが存在しない
+- 値がTestStateの契約に適合しない
+- Test Execution Recordの対象を安全に識別できない
+- その他、Record全体の信頼できる解釈が成立しない
+
+この例外を、
+空または仮の `TestState` へ変換しない。
+
+UC-08はDecision 46に従い、
+Provider failureとして `success=False` で終了する。
+
+### Immutability
+
+Test Execution Recordは、
+対象Implementationの実行時点で成立した履歴として扱う。
+
+後続のUC-08、
+Review、
+Correction、
+Reimplementationによって、
+過去のTest Execution Recordを上書きしない。
+
+CorrectionまたはReimplementationで
+Testを再実行した場合は、
+既存Recordを変更せず、
+新しいImplementationに対応する
+新しいTest Execution Recordを生成する。
+
+### Phase 3 responsibility
+
+Test Execution Recordの生成・保存は、
+Phase 3のImplementation実行経路に追加する責務とする。
+
+これは、
+Codex Runnerが最終文章内でTest成功を報告することとは
+別の責務である。
+
+Phase 3の実行制御は、
+実際のTest実行時点で確認できた事実を
+Test Execution Recordへ記録可能にする。
+
+Codex Runnerの自己申告だけを、
+独立した実行記録として保存し直してはならない。
+
+### Responsibility boundary
+
+`JsonTestStateProvider` は、
+保存済みTest Execution Recordの読み取りと
+`TestState`への変換だけを担当する。
+
+ProviderおよびUC-08は以下を行わない。
+
+- Evidence収集時のTest再実行
+- 欠けたInitial REDの再生成
+- Test Resultの推測または正常化
+- Test Resultだけに基づくImplementation適合性判断
+- Review Resultの決定
+- CorrectionまたはReimplementation要否の判断
+- Human Approval判断
+
+Implementation Resultと
+Test Execution Recordの不一致は、
+既存Comparatorによって機械的に検出・保持する。
+
+その不一致の意味評価は、
+Phase 5 Reviewへ委ねる。
