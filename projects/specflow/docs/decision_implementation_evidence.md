@@ -3400,3 +3400,247 @@ Test Resultだけを根拠として以下を判断しない。
 
 これらの意味評価は、
 Phase 5 Reviewへ委ねる。
+
+
+
+## Decision 53 — Execution trace persistence and sensitive data boundary
+
+**Human Decision #78**
+
+V1では、
+Codex CLIのraw JSONL execution traceを、
+そのまま永続Artifactとして保存しない。
+
+Test Execution Recordの根拠となる
+command execution eventだけを抽出し、
+正規化した補助Artifactとして保存する。
+
+### Raw JSONL boundary
+
+raw JSONLは、
+Runner処理中の解析入力としてのみ使用する。
+
+以下をraw JSONLのまま保存しない。
+
+- reasoning event
+- agent message
+- Prompt本文
+- Test Evidenceに不要なtool event
+- 認証情報
+- 環境変数全体
+- その他、Test実行事実の確認に不要なevent
+
+raw JSONL全体を、
+Implementation Evidenceまたは
+Test Execution Recordの代替として扱わない。
+
+### Normalized command trace
+
+Phase 3は、
+Test Execution Recordの根拠となる
+command execution eventを抽出し、
+正規化したcommand traceを保存する。
+
+canonical pathは次とする。
+
+`projects/specflow/evidence/codex_command_trace_<implementation_id>.jsonl`
+
+各JSONL recordは、
+少なくとも以下を保持可能にする。
+
+- event order
+- Test phase
+- command
+- command status
+- exit code
+- persistence可能と判断されたcommand output
+- redacted fields
+
+Test phaseはDecision 52で定めた
+明示的phase tagから取得する。
+
+実行順やcommand内容から、
+Initial、TargetまたはFullを推測しない。
+
+### Create-only
+
+command traceはcreate-onlyとする。
+
+同一pathに既存Artifactが存在する場合、
+上書き、置換、追記または削除しない。
+
+CorrectionまたはReimplementationでは、
+新しい `implementation_id` に対応する
+新しいcommand traceを保存する。
+
+### Git management boundary
+
+V1では、
+
+`projects/*/evidence/*`
+
+をGit管理外とする。
+
+必要な場合は、
+directory保持用の `.gitkeep` だけを
+Git管理対象として例外化できる。
+
+以下は正式なruntime Artifactであるが、
+Source Repositoryへcommitまたはpushしない。
+
+- Implementation Evidence JSON
+- Git Diff Evidence
+- Test Execution Record
+- normalized command trace
+
+V1ではローカルruntime Artifactとして保持する。
+
+将来、複数環境での共有、
+長期保管または災害対策が必要な場合は、
+アクセス制御された専用Artifact Storageを検討する。
+
+Source Repositoryを、
+Evidence Artifact Storageの代替として使用しない。
+
+
+### Sensitive data handling
+
+commandまたはcommand outputに、
+機密情報が含まれる可能性を検出した場合、
+該当値をそのまま保存しない。
+
+該当fieldを、
+
+`[REDACTED]`
+
+へ置換し、
+`redacted_fields` へfield名を記録する。
+
+少なくとも以下を
+保存対象から除外またはredactする。
+
+- 認証token
+- API key
+- password
+- secret
+- credential
+- private key
+- 機密値を含む環境変数
+- その他、認証またはアクセスに使用可能な値
+
+redactされた内容を、
+別のEvidence sourceから推測して復元しない。
+
+安全に正規化できないeventは、
+通常のcommand Evidenceとして保存しない。
+
+対応するparse errorおよび
+`unavailable_evidence`を保持する。
+
+### Test Execution Record reference
+
+Decision 51のTest Execution Recordへ、
+以下を追加する。
+
+- `command_trace_path`
+- `command_trace_sha256`
+
+`command_trace_path` は、
+実際に保存されたnormalized command traceを参照する。
+
+`command_trace_sha256` は、
+保存済みcommand trace bytesの
+SHA-256 hashとする。
+
+保存されていないtraceについて、
+架空のpathまたはhashを生成しない。
+
+raw JSONL自体を保存しないため、
+raw JSONLのhashだけを
+Evidenceとして保存しない。
+
+### Integrity validation
+
+`JsonTestStateProvider` は、
+Test Execution Recordが参照する
+command traceの存在を確認する。
+
+保存済みcommand traceからSHA-256を計算し、
+Record内の `command_trace_sha256` と比較する。
+
+以下の場合は、
+Test Execution Recordの根拠を確認できないため、
+有効な `TestState` を返さない。
+
+- command traceが存在しない
+- command traceを読み取れない
+- SHA-256が一致しない
+- command trace pathが不正
+- その他、参照先Artifactの同一性を確認できない
+
+この場合、
+Providerは例外を送出し、
+UC-08はDecision 46に従って
+`success=False` で終了する。
+
+### Persistence order
+
+Phase 3は原則として次の順序で保存する。
+
+1. normalized command traceを構築する
+2. command traceをcreate-onlyで保存する
+3. 保存されたbytesからSHA-256を確定する
+4. pathとhashを設定したTest Execution Recordを構築する
+5. Test Execution Recordをcreate-onlyで保存する
+
+command trace保存に失敗した場合、
+Test Execution Recordを保存しない。
+
+保存されていないtraceの
+pathまたはhashを返さない。
+
+### Partial persistence failure
+
+command trace保存成功後に、
+Test Execution Record保存が失敗した場合、
+Phase 3は `success=False` で終了する。
+
+V1では、
+保存済みcommand traceに対する
+自動rollbackまたはdeleteを要求しない。
+
+孤立command traceが残ることを許容する。
+
+孤立traceが存在することを理由として、
+Phase 3成功またはTest Evidence成立とは扱わない。
+
+### Review boundary
+
+Phase 4およびPhase 5は、
+normalized command traceの存在とhashを確認できる。
+
+redactされた内容を推測して復元しない。
+
+redactionまたは取得不能項目が、
+Implementationの適合性へ与える意味は、
+Phase 5 Reviewで評価する。
+
+Phase 3およびPhase 4が、
+redactionの存在だけを根拠として
+Review ResultまたはHuman Approvalを決定しない。
+
+### Responsibility boundary
+
+V1では、
+検証可能性のために必要なcommand eventだけを保存し、
+raw JSONL全体を永続化しない。
+
+normalized command traceの保存を、
+Codex Runner Reportの正当性確定として扱わない。
+
+command traceは、
+実際のCommand実行事実を確認するための
+補助Artifactである。
+
+Implementation Evidence JSONを、
+Version 1の正式なEvidence記録の正本として扱う。
