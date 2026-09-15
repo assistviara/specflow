@@ -2510,3 +2510,173 @@ Repository／Testの実状態取得、
 Diff保存、
 Evidence構築、
 JSON保存を実行しない。
+
+
+## Decision 49 — Git Repository State Provider
+
+**Human Decision #74**
+
+V1では、
+実際のGit Repository状態を取得する具象Providerとして、
+
+`GitRepositoryStateProvider`
+
+をInfrastructure Layerへ実装する。
+
+### Placement and interface
+
+`GitRepositoryStateProvider` は、
+Constructorで対象Repositoryの
+
+`working_directory: Path`
+
+を受け取る。
+
+既存Application Portである、
+
+`RepositoryStateProvider`
+
+の次の契約を満たす。
+
+`get_state(base_commit: str) -> RepositoryState`
+
+Application Layerは、
+Infrastructureの具象実装へ直接依存せず、
+既存Protocolを介してProviderを利用する。
+
+### Evidence source
+
+Git Repository状態の情報源には、
+対象working directoryで実行したGit CLIの結果を使用する。
+
+少なくとも以下を取得する。
+
+- 現在のImplementation Branch
+- Inputで指定されたBase Commitの実在および解決結果
+- Git Status
+- Base Commitと現在working treeとの差分
+- created files
+- modified files
+- deleted files
+
+Gitコマンドは、
+shell文字列として組み立てず、
+`subprocess.run()`へ引数listとして渡す。
+
+### Git commands
+
+V1では、概念的に以下のGit操作を使用する。
+
+- `git branch --show-current`
+- `git rev-parse --verify <base_commit>^{commit}`
+- `git status --porcelain=v1 --untracked-files=all`
+- `git diff --binary --find-renames <resolved_base_commit> --`
+- `git diff --name-status --find-renames <resolved_base_commit> --`
+
+同等の非対話的Gitコマンドへ置き換える場合も、
+取得する事実と責任境界を変更してはならない。
+
+### Resolved Base Commit
+
+`RepositoryState.base_commit` には、
+Gitが実在するcommitとして解決したcommit hashを格納する。
+
+Inputの `base_commit` 文字列を、
+実在確認せずにactual Base Commitとして転記しない。
+
+Base Commitを解決できない場合は、
+推測したhashまたはInput値で補完しない。
+
+### Untracked files
+
+Git Diffおよびname-statusだけでは、
+untracked fileを取得できない。
+
+そのためV1では、
+Git Statusからuntracked fileを抽出し、
+`created_files`へ追加する。
+
+同一pathが複数経路から得られた場合は、
+初出順を維持して重複を除去する。
+
+### Rename representation
+
+Gitがrenameとして報告した変更は、
+V1の `RepositoryState` では以下として表現する。
+
+- rename元path
+  - `deleted_files`
+- rename先path
+  - `created_files`
+
+Phase 4は、
+renameの意味評価または適合性判断を行わない。
+
+### Acquisition failure
+
+個別Gitコマンドが通常の実行失敗となっても、
+Providerが有効な `RepositoryState` を構築できる場合は、
+取得できなかった事実を推測して補完しない。
+
+取得不能項目を、
+
+`unavailable_evidence`
+
+へ記録する。
+
+取得不能値は以下で保持する。
+
+- 取得不能の文字列
+  - `""`
+- 取得不能のfile tuple
+  - `()`
+
+対応する取得不能markerを必ず付ける。
+
+V1で使用するmarkerの正規形は以下とする。
+
+- `implementation_branch`
+- `base_commit`
+- `git_status`
+- `git_diff`
+- `changed_files`
+
+空文字列または空tupleでも、
+対応するmarkerがなければ、
+取得に成功した結果として空だったことを表す。
+
+Providerが有効なStateそのものを
+安全に構築できない予期しない例外は、
+Decision 46に従い、
+UC-08まで送出してよい。
+
+### Git Diff persistence boundary
+
+`git_diff`を取得でき、
+`unavailable_evidence`に
+`git_diff` markerが存在しない場合、
+Git Diffが空文字列でも取得済みEvidenceとして扱う。
+
+この場合、
+UC-08はDecision 43に従ってDiffを保存する。
+
+`git_diff` markerが存在する場合、
+UC-08はDiffを保存しない。
+
+### Responsibility boundary
+
+`GitRepositoryStateProvider` は、
+Gitに関する事実取得だけを担当する。
+
+Providerは以下を行わない。
+
+- Codex Runner Reportとの不一致判定
+- Approved Scopeとの逸脱判定
+- Implementationの適合性判断
+- Review Resultの決定
+- CorrectionまたはReimplementation要否の判断
+- Human Approval判断
+
+これらは、
+既存のApplication Layer責務および
+後続Phaseの責務に従う。
