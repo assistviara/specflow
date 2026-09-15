@@ -94,6 +94,16 @@ class CollectImplementationEvidenceUseCase:
         implementation_kind = input_dto.implementation_kind
         previous_evidence_id = input_dto.previous_evidence_id
 
+        if implementation_kind not in {
+            "INITIAL",
+            "CORRECTION",
+            "REIMPLEMENTATION",
+        }:
+            return generation_failure(
+                "invalid implementation_kind: "
+                f"{implementation_kind}"
+            )
+
         if (
             implementation_kind == "INITIAL"
             and previous_evidence_id is not None
@@ -127,16 +137,24 @@ class CollectImplementationEvidenceUseCase:
                 "current evidence_id"
             )
 
-        if (
-            previous_evidence_id is not None
-            and not self._evidence_repository.exists(
-                previous_evidence_id
-            )
-        ):
-            return generation_failure(
-                "previous evidence does not exist: "
-                f"{previous_evidence_id}"
-            )
+        if previous_evidence_id is not None:
+            try:
+                previous_evidence_exists = (
+                    self._evidence_repository.exists(
+                        previous_evidence_id
+                    )
+                )
+            except Exception as exc:
+                return generation_failure(
+                    "Previous Evidence lookup failed: "
+                    f"{exc}"
+                )
+
+            if not previous_evidence_exists:
+                return generation_failure(
+                    "previous evidence does not exist: "
+                    f"{previous_evidence_id}"
+                )
 
         try:
             repository_state = (

@@ -1078,3 +1078,104 @@ def test_collects_persists_and_restores_with_json_repository(
     )
 
     assert restored == output.implementation_evidence
+
+
+
+class LookupFailingEvidenceRepository(
+    RecordingEvidenceRepository
+):
+    def exists(self, evidence_id):
+        raise OSError("evidence store unavailable")
+
+
+def test_invalid_implementation_kind_fails_before_collection(
+    tmp_path,
+):
+    original_input = make_failure_input(tmp_path)
+
+    input_dto = CollectImplementationEvidenceInput(
+        implementation_id=original_input.implementation_id,
+        implementation_kind="UNKNOWN",
+        previous_evidence_id=None,
+        specification_path=original_input.specification_path,
+        specification_approval_id=(
+            original_input.specification_approval_id
+        ),
+        implementation_plan_path=(
+            original_input.implementation_plan_path
+        ),
+        implementation_plan_approval_id=(
+            original_input.implementation_plan_approval_id
+        ),
+        codex_prompt_path=original_input.codex_prompt_path,
+        codex_prompt=original_input.codex_prompt,
+        implementation_branch=original_input.implementation_branch,
+        base_commit=original_input.base_commit,
+        implementation_result=original_input.implementation_result,
+        approved_scope=original_input.approved_scope,
+    )
+    evidence_repository = TrackingEvidenceRepository()
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=ProviderMustNotRun(),
+        test_state_provider=ProviderMustNotRun(),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert_provider_failure_output(
+        output,
+        input_dto,
+        "invalid implementation_kind: UNKNOWN",
+    )
+    assert evidence_repository.checked_ids == []
+    assert evidence_repository.calls == []
+
+
+def test_previous_evidence_lookup_exception_returns_failure(
+    tmp_path,
+):
+    original_input = make_failure_input(tmp_path)
+    previous_evidence_id = uuid4()
+
+    input_dto = CollectImplementationEvidenceInput(
+        implementation_id=original_input.implementation_id,
+        implementation_kind="CORRECTION",
+        previous_evidence_id=previous_evidence_id,
+        specification_path=original_input.specification_path,
+        specification_approval_id=(
+            original_input.specification_approval_id
+        ),
+        implementation_plan_path=(
+            original_input.implementation_plan_path
+        ),
+        implementation_plan_approval_id=(
+            original_input.implementation_plan_approval_id
+        ),
+        codex_prompt_path=original_input.codex_prompt_path,
+        codex_prompt=original_input.codex_prompt,
+        implementation_branch=original_input.implementation_branch,
+        base_commit=original_input.base_commit,
+        implementation_result=original_input.implementation_result,
+        approved_scope=original_input.approved_scope,
+    )
+    evidence_repository = LookupFailingEvidenceRepository()
+
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=ProviderMustNotRun(),
+        test_state_provider=ProviderMustNotRun(),
+        evidence_repository=evidence_repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert_provider_failure_output(
+        output,
+        input_dto,
+        (
+            "Previous Evidence lookup failed: "
+            "evidence store unavailable"
+        ),
+    )
+    assert evidence_repository.calls == []
