@@ -3165,3 +3165,238 @@ Test Execution Recordへ記録するかは、
 `ImplementationResult` の最終文章を
 このSchemaへ転記するだけでは、
 Decision 50で要求した独立Test Evidenceとは扱わない。
+
+
+
+## Decision 52 — Structured Codex execution trace
+
+**Human Decision #77**
+
+V1では、
+Phase 3がTest実行事実を
+Codex Runnerの最終文章から復元しない。
+
+`codex exec --json`
+
+が出力するJSONL execution eventsを、
+実際のCommand実行事実の情報源として使用する。
+
+### Current boundary
+
+現在の `CodexRunner`、
+`CommandExecutor` および
+`CodexImplementationAdapter` は、
+最終的な文字列だけを返す。
+
+この契約では、
+Codex実行中のCommand event、
+exit codeおよび出力を
+Application Layerから確認できない。
+
+V1ではこの境界を拡張し、
+最終文章と実行traceを区別して返す。
+
+### Structured runner result
+
+`CodexRunner` は、
+少なくとも以下を区別可能な
+構造化結果を返す。
+
+- Codexの最終メッセージ
+- raw JSONL execution trace
+- command execution events
+- runner processの成否
+- trace parse errors
+
+Codexの最終メッセージは、
+既存の `ImplementationResultParser` による
+Codex Runner Report解析へ使用する。
+
+raw JSONLおよびcommand execution eventsは、
+独立した実行事実の確認へ使用する。
+
+最終メッセージとexecution traceを、
+同一のEvidence sourceとして扱わない。
+
+### Command execution evidence
+
+Test Commandの実行事実には、
+JSONL内のcommand execution eventから
+確認できる情報を使用する。
+
+少なくとも以下を保持可能にする。
+
+- 実行command
+- command status
+- exit code
+- aggregated output
+
+Codexの最終メッセージに書かれていても、
+対応するcommand execution eventが存在しないcommandを、
+実行済みTest Evidenceとして扱わない。
+
+逆に、
+command execution eventに存在する事実を、
+最終メッセージに記載されていないことだけを理由として
+削除または無視しない。
+
+### Explicit Test phase tags
+
+Initial、Target、Fullの分類を、
+実行順またはcommand文字列から推測しない。
+
+Implementation Promptは、
+Test実行時に明示的なphase tagを付けることを要求する。
+
+概念的な実行形式は以下とする。
+
+    specflow-test --phase initial -- <test command>
+    specflow-test --phase target -- <test command>
+    specflow-test --phase full -- <test command>
+
+V1で有効なphaseは以下の3種類とする。
+
+- `initial`
+- `target`
+- `full`
+
+これら以外のphaseを、
+既知のphaseへ推測または変換しない。
+
+### Test execution wrapper
+
+専用Test execution wrapperは、
+phaseと子Test Commandを明示的に受け取る。
+
+wrapperは、
+指定されたTest Commandを子プロセスとして実行し、
+実際のexit codeおよび出力を
+記録可能な状態にする。
+
+Test Commandを、
+意味の異なる別Commandへ書き換えない。
+
+shell文字列として再構築せず、
+実行引数をlistとして扱う。
+
+wrapper自体の最終文章を、
+Test Resultの根拠として使用しない。
+
+Phase 3は、
+Codex JSONLのcommand execution eventと
+明示的なphase tagを対応付けて、
+Test Execution Recordを構築する。
+
+
+### Untagged Test command
+
+phase tagのないTestらしきCommandを、
+Initial、TargetまたはFullのいずれかへ
+推測して割り当てない。
+
+command execution eventから確認できた
+Command実行の事実は保持する。
+
+一方、
+各Test phaseとの対応を確認できない場合は、
+対応する項目を `unavailable_evidence` とする。
+
+phase tag不足を、
+Codexの最終メッセージによって補完しない。
+
+### Trace acquisition failure
+
+以下の場合、
+独立したCommand実行事実を確認できないため、
+Phase 3は `success=False` で終了する。
+
+- JSONL execution traceを取得できない
+- JSONLとして解釈できない
+- Runner process自体が成立しない
+- 最終メッセージしか取得できない
+- Command実行事実を安全に識別できない
+- その他、Test Execution Recordの根拠が成立しない
+
+これらを、
+空の正常なTest Execution Recordへ変換しない。
+
+保存されていないTest Execution Recordのpathを返さず、
+UC-08へ正常進行しない。
+
+### Partial trace interpretation
+
+一部のJSONL eventだけが解釈不能でも、
+trace全体と有効なeventを保持でき、
+有効なTestStateを構築可能な場合は、
+成立した事実を失わない。
+
+解釈できなかったeventまたは項目を、
+parse errorおよび
+`unavailable_evidence`として構造化する。
+
+解釈不能部分を推測して補完しない。
+
+有効なTestState自体を構築できない場合は、
+部分的な推測値を保存せず、
+Phase 3を `success=False` とする。
+
+### Output schema boundary
+
+`codex exec --output-schema` は、
+Codexの最終応答形式を統制するために利用できる。
+
+ただし、
+最終応答を構造化しただけでは、
+実際のCommand実行証跡にはならない。
+
+したがって、
+Test Execution Recordの実行事実には、
+
+`--json` execution events
+
+を使用する。
+
+`--output-schema` に従った最終応答は、
+Codex Runner Reportとして扱い、
+独立Test Evidenceの代替にはしない。
+
+### No Phase 4 re-execution
+
+Application Layerは、
+Implementation Evidence収集時に
+Testを再実行しない。
+
+Phase 3のCodex実行中に成立した
+Test execution eventを捕捉する。
+
+過去のInitial RED、
+Target TestまたはFull Testの結果を、
+Phase 4の新しい実行によって置換しない。
+
+### Responsibility boundary
+
+Phase 3は以下を担当する。
+
+- Codex CLIのJSONL event取得
+- final messageとexecution traceの分離
+- command execution eventの抽出
+- 明示的Test phaseとの対応付け
+- Test Execution Recordの構築
+- trace取得不能および解釈不能の記録
+
+Codexは、
+Test phaseを明示してTest Commandを実行する。
+
+ただしCodex自身が、
+Implementation Evidenceの正当性を確定してはならない。
+
+Phase 3およびPhase 4は、
+Test Resultだけを根拠として以下を判断しない。
+
+- Implementationの適合性
+- Review Result
+- CorrectionまたはReimplementation要否
+- Human Approval要否
+
+これらの意味評価は、
+Phase 5 Reviewへ委ねる。
