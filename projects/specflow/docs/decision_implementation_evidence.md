@@ -2369,3 +2369,144 @@ V1では、
 成立済みの診断情報と、
 成立していないEvidence Artifactを
 明確に区別してOutputへ保持する。
+
+
+## Decision 48 — Generation validation and previous Evidence lookup failure
+
+**Human Decision #73**
+
+V1では、
+Implementation Evidenceの世代関係を成立させるため、
+`implementation_kind` の有効性と
+previous Evidence参照可否を、
+Evidence収集および永続化より前に検証する。
+
+### Valid implementation kinds
+
+V1で有効な `implementation_kind` は、
+以下の3種類に限定する。
+
+- `INITIAL`
+- `CORRECTION`
+- `REIMPLEMENTATION`
+
+これら以外の値が指定された場合、
+Evidence世代関係を成立させられないため、
+UC-08は `success=False` で終了する。
+
+この検証は、少なくとも以下より前に行う。
+
+- previous Evidenceの存在確認
+- RepositoryStateProviderの呼び出し
+- TestStateProviderの呼び出し
+- Git Diffの保存
+- Implementation Evidenceの構築
+- Evidence JSONの保存
+
+### Invalid kind failure output
+
+不正な `implementation_kind` の場合、
+実際に成立した情報だけをOutputへ返す。
+
+- `evidence_id`
+  - UC-08開始時に発行したID
+- `implementation_id`
+  - InputのImplementation ID
+- `implementation_evidence`
+  - `None`
+- `evidence_path`
+  - `None`
+- `git_diff_path`
+  - `None`
+- `status`
+  - `None`
+- `missing_evidence`
+  - `()`
+- `inconsistencies`
+  - `()`
+- `human_approval_required`
+  - `()`
+- `success`
+  - `False`
+- `error_message`
+  - `invalid implementation_kind: <入力値>`
+
+不正なkindを、
+既知のkindへ推測または変換してはならない。
+
+### Previous Evidence lookup failure
+
+`CORRECTION`または`REIMPLEMENTATION`で、
+指定された `previous_evidence_id` の存在を、
+
+`ImplementationEvidenceRepository.exists()`
+
+によって確認する。
+
+`exists()` が `False` を返した場合は、
+Decision 44に従い、
+previous Evidence不存在として
+UC-08を `success=False` で終了する。
+
+一方、
+`exists()` が通常の `Exception` を送出した場合は、
+previous Evidenceの存在・不存在を確認できていない状態として扱う。
+
+この場合、
+previous Evidenceが存在しないと推測せず、
+UC-08を `success=False` で終了する。
+
+UC-08は通常の `Exception` を捕捉するが、
+`BaseException` までは捕捉しない。
+
+### Lookup failure output
+
+Previous Evidence lookup failure時は、
+以下を返す。
+
+- `evidence_id`
+  - UC-08開始時に発行したID
+- `implementation_id`
+  - InputのImplementation ID
+- `implementation_evidence`
+  - `None`
+- `evidence_path`
+  - `None`
+- `git_diff_path`
+  - `None`
+- `status`
+  - `None`
+- `missing_evidence`
+  - `()`
+- `inconsistencies`
+  - `()`
+- `human_approval_required`
+  - `()`
+- `success`
+  - `False`
+- `error_message`
+  - `Previous Evidence lookup failed: <例外内容>`
+
+### Responsibility boundary
+
+不正な `implementation_kind` および
+Previous Evidence lookup failureを、
+
+- `PARTIAL` Implementation Evidence
+- Implementationの不適合
+- Review Result
+- CorrectionまたはReimplementationの要否
+- Human Approvalの代替判断
+
+へ変換しない。
+
+これらは、
+Evidence収集開始前の
+入力およびtraceability検証失敗として扱う。
+
+UC-08は、
+これらの失敗時に
+Repository／Testの実状態取得、
+Diff保存、
+Evidence構築、
+JSON保存を実行しない。
