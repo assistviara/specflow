@@ -2880,3 +2880,288 @@ Test Execution Recordの不一致は、
 
 その不一致の意味評価は、
 Phase 5 Reviewへ委ねる。
+
+
+
+## Decision 51 — Test Execution Record identity, schema and persistence
+
+**Human Decision #76**
+
+V1では、Test Execution Recordと
+Implementation Evidenceの対象同一性を
+機械的に確認可能にする。
+
+### Implementation identity lifecycle
+
+`implementation_id` は、
+UC-08開始時ではなく、
+UC-07開始前に発行する。
+
+同一IDを以下へ一貫して引き継ぐ。
+
+- `ExecuteImplementationInput`
+- `ExecuteImplementationOutput`
+- Test Execution Record
+- `CollectImplementationEvidenceInput`
+- Implementation Evidence
+
+Phase 3とPhase 4が、
+別々のImplementation IDを発行してはならない。
+
+`ExecuteImplementationInput` と
+`ExecuteImplementationOutput` へ、
+
+`implementation_id: UUID`
+
+を追加する。
+
+`ExecuteImplementationOutput` は、
+
+`test_execution_record_path: Path | None`
+
+を保持する。
+
+保存されていないRecordのpathを返さない。
+
+`CollectImplementationEvidenceInput` は、
+
+`test_execution_record_path: Path`
+
+を受け取る。
+
+### Canonical persistence path
+
+V1の保存pathは次とする。
+
+`projects/specflow/evidence/test_execution_<implementation_id>.json`
+
+Test Execution Recordはcreate-onlyとする。
+
+同一pathに既存Recordが存在する場合、
+上書き、置換、追記または削除しない。
+
+### V1 JSON Schema
+
+V1 Recordは少なくとも次の構造を持つ。
+
+    {
+      "schema_version": "1",
+      "implementation_id": "<UUID>",
+      "recorded_at": "<timezone-aware ISO 8601>",
+      "tests_created_or_modified": [],
+      "test_commands": [],
+      "initial_test": {
+        "status": "COMPLETED | ERROR | NOT_RUN",
+        "result": "PASS | FAIL | NONE"
+      },
+      "target_test": {
+        "status": "COMPLETED | ERROR | NOT_RUN",
+        "result": "PASS | FAIL | NONE"
+      },
+      "full_test": {
+        "status": "COMPLETED | ERROR | NOT_RUN",
+        "result": "PASS | FAIL | NONE"
+      },
+      "errors": [],
+      "warnings": [],
+      "unavailable_evidence": [],
+      "no_tdd_reason": null
+    }
+
+`schema_version` は文字列 `"1"` とする。
+
+`implementation_id` は有効なUUID文字列とする。
+
+`recorded_at` は、
+timezone-awareなISO 8601 datetime文字列とする。
+
+次の値は文字列配列とする。
+
+- `tests_created_or_modified`
+- `test_commands`
+- `errors`
+- `warnings`
+- `unavailable_evidence`
+
+`no_tdd_reason` は `str` または `None` とする。
+
+Required Keyのうち、
+nullableなのは `no_tdd_reason` だけとする。
+
+
+### Status and result pairs
+
+Initial、Target、Fullの各Testについて、
+既存 `TestState` 契約と同じ組合せを要求する。
+
+有効な組合せは以下とする。
+
+- `COMPLETED` + `PASS`
+- `COMPLETED` + `FAIL`
+- `ERROR` + `NONE`
+- `NOT_RUN` + `NONE`
+
+これ以外のstatus/result組合せを許可しない。
+
+### Individual unavailable evidence
+
+個別Test Evidenceを取得または記録できなかった場合も、
+Required Keyを削除しない。
+
+`TestState` 契約上有効な中立値と、
+対応する `unavailable_evidence` markerを併記する。
+
+中立値だけを見て、
+実際にTestが `NOT_RUN` だったと判断してはならない。
+
+markerが存在する場合は、
+取得不能または記録不能である事実を優先する。
+
+取得不能項目を、
+Codex Runner Reportまたは他のTest結果から
+推測して補完しない。
+
+### JsonTestStateProvider
+
+Infrastructure Layerへ、
+
+`JsonTestStateProvider`
+
+を実装する。
+
+Constructorは以下を受け取る。
+
+- `record_path: Path`
+- `expected_implementation_id: UUID`
+
+Providerは指定されたJSONを読み取り、
+Application Layerの `TestState` へ変換する。
+
+JSON内の `implementation_id` と、
+`expected_implementation_id` が一致しない場合、
+別ImplementationのRecordである可能性を無視しない。
+
+有効な `TestState` を返さず例外を送出する。
+
+### Record validation failure
+
+以下の場合、
+`JsonTestStateProvider` は例外を送出する。
+
+- Record fileが存在しない
+- JSONとして読み取れない
+- RootがJSON objectではない
+- Required Keyが不足している
+- Required Valueの型が不正
+- `schema_version` が `"1"` ではない
+- `implementation_id` がUUIDとして不正
+- `implementation_id` が期待IDと一致しない
+- `recorded_at` がtimezone-aware ISO 8601ではない
+- statusまたはresultが許可値ではない
+- status/resultの組合せが不正
+- `no_tdd_reason` の型が不正
+- その他、信頼できる `TestState` を構築できない
+
+Record全体を信頼して解釈できない場合、
+空または仮の `TestState` を生成しない。
+
+UC-08はDecision 46に従い、
+Provider failureとして `success=False` で終了する。
+
+### Evidence traceability
+
+Implementation Evidenceの
+`verification` ブロックへ、
+
+`test_execution_record_path: Path`
+
+を追加する。
+
+SerializerはこのpathをJSON文字列として保存し、
+復元時に `Path` へ戻す。
+
+Test Execution Recordの内容を、
+Implementation Evidenceへ正本として複製しない。
+
+Implementation Evidenceは、
+Reviewに必要な構造化結果を保持するとともに、
+根拠となったTest Execution Recordのpathを参照する。
+
+
+### Persistence failure
+
+Test Execution Recordを保存できなかった場合、
+Phase 3は `success=False` で終了する。
+
+以下を保存成功として扱わない。
+
+- directoryを作成できない
+- JSONをSerializationできない
+- fileを書き込めない
+- 同一pathのRecordがすでに存在する
+- その他、Recordのcreate-only保存が成立しない
+
+保存されていないRecordについて、
+架空の `test_execution_record_path` を返さない。
+
+Test Execution Recordが成立していない状態で、
+UC-08へ正常進行しない。
+
+### Partial persistence failure
+
+Test Execution Recordの保存成功後に、
+Phase 3の別処理が失敗した場合、
+Phase 3全体を成功とは扱わない。
+
+ただしV1では、
+保存済みTest Execution Recordに対する
+自動rollbackまたはdeleteを要求しない。
+
+保存済みRecordは、
+実際に成立したArtifactとして保持する。
+
+この状態を、
+
+- Phase 3成功
+- Implementationの適合
+- Review Result
+- Correction要否
+- Human Approval判断
+
+へ変換しない。
+
+### Immutability
+
+保存済みTest Execution Recordを、
+後続のUC-08、
+Review、
+CorrectionまたはReimplementationによって
+上書きしない。
+
+CorrectionまたはReimplementationでは、
+新しい `implementation_id` を発行し、
+新しいTest Execution Recordを保存する。
+
+過去Recordを変更して、
+新しいImplementationのTest結果として使用しない。
+
+### Responsibility boundary
+
+Decision 51は以下を確定する。
+
+- Test Execution Recordのidentity
+- V1 JSON Schema
+- canonical persistence path
+- Provider validation
+- Evidenceからの参照
+- create-only persistence
+- persistence failure
+
+実際のTest Command実行を、
+Phase 3がどの境界から捕捉し、
+Test Execution Recordへ記録するかは、
+別Decisionで定める。
+
+`ImplementationResult` の最終文章を
+このSchemaへ転記するだけでは、
+Decision 50で要求した独立Test Evidenceとは扱わない。
