@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from pathlib import Path
+from application.implementation_evidence import ImplementationEvidence
 from typing import Any
+
+from application.implementation_evidence import EvidenceScope
+from uuid import UUID
 
 from core.approval_validation import ApprovalValidationResult
 
@@ -137,4 +141,36 @@ class ExecuteImplementationOutput:
     technical_retry_required: bool
     critical_change_required: bool
     stop_reason: str | None = None
+    error_message: str | None = None
+
+
+@dataclass(frozen=True)
+class CollectImplementationEvidenceInput:
+    implementation_id: UUID
+    implementation_kind: str
+    previous_evidence_id: UUID | None
+    specification_path: Path
+    specification_approval_id: str
+    implementation_plan_path: Path
+    implementation_plan_approval_id: str
+    codex_prompt_path: Path
+    codex_prompt: str
+    implementation_branch: str
+    base_commit: str
+    implementation_result: Any | None
+    approved_scope: "EvidenceScope | None"
+
+
+@dataclass(frozen=True)
+class CollectImplementationEvidenceOutput:
+    success: bool
+    evidence_id: UUID
+    implementation_id: UUID
+    implementation_evidence: ImplementationEvidence | None
+    evidence_path: Path | None
+    git_diff_path: Path | None
+    status: str | None
+    missing_evidence: tuple[str, ...]
+    inconsistencies: tuple[str, ...]
+    human_approval_required: tuple[str, ...]
     error_message: str | None = None
