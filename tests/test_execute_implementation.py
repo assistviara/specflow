@@ -1653,6 +1653,36 @@ NONE
 NONE
 """
 
+    class StructuredNoTestsRequiredAdapter:
+        def run(
+            self,
+            *,
+            prompt: str,
+            working_directory: Path,
+        ) -> CodexJsonlParseResult:
+            report = NoTestsRequiredAdapter().run(
+                prompt=prompt,
+                working_directory=working_directory,
+            )
+
+            return CodexJsonlParseResult(
+                raw_jsonl="",
+                command_events=(),
+                final_message=report,
+                process_succeeded=True,
+                errors=(),
+            )
+
+    implementation_id = uuid4()
+    record_path = (
+        tmp_path
+        / "evidence"
+        / f"test_execution_{implementation_id}.json"
+    )
+    recorder = FakeTestExecutionRecorder(
+        record_path
+    )
+
     use_case = ExecuteImplementationUseCase(
         approval_repository=FakeApprovalRecordRepository(
             {
@@ -1660,12 +1690,15 @@ NONE
                 "plan-approval-001": plan_record,
             }
         ),
-        implementation_adapter=NoTestsRequiredAdapter(),
+        implementation_adapter=(
+            StructuredNoTestsRequiredAdapter()
+        ),
+        test_execution_recorder=recorder,
     )
 
     output = use_case.execute(
         ExecuteImplementationInput(
-            implementation_id=uuid4(),
+            implementation_id=implementation_id,
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1680,6 +1713,16 @@ NONE
             state_history_dir=tmp_path / "state_history",
         )
     )
+
+    assert recorder.received is not None
+    assert recorder.received[
+        "unavailable_evidence"
+    ] == (
+        "tests_created_or_modified",
+        "warnings",
+        "no_tdd_reason",
+    )
+    assert output.test_execution_record_path == record_path
 
     assert output.success is True
     assert output.current_state == "implementation_completed"

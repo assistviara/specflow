@@ -723,6 +723,11 @@ class ExecuteImplementationUseCase:
                         unavailable_evidence=(
                             "tests_created_or_modified",
                             "warnings",
+                            *(
+                                ("no_tdd_reason",)
+                                if not implementation_result.test_required
+                                else ()
+                            ),
                         ),
                     )
                 )
