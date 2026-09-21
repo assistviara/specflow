@@ -103,9 +103,13 @@ class ExecuteImplementationUseCase:
         self,
         approval_repository,
         implementation_adapter,
+        test_execution_recorder=None,
     ) -> None:
         self._approval_repository = approval_repository
         self._implementation_adapter = implementation_adapter
+        self._test_execution_recorder = (
+            test_execution_recorder
+        )
 
     def execute(
         self,
@@ -687,6 +691,92 @@ class ExecuteImplementationUseCase:
                 stop_reason="Required tests were not run.",
             )
 
+        test_execution_record_path = None
+
+        if (
+            isinstance(
+                raw_result,
+                CodexJsonlParseResult,
+            )
+            and self._test_execution_recorder
+            is not None
+        ):
+            try:
+                test_execution_record_path = (
+                    self._test_execution_recorder.record(
+                        implementation_id=(
+                            input_dto.implementation_id
+                        ),
+                        recorded_at=(
+                            datetime.now().astimezone()
+                        ),
+                        command_events=(
+                            raw_result.command_events
+                        ),
+                        test_required=(
+                            implementation_result.test_required
+                        ),
+                        tests_created_or_modified=(),
+                        errors=raw_result.errors,
+                        warnings=(),
+                        no_tdd_reason=None,
+                    )
+                )
+            except Exception as exc:
+                transition_state(
+                    input_dto.state_file,
+                    input_dto.state_history_dir,
+                    {
+                        "transition_id": str(uuid4()),
+                        "from_state": current_state,
+                        "to_state": "implementation_failed",
+                        "occurred_at": (
+                            datetime.now()
+                            .astimezone()
+                            .isoformat()
+                        ),
+                        "reason": (
+                            "Test Execution Record "
+                            "persistence failed"
+                        ),
+                    },
+                )
+
+                return ExecuteImplementationOutput(
+                    implementation_id=(
+                        input_dto.implementation_id
+                    ),
+                    test_execution_record_path=None,
+                    success=False,
+                    implementation_result=(
+                        implementation_result
+                    ),
+                    specification_path=(
+                        input_dto.specification_path
+                    ),
+                    implementation_plan_path=(
+                        input_dto.implementation_plan_path
+                    ),
+                    implementation_branch=(
+                        input_dto.implementation_branch
+                    ),
+                    base_commit=input_dto.base_commit,
+                    specification_approval_validation_result=(
+                        specification_validation
+                    ),
+                    implementation_plan_approval_validation_result=(
+                        implementation_plan_validation
+                    ),
+                    current_state="implementation_failed",
+                    technical_retry_required=False,
+                    critical_change_required=False,
+                    stop_reason=(
+                        "Test Execution Record "
+                        "persistence failed."
+                    ),
+                    error_message=str(exc),
+                )
+
         transition_state(
             input_dto.state_file,
             input_dto.state_history_dir,
@@ -701,7 +791,9 @@ class ExecuteImplementationUseCase:
 
         return ExecuteImplementationOutput(
             implementation_id=input_dto.implementation_id,
-            test_execution_record_path=None,
+            test_execution_record_path=(
+                test_execution_record_path
+            ),
             success=True,
             implementation_result=implementation_result,
             specification_path=input_dto.specification_path,
