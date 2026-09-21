@@ -28,6 +28,23 @@ The generated prompt must not allow Codex to self-certify final Implementation E
 
 {{TDD_RULES}}
 
+The generated `TDD Requirements` section must require Codex to execute
+each Test command through the dedicated Test phase wrapper.
+
+Use these forms:
+
+    python -m infrastructure.specflow_test_wrapper --phase initial -- <test command and arguments>
+    python -m infrastructure.specflow_test_wrapper --phase target -- <test command and arguments>
+    python -m infrastructure.specflow_test_wrapper --phase full -- <test command and arguments>
+
+Do not infer a Test phase from execution order or from the Test command.
+
+Do not execute a Test command outside this wrapper when the result is
+required as Test Execution Evidence.
+
+The `initial`, `target`, and `full` phase values must be stated
+explicitly. Do not substitute an unknown phase with a known phase.
+
 ## Completion Conditions
 
 {{COMPLETION_CONDITIONS}}

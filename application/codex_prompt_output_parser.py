@@ -64,6 +64,28 @@ def parse_codex_prompt_output(content: str) -> CodexPromptOutput:
             "required section is empty"
         )
 
+    wrapper = (
+        "python -m "
+        "infrastructure.specflow_test_wrapper"
+    )
+    required_phase_instructions = tuple(
+        f"{wrapper} --phase {phase} --"
+        for phase in (
+            "initial",
+            "target",
+            "full",
+        )
+    )
+
+    if not all(
+        instruction in sections[3]
+        for instruction in required_phase_instructions
+    ):
+        raise CodexPromptOutputParseError(
+            "required Test phase wrapper "
+            "instruction is missing"
+        )
+
     return CodexPromptOutput(
         implementation_scope=sections[0],
         allowed_changes=sections[1],
