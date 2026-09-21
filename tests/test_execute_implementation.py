@@ -239,6 +239,12 @@ def test_successful_implementation_moves_to_implementation_completed(
     assert len(
         recorder.received["command_events"]
     ) == 1
+    assert recorder.received[
+        "unavailable_evidence"
+    ] == (
+        "tests_created_or_modified",
+        "warnings",
+    )
 
     assert output.success is True
     assert output.implementation_id == implementation_id

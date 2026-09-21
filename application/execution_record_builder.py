@@ -70,6 +70,7 @@ def build_test_execution_record(
     errors: tuple[str, ...],
     warnings: tuple[str, ...],
     no_tdd_reason: str | None,
+    unavailable_evidence: tuple[str, ...] = (),
 ) -> TestExecutionRecord:
     test_commands = tuple(
         event.command
@@ -77,7 +78,7 @@ def build_test_execution_record(
         if event.test_phase is not None
     )
 
-    unavailable_evidence = (
+    unavailable_phase_evidence = (
         tuple(
             f"{phase}_test_result"
             for phase in (
@@ -92,6 +93,15 @@ def build_test_execution_record(
         )
         if test_required
         else ()
+    )
+
+    combined_unavailable_evidence = tuple(
+        dict.fromkeys(
+            (
+                *unavailable_evidence,
+                *unavailable_phase_evidence,
+            )
+        )
     )
 
     return TestExecutionRecord(
@@ -117,7 +127,7 @@ def build_test_execution_record(
         errors=errors,
         warnings=warnings,
         unavailable_evidence=(
-            unavailable_evidence
+            combined_unavailable_evidence
         ),
         no_tdd_reason=no_tdd_reason,
         command_trace_path=command_trace_path,

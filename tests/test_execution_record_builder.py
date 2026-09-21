@@ -148,3 +148,47 @@ def test_builder_marks_missing_required_test_phases_unavailable():
         "initial_test_result",
         "full_test_result",
     )
+
+
+
+def test_builder_preserves_explicit_unavailable_evidence():
+    implementation_id = uuid4()
+    target_event = CodexCommandEvent(
+        event_order=1,
+        item_id="item_target",
+        command=(
+            "specflow-test --phase target -- "
+            "python -m pytest tests/test_example.py"
+        ),
+        status="completed",
+        exit_code=0,
+        output="1 passed\n",
+        test_phase="target",
+    )
+
+    record = build_test_execution_record(
+        implementation_id=implementation_id,
+        recorded_at=datetime.now(timezone.utc),
+        command_events=(target_event,),
+        test_required=True,
+        tests_created_or_modified=(),
+        command_trace_path=Path(
+            "projects/specflow/evidence/"
+            f"codex_command_trace_{implementation_id}.jsonl"
+        ),
+        command_trace_sha256="c" * 64,
+        errors=(),
+        warnings=(),
+        unavailable_evidence=(
+            "tests_created_or_modified",
+            "warnings",
+        ),
+        no_tdd_reason=None,
+    )
+
+    assert record.unavailable_evidence == (
+        "tests_created_or_modified",
+        "warnings",
+        "initial_test_result",
+        "full_test_result",
+    )

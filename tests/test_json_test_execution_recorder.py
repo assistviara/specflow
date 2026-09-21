@@ -58,6 +58,10 @@ def test_record_saves_trace_before_test_execution_record(
         errors=(),
         warnings=(),
         no_tdd_reason=None,
+        unavailable_evidence=(
+            "tests_created_or_modified",
+            "warnings",
+        ),
     )
 
     trace_path = (
@@ -81,6 +85,8 @@ def test_record_saves_trace_before_test_execution_record(
     assert record.target_test.status == "COMPLETED"
     assert record.target_test.result == "PASS"
     assert record.unavailable_evidence == (
+        "tests_created_or_modified",
+        "warnings",
         "initial_test_result",
         "full_test_result",
     )

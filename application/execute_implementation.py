@@ -720,6 +720,10 @@ class ExecuteImplementationUseCase:
                         errors=raw_result.errors,
                         warnings=(),
                         no_tdd_reason=None,
+                        unavailable_evidence=(
+                            "tests_created_or_modified",
+                            "warnings",
+                        ),
                     )
                 )
             except Exception as exc:

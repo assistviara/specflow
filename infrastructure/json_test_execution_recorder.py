@@ -45,6 +45,7 @@ class JsonTestExecutionRecorder:
         errors: tuple[str, ...],
         warnings: tuple[str, ...],
         no_tdd_reason: str | None,
+        unavailable_evidence: tuple[str, ...] = (),
     ) -> Path:
         normalized_trace = normalize_command_trace(
             command_events
@@ -70,6 +71,9 @@ class JsonTestExecutionRecorder:
             errors=errors,
             warnings=warnings,
             no_tdd_reason=no_tdd_reason,
+            unavailable_evidence=(
+                unavailable_evidence
+            ),
         )
 
         return self._record_repository.save(
