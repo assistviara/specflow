@@ -3,6 +3,9 @@ from pathlib import Path
 from application.codex_implementation_adapter import (
     CodexImplementationAdapter,
 )
+from infrastructure.codex_jsonl_parser import (
+    parse_codex_jsonl,
+)
 
 
 class FakeCodexRunner:
@@ -18,18 +21,39 @@ class FakeCodexRunner:
     ) -> str:
         self.received_prompt = prompt
         self.received_working_directory = working_directory
-        return "raw implementation result"
+        return (
+            '{"type":"thread.started",'
+            '"thread_id":"thread-001"}\n'
+            '{"type":"turn.started"}\n'
+            '{"type":"item.completed","item":{'
+            '"id":"item_1",'
+            '"type":"agent_message",'
+            '"text":"raw implementation result"}}\n'
+            '{"type":"turn.completed","usage":{}}'
+        )
 
 
-def test_adapter_passes_prompt_and_working_directory_to_runner() -> None:
+def test_adapter_returns_parsed_codex_execution_result() -> None:
     runner = FakeCodexRunner()
-    adapter = CodexImplementationAdapter(runner)
+    adapter = CodexImplementationAdapter(
+        runner,
+        trace_parser=parse_codex_jsonl,
+    )
 
     result = adapter.run(
         prompt="implement approved scope",
         working_directory=Path("project"),
     )
 
-    assert result == "raw implementation result"
-    assert runner.received_prompt == "implement approved scope"
-    assert runner.received_working_directory == Path("project")
+    assert result.final_message == (
+        "raw implementation result"
+    )
+    assert result.command_events == ()
+    assert result.errors == ()
+
+    assert runner.received_prompt == (
+        "implement approved scope"
+    )
+    assert runner.received_working_directory == Path(
+        "project"
+    )

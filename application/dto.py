@@ -113,6 +113,7 @@ class GenerateCodexPromptOutput:
 
 @dataclass(frozen=True)
 class ExecuteImplementationInput:
+    implementation_id: UUID
     specification_path: Path
     specification_approval_id: str
     implementation_plan_path: Path
@@ -130,6 +131,8 @@ class ExecuteImplementationInput:
 @dataclass(frozen=True)
 class ExecuteImplementationOutput:
     success: bool
+    implementation_id: UUID
+    test_execution_record_path: Path | None
     implementation_result: Any | None
     specification_path: Path
     implementation_plan_path: Path

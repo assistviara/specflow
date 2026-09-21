@@ -30,7 +30,13 @@ class CodexRunner:
         """指定した作業ディレクトリでCodexを実行する。"""
 
         return self._command_executor.run(
-            ["codex"],
+            [
+                "codex",
+                "exec",
+                "--json",
+                "--ephemeral",
+                "-",
+            ],
             cwd=working_directory,
             input_text=prompt,
         )

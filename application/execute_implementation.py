@@ -4,6 +4,9 @@ import subprocess
 from uuid import uuid4
 
 from application.current_state_repository import load_current_state
+from application.codex_execution import (
+    CodexJsonlParseResult,
+)
 from application.dto import (
     ExecuteImplementationInput,
     ExecuteImplementationOutput,
@@ -14,6 +17,26 @@ from application.implementation_result_parser import (
 )
 from application.state_transition import transition_state
 from core.approval_validation import validate_approval_result
+
+
+
+def _implementation_report_from_runner_result(
+    runner_result: str | CodexJsonlParseResult,
+) -> str:
+    if isinstance(runner_result, str):
+        return runner_result
+
+    if not runner_result.process_succeeded:
+        raise ImplementationResultParseError(
+            "Codex runner process failed"
+        )
+
+    if runner_result.final_message is None:
+        raise ImplementationResultParseError(
+            "Codex final message is unavailable"
+        )
+
+    return runner_result.final_message
 
 
 def _git_working_tree_has_artifact_changes(
@@ -80,9 +103,13 @@ class ExecuteImplementationUseCase:
         self,
         approval_repository,
         implementation_adapter,
+        test_execution_recorder=None,
     ) -> None:
         self._approval_repository = approval_repository
         self._implementation_adapter = implementation_adapter
+        self._test_execution_recorder = (
+            test_execution_recorder
+        )
 
     def execute(
         self,
@@ -115,6 +142,8 @@ class ExecuteImplementationUseCase:
             or not implementation_plan_validation.is_valid
         ):
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -140,6 +169,8 @@ class ExecuteImplementationUseCase:
             != input_dto.implementation_plan_path
         ):
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -162,6 +193,8 @@ class ExecuteImplementationUseCase:
 
         if current_state != "implementation_ready":
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -217,6 +250,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -238,7 +273,9 @@ class ExecuteImplementationUseCase:
 
         try:
             implementation_result = ImplementationResultParser.parse(
-                raw_result
+                _implementation_report_from_runner_result(
+                    raw_result
+                )
             )
         except ImplementationResultParseError as exc:
             current_state = load_current_state(
@@ -260,6 +297,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -299,6 +338,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=implementation_result,
                 specification_path=input_dto.specification_path,
@@ -333,6 +374,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=implementation_result,
                 specification_path=input_dto.specification_path,
@@ -390,6 +433,8 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        implementation_id=input_dto.implementation_id,
+                        test_execution_record_path=None,
                         success=False,
                         implementation_result=implementation_result,
                         specification_path=input_dto.specification_path,
@@ -411,7 +456,11 @@ class ExecuteImplementationUseCase:
 
                 try:
                     implementation_result = (
-                        ImplementationResultParser.parse(raw_result)
+                        ImplementationResultParser.parse(
+                            _implementation_report_from_runner_result(
+                                raw_result
+                            )
+                        )
                     )
                 except ImplementationResultParseError as exc:
                     transition_state(
@@ -429,6 +478,8 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        implementation_id=input_dto.implementation_id,
+                        test_execution_record_path=None,
                         success=False,
                         implementation_result=implementation_result,
                         specification_path=input_dto.specification_path,
@@ -471,6 +522,8 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        implementation_id=input_dto.implementation_id,
+                        test_execution_record_path=None,
                         success=False,
                         implementation_result=implementation_result,
                         specification_path=input_dto.specification_path,
@@ -505,6 +558,8 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        implementation_id=input_dto.implementation_id,
+                        test_execution_record_path=None,
                         success=False,
                         implementation_result=implementation_result,
                         specification_path=input_dto.specification_path,
@@ -539,6 +594,8 @@ class ExecuteImplementationUseCase:
                 )
 
                 return ExecuteImplementationOutput(
+                    implementation_id=input_dto.implementation_id,
+                    test_execution_record_path=None,
                     success=False,
                     implementation_result=implementation_result,
                     specification_path=input_dto.specification_path,
@@ -575,6 +632,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=implementation_result,
                 specification_path=input_dto.specification_path,
@@ -612,6 +671,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=implementation_result,
                 specification_path=input_dto.specification_path,
@@ -630,6 +691,101 @@ class ExecuteImplementationUseCase:
                 stop_reason="Required tests were not run.",
             )
 
+        test_execution_record_path = None
+
+        if (
+            isinstance(
+                raw_result,
+                CodexJsonlParseResult,
+            )
+            and self._test_execution_recorder
+            is not None
+        ):
+            try:
+                test_execution_record_path = (
+                    self._test_execution_recorder.record(
+                        implementation_id=(
+                            input_dto.implementation_id
+                        ),
+                        recorded_at=(
+                            datetime.now().astimezone()
+                        ),
+                        command_events=(
+                            raw_result.command_events
+                        ),
+                        test_required=(
+                            implementation_result.test_required
+                        ),
+                        tests_created_or_modified=(),
+                        errors=raw_result.errors,
+                        warnings=(),
+                        no_tdd_reason=None,
+                        unavailable_evidence=(
+                            "tests_created_or_modified",
+                            "warnings",
+                            *(
+                                ("no_tdd_reason",)
+                                if not implementation_result.test_required
+                                else ()
+                            ),
+                        ),
+                    )
+                )
+            except Exception as exc:
+                transition_state(
+                    input_dto.state_file,
+                    input_dto.state_history_dir,
+                    {
+                        "transition_id": str(uuid4()),
+                        "from_state": current_state,
+                        "to_state": "implementation_failed",
+                        "occurred_at": (
+                            datetime.now()
+                            .astimezone()
+                            .isoformat()
+                        ),
+                        "reason": (
+                            "Test Execution Record "
+                            "persistence failed"
+                        ),
+                    },
+                )
+
+                return ExecuteImplementationOutput(
+                    implementation_id=(
+                        input_dto.implementation_id
+                    ),
+                    test_execution_record_path=None,
+                    success=False,
+                    implementation_result=(
+                        implementation_result
+                    ),
+                    specification_path=(
+                        input_dto.specification_path
+                    ),
+                    implementation_plan_path=(
+                        input_dto.implementation_plan_path
+                    ),
+                    implementation_branch=(
+                        input_dto.implementation_branch
+                    ),
+                    base_commit=input_dto.base_commit,
+                    specification_approval_validation_result=(
+                        specification_validation
+                    ),
+                    implementation_plan_approval_validation_result=(
+                        implementation_plan_validation
+                    ),
+                    current_state="implementation_failed",
+                    technical_retry_required=False,
+                    critical_change_required=False,
+                    stop_reason=(
+                        "Test Execution Record "
+                        "persistence failed."
+                    ),
+                    error_message=str(exc),
+                )
+
         transition_state(
             input_dto.state_file,
             input_dto.state_history_dir,
@@ -643,6 +799,10 @@ class ExecuteImplementationUseCase:
         )
 
         return ExecuteImplementationOutput(
+            implementation_id=input_dto.implementation_id,
+            test_execution_record_path=(
+                test_execution_record_path
+            ),
             success=True,
             implementation_result=implementation_result,
             specification_path=input_dto.specification_path,

@@ -1,8 +1,21 @@
 from pathlib import Path
+from uuid import uuid4
 import subprocess
 
+import pytest
+
+from application.codex_execution import (
+    CodexCommandEvent,
+    CodexJsonlParseResult,
+)
 from application.dto import ExecuteImplementationInput
-from application.execute_implementation import ExecuteImplementationUseCase
+from application.execute_implementation import (
+    ExecuteImplementationUseCase,
+    _implementation_report_from_runner_result,
+)
+from application.implementation_result_parser import (
+    ImplementationResultParseError,
+)
 from core.approval_record_service import (
     build_approval_record_from_artifact,
 )
@@ -62,7 +75,7 @@ class SuccessfulCodexImplementationAdapter:
     ) -> str:
         self.called = True
 
-        return """## Implementation Summary
+        report = """## Implementation Summary
 TEST_REQUIRED: YES
 Approved scope implementation completed.
 
@@ -95,6 +108,49 @@ NONE
 NONE
 """
 
+        return CodexJsonlParseResult(
+            raw_jsonl="",
+            command_events=(
+                CodexCommandEvent(
+                    event_order=1,
+                    item_id="item_target",
+                    command=(
+                        "specflow-test --phase target -- "
+                        "python -m pytest "
+                        "tests/test_example.py"
+                    ),
+                    status="completed",
+                    exit_code=0,
+                    output="1 passed\n",
+                    test_phase="target",
+                ),
+            ),
+            final_message=report,
+            process_succeeded=True,
+            errors=(),
+        )
+
+
+
+class FakeTestExecutionRecorder:
+    def __init__(
+        self,
+        record_path: Path,
+    ) -> None:
+        self._record_path = record_path
+        self.received: dict | None = None
+
+    def record(self, **kwargs) -> Path:
+        self.received = kwargs
+        self._record_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        self._record_path.write_text(
+            "{}",
+            encoding="utf-8",
+        )
+        return self._record_path
 
 def test_successful_implementation_moves_to_implementation_completed(
     tmp_path,
@@ -136,6 +192,15 @@ def test_successful_implementation_moves_to_implementation_completed(
     )
 
     adapter = SuccessfulCodexImplementationAdapter()
+    implementation_id = uuid4()
+    record_path = (
+        tmp_path
+        / "evidence"
+        / f"test_execution_{implementation_id}.json"
+    )
+    recorder = FakeTestExecutionRecorder(
+        record_path
+    )
 
     use_case = ExecuteImplementationUseCase(
         approval_repository=FakeApprovalRecordRepository(
@@ -145,10 +210,12 @@ def test_successful_implementation_moves_to_implementation_completed(
             }
         ),
         implementation_adapter=adapter,
+        test_execution_recorder=recorder,
     )
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=implementation_id,
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -165,8 +232,23 @@ def test_successful_implementation_moves_to_implementation_completed(
     )
 
     assert adapter.called is True
+    assert recorder.received is not None
+    assert recorder.received["implementation_id"] == (
+        implementation_id
+    )
+    assert len(
+        recorder.received["command_events"]
+    ) == 1
+    assert recorder.received[
+        "unavailable_evidence"
+    ] == (
+        "tests_created_or_modified",
+        "warnings",
+    )
 
     assert output.success is True
+    assert output.implementation_id == implementation_id
+    assert output.test_execution_record_path == record_path
     assert output.current_state == "implementation_completed"
     assert output.technical_retry_required is False
     assert output.critical_change_required is False
@@ -253,6 +335,7 @@ def test_invalid_specification_approval_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -350,6 +433,7 @@ def test_invalid_implementation_plan_approval_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -442,6 +526,7 @@ def test_codex_prompt_path_mismatch_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -561,6 +646,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -679,6 +765,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -840,6 +927,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -969,6 +1057,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1087,6 +1176,7 @@ Database schema change is required outside the approved scope.
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1208,6 +1298,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1329,6 +1420,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1450,6 +1542,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1560,6 +1653,36 @@ NONE
 NONE
 """
 
+    class StructuredNoTestsRequiredAdapter:
+        def run(
+            self,
+            *,
+            prompt: str,
+            working_directory: Path,
+        ) -> CodexJsonlParseResult:
+            report = NoTestsRequiredAdapter().run(
+                prompt=prompt,
+                working_directory=working_directory,
+            )
+
+            return CodexJsonlParseResult(
+                raw_jsonl="",
+                command_events=(),
+                final_message=report,
+                process_succeeded=True,
+                errors=(),
+            )
+
+    implementation_id = uuid4()
+    record_path = (
+        tmp_path
+        / "evidence"
+        / f"test_execution_{implementation_id}.json"
+    )
+    recorder = FakeTestExecutionRecorder(
+        record_path
+    )
+
     use_case = ExecuteImplementationUseCase(
         approval_repository=FakeApprovalRecordRepository(
             {
@@ -1567,11 +1690,15 @@ NONE
                 "plan-approval-001": plan_record,
             }
         ),
-        implementation_adapter=NoTestsRequiredAdapter(),
+        implementation_adapter=(
+            StructuredNoTestsRequiredAdapter()
+        ),
+        test_execution_recorder=recorder,
     )
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=implementation_id,
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1586,6 +1713,16 @@ NONE
             state_history_dir=tmp_path / "state_history",
         )
     )
+
+    assert recorder.received is not None
+    assert recorder.received[
+        "unavailable_evidence"
+    ] == (
+        "tests_created_or_modified",
+        "warnings",
+        "no_tdd_reason",
+    )
+    assert output.test_execution_record_path == record_path
 
     assert output.success is True
     assert output.current_state == "implementation_completed"
@@ -1693,6 +1830,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1788,6 +1926,7 @@ def test_runner_exception_fails_without_automatic_retry(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1888,6 +2027,7 @@ application/example.py
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2019,6 +2159,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2155,6 +2296,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2316,6 +2458,7 @@ Change outside approved implementation scope.
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2476,6 +2619,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2642,6 +2786,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2764,6 +2909,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2853,6 +2999,7 @@ def test_implementation_does_not_start_from_invalid_current_state(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2877,3 +3024,139 @@ def test_implementation_does_not_start_from_invalid_current_state(
 
     current_state = state_file.read_text(encoding="utf-8")
     assert '"status": "plan_approved"' in current_state
+
+
+
+def test_failed_structured_runner_result_is_not_treated_as_report():
+    runner_result = CodexJsonlParseResult(
+        raw_jsonl=(
+            '{"type":"turn.failed",'
+            '"error":{"message":"runner failed"}}'
+        ),
+        command_events=(),
+        final_message="apparently successful report",
+        process_succeeded=False,
+        errors=("runner failed",),
+    )
+
+    with pytest.raises(
+        ImplementationResultParseError,
+        match="Codex runner process failed",
+    ):
+        _implementation_report_from_runner_result(
+            runner_result
+        )
+
+
+
+class FailingTestExecutionRecorder:
+    def record(self, **kwargs) -> Path:
+        raise OSError(
+            "record persistence failed"
+        )
+
+
+def test_test_execution_record_failure_prevents_implementation_completion(
+    tmp_path,
+) -> None:
+    specification_path = tmp_path / "specification.md"
+    specification_path.write_text(
+        "approved specification",
+        encoding="utf-8",
+    )
+    implementation_plan_path = (
+        tmp_path / "implementation_plan.md"
+    )
+    implementation_plan_path.write_text(
+        "approved implementation plan",
+        encoding="utf-8",
+    )
+
+    specification_record = build_approval_record_from_artifact(
+        approval_id="spec-approval-record-failure",
+        artifact_type="specification",
+        artifact_path=str(specification_path),
+        decision="approved",
+        approved_at="2026-09-21T10:00:00+09:00",
+        comment="Specification approved.",
+    )
+    plan_record = build_approval_record_from_artifact(
+        approval_id="plan-approval-record-failure",
+        artifact_type="implementation_plan",
+        artifact_path=str(implementation_plan_path),
+        decision="approved",
+        approved_at="2026-09-21T10:01:00+09:00",
+        comment="Implementation Plan approved.",
+    )
+
+    state_file = tmp_path / "state.json"
+    state_file.write_text(
+        '{"status": "implementation_ready"}',
+        encoding="utf-8",
+    )
+    implementation_id = uuid4()
+
+    use_case = ExecuteImplementationUseCase(
+        approval_repository=FakeApprovalRecordRepository(
+            {
+                "spec-approval-record-failure": (
+                    specification_record
+                ),
+                "plan-approval-record-failure": (
+                    plan_record
+                ),
+            }
+        ),
+        implementation_adapter=(
+            SuccessfulCodexImplementationAdapter()
+        ),
+        test_execution_recorder=(
+            FailingTestExecutionRecorder()
+        ),
+    )
+
+    output = use_case.execute(
+        ExecuteImplementationInput(
+            implementation_id=implementation_id,
+            specification_path=specification_path,
+            specification_approval_id=(
+                "spec-approval-record-failure"
+            ),
+            implementation_plan_path=(
+                implementation_plan_path
+            ),
+            implementation_plan_approval_id=(
+                "plan-approval-record-failure"
+            ),
+            codex_prompt="implement approved scope",
+            codex_prompt_specification_path=(
+                specification_path
+            ),
+            codex_prompt_implementation_plan_path=(
+                implementation_plan_path
+            ),
+            implementation_branch="developer",
+            base_commit="abc123",
+            working_directory=tmp_path,
+            state_file=state_file,
+            state_history_dir=(
+                tmp_path / "state_history"
+            ),
+        )
+    )
+
+    assert output.success is False
+    assert output.implementation_id == implementation_id
+    assert output.test_execution_record_path is None
+    assert output.current_state == "implementation_failed"
+    assert output.stop_reason == (
+        "Test Execution Record persistence failed."
+    )
+    assert output.error_message == (
+        "record persistence failed"
+    )
+
+    current_state = state_file.read_text(
+        encoding="utf-8"
+    )
+    assert '"status": "implementation_failed"' in current_state

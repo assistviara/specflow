@@ -796,6 +796,15 @@ Do not change files outside the approved scope.
 ## TDD Requirements
 Use RED, GREEN, and regression testing.
 
+Run Initial tests with:
+python -m infrastructure.specflow_test_wrapper --phase initial -- pytest
+
+Run Target tests with:
+python -m infrastructure.specflow_test_wrapper --phase target -- pytest
+
+Run the Full Test Suite with:
+python -m infrastructure.specflow_test_wrapper --phase full -- pytest
+
 ## Completion Conditions
 Required tests pass.
 

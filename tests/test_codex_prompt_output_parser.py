@@ -14,7 +14,11 @@ allowed
 forbidden
 
 ## TDD Requirements
-tdd
+Use these Test phase wrappers:
+
+python -m infrastructure.specflow_test_wrapper --phase initial -- pytest
+python -m infrastructure.specflow_test_wrapper --phase target -- pytest
+python -m infrastructure.specflow_test_wrapper --phase full -- pytest
 
 ## Completion Conditions
 complete
@@ -36,7 +40,21 @@ def test_parse_codex_prompt_output_returns_sections() -> None:
     assert result.implementation_scope == "scope"
     assert result.allowed_changes == "allowed"
     assert result.forbidden_changes == "forbidden"
-    assert result.tdd_requirements == "tdd"
+    assert (
+        "infrastructure.specflow_test_wrapper "
+        "--phase initial --"
+        in result.tdd_requirements
+    )
+    assert (
+        "infrastructure.specflow_test_wrapper "
+        "--phase target --"
+        in result.tdd_requirements
+    )
+    assert (
+        "infrastructure.specflow_test_wrapper "
+        "--phase full --"
+        in result.tdd_requirements
+    )
     assert result.completion_conditions == "complete"
     assert result.stop_conditions == "stop"
     assert result.required_execution_result_reporting == "report"
@@ -141,6 +159,48 @@ approval
         parse_codex_prompt_output(invalid_content)
     except CodexPromptOutputParseError as exc:
         assert str(exc) == "required section is empty"
+    else:
+        raise AssertionError(
+            "CodexPromptOutputParseError was not raised"
+        )
+
+
+
+def test_parse_rejects_tdd_requirements_without_phase_wrappers():
+    invalid_content = """## Implementation Scope
+scope
+
+## Allowed Changes
+allowed
+
+## Forbidden Changes
+forbidden
+
+## TDD Requirements
+Use TDD, but run tests directly.
+
+## Completion Conditions
+complete
+
+## Stop Conditions
+stop
+
+## Required Execution Result Reporting
+report
+
+## Human Approval Required Conditions
+approval
+"""
+
+    try:
+        parse_codex_prompt_output(
+            invalid_content
+        )
+    except CodexPromptOutputParseError as exc:
+        assert str(exc) == (
+            "required Test phase wrapper "
+            "instruction is missing"
+        )
     else:
         raise AssertionError(
             "CodexPromptOutputParseError was not raised"
