@@ -1,4 +1,4 @@
-from infrastructure.codex_jsonl_parser import (
+from application.codex_execution import (
     CodexCommandEvent,
 )
 from infrastructure.command_trace_normalizer import (

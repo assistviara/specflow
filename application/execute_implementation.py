@@ -4,6 +4,9 @@ import subprocess
 from uuid import uuid4
 
 from application.current_state_repository import load_current_state
+from application.codex_execution import (
+    CodexJsonlParseResult,
+)
 from application.dto import (
     ExecuteImplementationInput,
     ExecuteImplementationOutput,
@@ -14,6 +17,26 @@ from application.implementation_result_parser import (
 )
 from application.state_transition import transition_state
 from core.approval_validation import validate_approval_result
+
+
+
+def _implementation_report_from_runner_result(
+    runner_result: str | CodexJsonlParseResult,
+) -> str:
+    if isinstance(runner_result, str):
+        return runner_result
+
+    if not runner_result.process_succeeded:
+        raise ImplementationResultParseError(
+            "Codex runner process failed"
+        )
+
+    if runner_result.final_message is None:
+        raise ImplementationResultParseError(
+            "Codex final message is unavailable"
+        )
+
+    return runner_result.final_message
 
 
 def _git_working_tree_has_artifact_changes(
@@ -238,7 +261,9 @@ class ExecuteImplementationUseCase:
 
         try:
             implementation_result = ImplementationResultParser.parse(
-                raw_result
+                _implementation_report_from_runner_result(
+                    raw_result
+                )
             )
         except ImplementationResultParseError as exc:
             current_state = load_current_state(
@@ -411,7 +436,11 @@ class ExecuteImplementationUseCase:
 
                 try:
                     implementation_result = (
-                        ImplementationResultParser.parse(raw_result)
+                        ImplementationResultParser.parse(
+                            _implementation_report_from_runner_result(
+                                raw_result
+                            )
+                        )
                     )
                 except ImplementationResultParseError as exc:
                     transition_state(

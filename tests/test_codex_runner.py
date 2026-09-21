@@ -32,7 +32,13 @@ def test_run_executes_codex_in_target_directory() -> None:
         working_directory=target_path,
     )
 
-    assert executor.received_command == ["codex"]
+    assert executor.received_command == [
+        "codex",
+        "exec",
+        "--json",
+        "--ephemeral",
+        "-",
+    ]
     assert executor.received_cwd == target_path
     assert executor.received_input == "Planを作成してください。"
     assert result == "生成されたPlan"

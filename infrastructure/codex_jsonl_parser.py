@@ -1,25 +1,10 @@
 import json
 import re
-from dataclasses import dataclass
 
-
-@dataclass(frozen=True)
-class CodexCommandEvent:
-    event_order: int
-    item_id: str
-    command: str
-    status: str
-    exit_code: int | None
-    output: str
-    test_phase: str | None
-
-
-@dataclass(frozen=True)
-class CodexJsonlParseResult:
-    command_events: tuple[CodexCommandEvent, ...]
-    final_message: str | None
-    errors: tuple[str, ...]
-
+from application.codex_execution import (
+    CodexCommandEvent,
+    CodexJsonlParseResult,
+)
 
 
 _EXPLICIT_TEST_PHASE_PATTERN = re.compile(
@@ -65,6 +50,8 @@ def parse_codex_jsonl(
     command_events: list[CodexCommandEvent] = []
     final_message: str | None = None
     errors: list[str] = []
+    turn_completed = False
+    turn_failed = False
 
     def preserve_error(message: object) -> None:
         if (
@@ -92,11 +79,16 @@ def parse_codex_jsonl(
 
         event_type = event.get("type")
 
+        if event_type == "turn.completed":
+            turn_completed = True
+            continue
+
         if event_type == "error":
             preserve_error(event.get("message"))
             continue
 
         if event_type == "turn.failed":
+            turn_failed = True
             error = event.get("error")
 
             if isinstance(error, dict):
@@ -159,7 +151,12 @@ def parse_codex_jsonl(
             )
 
     return CodexJsonlParseResult(
+        raw_jsonl=raw_jsonl,
         command_events=tuple(command_events),
         final_message=final_message,
+        process_succeeded=(
+            turn_completed
+            and not turn_failed
+        ),
         errors=tuple(errors),
     )

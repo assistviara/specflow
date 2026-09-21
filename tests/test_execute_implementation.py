@@ -1,8 +1,19 @@
 from pathlib import Path
 import subprocess
 
+import pytest
+
+from application.codex_execution import (
+    CodexJsonlParseResult,
+)
 from application.dto import ExecuteImplementationInput
-from application.execute_implementation import ExecuteImplementationUseCase
+from application.execute_implementation import (
+    ExecuteImplementationUseCase,
+    _implementation_report_from_runner_result,
+)
+from application.implementation_result_parser import (
+    ImplementationResultParseError,
+)
 from core.approval_record_service import (
     build_approval_record_from_artifact,
 )
@@ -62,7 +73,7 @@ class SuccessfulCodexImplementationAdapter:
     ) -> str:
         self.called = True
 
-        return """## Implementation Summary
+        report = """## Implementation Summary
 TEST_REQUIRED: YES
 Approved scope implementation completed.
 
@@ -95,6 +106,13 @@ NONE
 NONE
 """
 
+        return CodexJsonlParseResult(
+            raw_jsonl="",
+            command_events=(),
+            final_message=report,
+            process_succeeded=True,
+            errors=(),
+        )
 
 def test_successful_implementation_moves_to_implementation_completed(
     tmp_path,
@@ -2877,3 +2895,25 @@ def test_implementation_does_not_start_from_invalid_current_state(
 
     current_state = state_file.read_text(encoding="utf-8")
     assert '"status": "plan_approved"' in current_state
+
+
+
+def test_failed_structured_runner_result_is_not_treated_as_report():
+    runner_result = CodexJsonlParseResult(
+        raw_jsonl=(
+            '{"type":"turn.failed",'
+            '"error":{"message":"runner failed"}}'
+        ),
+        command_events=(),
+        final_message="apparently successful report",
+        process_succeeded=False,
+        errors=("runner failed",),
+    )
+
+    with pytest.raises(
+        ImplementationResultParseError,
+        match="Codex runner process failed",
+    ):
+        _implementation_report_from_runner_result(
+            runner_result
+        )

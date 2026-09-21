@@ -1,3 +1,8 @@
+from application.codex_execution import (
+    CodexCommandEvent as ApplicationCodexCommandEvent,
+    CodexJsonlParseResult as ApplicationCodexJsonlParseResult,
+)
+
 import json
 
 from infrastructure.codex_jsonl_parser import (
@@ -240,3 +245,76 @@ def test_parse_preserves_invalid_explicit_test_phase():
         "invalid test phase tag in command event "
         "item_invalid_phase: smoke",
     )
+
+
+
+def test_parse_returns_application_execution_models():
+    event = {
+        "type": "item.completed",
+        "item": {
+            "id": "item_1",
+            "type": "command_execution",
+            "command": "python --version",
+            "aggregated_output": "Python 3.13.5\n",
+            "exit_code": 0,
+            "status": "completed",
+        },
+    }
+
+    result = parse_codex_jsonl(
+        json.dumps(event)
+    )
+
+    assert isinstance(
+        result,
+        ApplicationCodexJsonlParseResult,
+    )
+    assert isinstance(
+        result.command_events[0],
+        ApplicationCodexCommandEvent,
+    )
+
+
+
+def test_parse_distinguishes_completed_and_failed_runner_process():
+    completed_jsonl = "\n".join(
+        (
+            '{"type":"turn.started"}',
+            (
+                '{"type":"item.completed","item":{'
+                '"id":"item_1",'
+                '"type":"agent_message",'
+                '"text":"completed"}}'
+            ),
+            (
+                '{"type":"turn.completed",'
+                '"usage":{"input_tokens":1}}'
+            ),
+        )
+    )
+    failed_jsonl = "\n".join(
+        (
+            '{"type":"turn.started"}',
+            (
+                '{"type":"error",'
+                '"message":"runner failed"}'
+            ),
+            (
+                '{"type":"turn.failed","error":{'
+                '"message":"runner failed"}}'
+            ),
+        )
+    )
+
+    completed = parse_codex_jsonl(
+        completed_jsonl
+    )
+    failed = parse_codex_jsonl(
+        failed_jsonl
+    )
+
+    assert completed.raw_jsonl == completed_jsonl
+    assert completed.process_succeeded is True
+
+    assert failed.raw_jsonl == failed_jsonl
+    assert failed.process_succeeded is False

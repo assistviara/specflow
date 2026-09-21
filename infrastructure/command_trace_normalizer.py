@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 
-from infrastructure.codex_jsonl_parser import (
+from application.codex_execution import (
     CodexCommandEvent,
 )
 
