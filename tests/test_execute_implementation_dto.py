@@ -1,5 +1,6 @@
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -10,7 +11,9 @@ from application.dto import (
 
 
 def test_execute_implementation_input_is_frozen_dataclass() -> None:
+    implementation_id = uuid4()
     dto = ExecuteImplementationInput(
+        implementation_id=implementation_id,
         specification_path=Path("spec.md"),
         specification_approval_id="spec-approval-1",
         implementation_plan_path=Path("plan.md"),
@@ -25,13 +28,18 @@ def test_execute_implementation_input_is_frozen_dataclass() -> None:
         state_history_dir=Path("state_history"),
     )
 
+    assert dto.implementation_id == implementation_id
+
     with pytest.raises(FrozenInstanceError):
         dto.base_commit = "changed"
 
 
 def test_execute_implementation_output_is_frozen_dataclass() -> None:
+    implementation_id = uuid4()
     dto = ExecuteImplementationOutput(
         success=False,
+        implementation_id=implementation_id,
+        test_execution_record_path=None,
         implementation_result=None,
         specification_path=Path("spec.md"),
         implementation_plan_path=Path("plan.md"),
@@ -45,6 +53,9 @@ def test_execute_implementation_output_is_frozen_dataclass() -> None:
         stop_reason=None,
         error_message=None,
     )
+
+    assert dto.implementation_id == implementation_id
+    assert dto.test_execution_record_path is None
 
     with pytest.raises(FrozenInstanceError):
         dto.success = True

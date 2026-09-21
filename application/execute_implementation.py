@@ -138,6 +138,8 @@ class ExecuteImplementationUseCase:
             or not implementation_plan_validation.is_valid
         ):
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -163,6 +165,8 @@ class ExecuteImplementationUseCase:
             != input_dto.implementation_plan_path
         ):
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -185,6 +189,8 @@ class ExecuteImplementationUseCase:
 
         if current_state != "implementation_ready":
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -240,6 +246,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -285,6 +293,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=None,
                 specification_path=input_dto.specification_path,
@@ -324,6 +334,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=implementation_result,
                 specification_path=input_dto.specification_path,
@@ -358,6 +370,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=implementation_result,
                 specification_path=input_dto.specification_path,
@@ -415,6 +429,8 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        implementation_id=input_dto.implementation_id,
+                        test_execution_record_path=None,
                         success=False,
                         implementation_result=implementation_result,
                         specification_path=input_dto.specification_path,
@@ -458,6 +474,8 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        implementation_id=input_dto.implementation_id,
+                        test_execution_record_path=None,
                         success=False,
                         implementation_result=implementation_result,
                         specification_path=input_dto.specification_path,
@@ -500,6 +518,8 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        implementation_id=input_dto.implementation_id,
+                        test_execution_record_path=None,
                         success=False,
                         implementation_result=implementation_result,
                         specification_path=input_dto.specification_path,
@@ -534,6 +554,8 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        implementation_id=input_dto.implementation_id,
+                        test_execution_record_path=None,
                         success=False,
                         implementation_result=implementation_result,
                         specification_path=input_dto.specification_path,
@@ -568,6 +590,8 @@ class ExecuteImplementationUseCase:
                 )
 
                 return ExecuteImplementationOutput(
+                    implementation_id=input_dto.implementation_id,
+                    test_execution_record_path=None,
                     success=False,
                     implementation_result=implementation_result,
                     specification_path=input_dto.specification_path,
@@ -604,6 +628,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=implementation_result,
                 specification_path=input_dto.specification_path,
@@ -641,6 +667,8 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                implementation_id=input_dto.implementation_id,
+                test_execution_record_path=None,
                 success=False,
                 implementation_result=implementation_result,
                 specification_path=input_dto.specification_path,
@@ -672,6 +700,8 @@ class ExecuteImplementationUseCase:
         )
 
         return ExecuteImplementationOutput(
+            implementation_id=input_dto.implementation_id,
+            test_execution_record_path=None,
             success=True,
             implementation_result=implementation_result,
             specification_path=input_dto.specification_path,

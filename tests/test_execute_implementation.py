@@ -1,4 +1,5 @@
 from pathlib import Path
+from uuid import uuid4
 import subprocess
 
 import pytest
@@ -167,6 +168,7 @@ def test_successful_implementation_moves_to_implementation_completed(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -271,6 +273,7 @@ def test_invalid_specification_approval_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -368,6 +371,7 @@ def test_invalid_implementation_plan_approval_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -460,6 +464,7 @@ def test_codex_prompt_path_mismatch_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -579,6 +584,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -697,6 +703,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -858,6 +865,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -987,6 +995,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1105,6 +1114,7 @@ Database schema change is required outside the approved scope.
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1226,6 +1236,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1347,6 +1358,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1468,6 +1480,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1590,6 +1603,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1711,6 +1725,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1806,6 +1821,7 @@ def test_runner_exception_fails_without_automatic_retry(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -1906,6 +1922,7 @@ application/example.py
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2037,6 +2054,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2173,6 +2191,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2334,6 +2353,7 @@ Change outside approved implementation scope.
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2494,6 +2514,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2660,6 +2681,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2782,6 +2804,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
@@ -2871,6 +2894,7 @@ def test_implementation_does_not_start_from_invalid_current_state(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
             implementation_plan_path=implementation_plan_path,
