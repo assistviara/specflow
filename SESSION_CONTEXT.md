@@ -28,12 +28,12 @@
 確認済みCommit:
 
 ```text
-d7df90d Merge pull request #32 from assistviara/developer
+7f37fad Merge pull request #37 from assistviara/developer
 ```
 
-Pull Request #32により、Application Layer SpecificationおよびApplication Layer Implementation Planは`main`へMerge済みである。
+Pull Request #37により、Application Layer Phase 3のCodex実行traceから、Phase 4のTest State取得までの経路は`main`へMerge済みである。
 
-この`main`へのMergeを、Application Layer実装開始前の正式な設計ベースラインとして扱う。
+`main`、`developer`、`origin/main`、`origin/developer`は、上記Commitを指していることを確認済みである。
 
 正式Artifact本文のStatus表記は、この引き継ぎ更新では変更していない。
 
@@ -61,6 +61,32 @@ Pull Request #32により、Application Layer SpecificationおよびApplication 
 - Phase 7のPurpose、Scope、Implementation Targets 1-8、Tests 1-8、Completion Conditions 1-8の最終横断監査
 - Technical Retry、Correction、Human Approval、Evidence、Review、Final Approval、Merge、completedの責務境界の横断確認
 - Pull Request #32によるApplication Layer設計ベースラインの`main`へのMerge
+- Application Layer Phase 1の実装と`main`へのMerge
+- Application Layer Phase 2の実装と`main`へのMerge
+- Application Layer Phase 3のImplementation実行基盤
+- Application Layer Phase 4のImplementation Evidence収集基盤
+- UC-08 `Collect Implementation Evidence`のApplication Layerオーケストレーション
+- Git Repository State Provider
+- Implementation Evidenceの構造、比較、Serialization、create-only永続化
+- Test Execution Recordのモデル、Serialization、create-only永続化
+- JsonTestStateProviderによるcommand traceの存在確認およびSHA-256検証
+- `codex exec --json`によるJSONL execution traceの取得・解析
+- Codex最終メッセージとcommand execution eventの分離
+- Initial、Target、Fullを明示するTest phase wrapper
+- normalized command traceの機密情報redact、保存、SHA-256算出
+- Test Execution Record構築・保存のPhase 3への接続
+- Implementation IDのPhase 3からPhase 4への一貫した引き継ぎ
+- trace取得不能、保存失敗、取得不能Evidence、No-TDD理由不足の安全な記録・停止
+- Codex PromptへのTest phase wrapper契約追加と生成Prompt検証
+- Phase 3からPhase 4 TestStateまでのE2Eテスト
+- Pull Request #36によるPhase 4 Implementation Evidence収集基盤の`main`へのMerge
+- Pull Request #37によるPhase 3からPhase 4へのTest Evidence経路の`main`へのMerge
+
+最新のFull Test Suite確認結果:
+
+```text
+425 passed
+```
 
 ---
 
@@ -147,11 +173,13 @@ Implementation中にSpecificationまたはImplementation Planから一意に決�
 
 # Current Task
 
-次の主要作業は、承認済みImplementation Planに基づくApplication Layer Phase 1の実装開始である。
+次の主要作業は、承認済みImplementation Planに基づくApplication Layer Phase 5 `Review & Correction`の実装開始である。
 
-ただし、新しいセッションでは直ちにImplementationを開始しない。まずConstitution / Project Rules、最新のSession Context、Application Layer Specification、Application Layer Implementation Plan、Gitの現在状態を確認する。
+ただし、新しいセッションでは直ちにImplementationを開始しない。まずConstitution / Project Rules、最新のSession Context、Application Layer Specification、Application Layer Implementation PlanのPhase 5、Gitの現在状態を確認する。
 
-確認後、Humanへ現在地点を簡潔に報告し、Application Layer Phase 1 Implementationを開始できる状態から再開する。
+確認後、Humanへ現在地点を簡潔に報告し、Application Layer Phase 5 Implementationを開始できる状態から再開する。
+
+Phase 3およびPhase 4について、新しいDecisionや補助機能を追加して完成範囲を拡張しない。Phase 5開始前に重大な欠落が確認された場合だけ、既存Specification、Implementation Plan、Decision 39から53の範囲で扱う。
 
 ---
 
@@ -161,10 +189,11 @@ Implementation中にSpecificationまたはImplementation Planから一意に決�
 
 1. 上記の必読文書を順番に読む。
 2. `git status --short --branch`でWorking Treeと現在Branchを確認する。
-3. `git log --oneline --decorate -n 5`でPR #32 merge commitを確認する。
-4. Application Layer Implementation PlanのPhase 1を読み、Phase 1のPurpose、Scope、Implementation Targets、Tests、Completion Conditionsを抽出する。
-5. Humanへ「Application Layer Phase 1 Implementationを開始する」地点であることを報告する。
-6. 実装に入る場合は、Phase 1の最初の振る舞いからTDDで開始する。
+3. `git log --oneline --decorate -n 5`でPR #37 merge commit `7f37fad`を確認する。
+4. Application Layer Implementation PlanのPhase 5を読み、Purpose、Scope、Implementation Targets、Tests、Completion Conditionsを抽出する。
+5. Phase 4で構築されたImplementation Evidence、Git Diff、Test StateをPhase 5が確認できる現在の境界を確認する。
+6. Humanへ「Application Layer Phase 5 Review & Correctionを開始する」地点であることを報告する。
+7. 実装に入る場合は、Phase 5の最初の振る舞いからTDDで開始する。
 
 ---
 
@@ -172,7 +201,8 @@ Implementation中にSpecificationまたはImplementation Planから一意に決�
 
 - SpecificationまたはImplementation Planを推測で変更しない。
 - Human ApprovalをAIが生成、推測、補完、代替しない。
-- Phase 1開始前にPhase 2以降の業務処理を先行実装しない。
+- Phase 5開始前にPhase 6以降の業務処理を先行実装しない。
+- 完了済みのPhase 3およびPhase 4を、追加Decisionや不要な抽象化によって再拡張しない。
 - Application LayerからInfrastructure具体実装へ直接依存しない。
 - CoreからApplication Layerへの逆依存を導入しない。
 - Evidence、Review、Approval、Git Result、State Historyを同一情報として扱わない。
