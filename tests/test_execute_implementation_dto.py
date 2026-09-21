@@ -13,6 +13,7 @@ from application.dto import (
 def test_execute_implementation_input_is_frozen_dataclass() -> None:
     implementation_id = uuid4()
     dto = ExecuteImplementationInput(
+        base_branch="release/baseline",
         implementation_id=implementation_id,
         specification_path=Path("spec.md"),
         specification_approval_id="spec-approval-1",
@@ -37,6 +38,7 @@ def test_execute_implementation_input_is_frozen_dataclass() -> None:
 def test_execute_implementation_output_is_frozen_dataclass() -> None:
     implementation_id = uuid4()
     dto = ExecuteImplementationOutput(
+        base_branch="release/baseline",
         success=False,
         implementation_id=implementation_id,
         test_execution_record_path=None,

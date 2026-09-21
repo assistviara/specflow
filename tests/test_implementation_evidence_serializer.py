@@ -41,6 +41,9 @@ def make_evidence() -> ImplementationEvidence:
 
     return ImplementationEvidence(
         identity=EvidenceIdentity(
+            base_branch="release/baseline",
+            base_commit="abc123",
+            implementation_branch="impl/example",
             evidence_id=evidence_id,
             implementation_id=implementation_id,
             implementation_kind="INITIAL",
@@ -86,6 +89,7 @@ def make_evidence() -> ImplementationEvidence:
             change_summary="Implementation Evidence example",
         ),
         verification=EvidenceVerification(
+            test_execution_record_path=Path("evidence/test_execution.json"),
             commands=("python -m pytest",),
             tests_created_or_modified=("tests/test_example.py",),
             test_commands=("python -m pytest",),
@@ -115,6 +119,13 @@ def test_implementation_evidence_to_dict_uses_json_safe_values() -> None:
     evidence = make_evidence()
 
     data = implementation_evidence_to_dict(evidence)
+
+    assert data["identity"]["base_branch"] == "release/baseline"
+    assert data["identity"]["base_commit"] == "abc123"
+    assert data["identity"]["implementation_branch"] == "impl/example"
+    assert data["verification"]["test_execution_record_path"] == (
+        "evidence/test_execution.json"
+    )
 
     assert data["identity"]["evidence_id"] == str(
         evidence.identity.evidence_id
@@ -158,6 +169,7 @@ def test_implementation_evidence_round_trip_restores_types() -> None:
     )
 
     assert restored == evidence
+    assert isinstance(restored.verification.test_execution_record_path, Path)
 
     assert isinstance(
         restored.identity.evidence_id,

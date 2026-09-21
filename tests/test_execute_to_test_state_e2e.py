@@ -1,6 +1,12 @@
 import json
 from pathlib import Path
 from uuid import uuid4
+from unittest.mock import Mock
+
+from application.collect_implementation_evidence import CollectImplementationEvidenceUseCase
+from application.dto import CollectImplementationEvidenceInput
+from application.repository_state_provider import RepositoryState, RepositoryStateProvider
+from infrastructure.json_implementation_evidence_repository import JsonImplementationEvidenceRepository
 
 from application.codex_implementation_adapter import (
     CodexImplementationAdapter,
@@ -249,6 +255,7 @@ def test_phase_3_record_is_verified_by_phase_4_provider(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=implementation_id,
             specification_path=(
                 specification_path
@@ -319,3 +326,48 @@ def test_phase_3_record_is_verified_by_phase_4_provider(
         "tests_created_or_modified",
         "warnings",
     )
+
+    repository_provider = Mock(spec=RepositoryStateProvider)
+    repository_provider.get_state.return_value = RepositoryState(
+        branch=output.implementation_branch,
+        base_commit=output.base_commit,
+        git_status="",
+        git_diff="",
+        created_files=(),
+        modified_files=(),
+        deleted_files=(),
+    )
+    evidence_repository = JsonImplementationEvidenceRepository(evidence_dir)
+    collected = CollectImplementationEvidenceUseCase(
+        repository_state_provider=repository_provider,
+        test_state_provider=provider,
+        evidence_repository=evidence_repository,
+    ).execute(CollectImplementationEvidenceInput(
+        base_branch=output.base_branch,
+        base_commit=output.base_commit,
+        implementation_branch=output.implementation_branch,
+        implementation_id=output.implementation_id,
+        test_execution_record_path=output.test_execution_record_path,
+        implementation_kind="INITIAL",
+        previous_evidence_id=None,
+        specification_path=output.specification_path,
+        specification_approval_id="spec-approval-e2e",
+        implementation_plan_path=output.implementation_plan_path,
+        implementation_plan_approval_id="plan-approval-e2e",
+        codex_prompt_path=tmp_path / "codex_prompt.md",
+        codex_prompt="Implement approved scope.",
+        implementation_result=output.implementation_result,
+        approved_scope=None,
+    ))
+
+    assert collected.success is True
+    restored = evidence_repository.load(collected.evidence_id)
+    assert restored.identity.implementation_id == output.implementation_id
+    assert restored.identity.base_branch == "release/baseline"
+    assert restored.identity.base_commit == output.base_commit
+    assert restored.identity.implementation_branch == output.implementation_branch
+    assert restored.verification.test_execution_record_path == output.test_execution_record_path
+    assert JsonTestStateProvider(
+        record_path=restored.verification.test_execution_record_path,
+        expected_implementation_id=restored.identity.implementation_id,
+    ).get_state() == state

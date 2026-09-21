@@ -1,4 +1,5 @@
 from pathlib import Path
+from dataclasses import replace
 from uuid import UUID, uuid4
 
 import pytest
@@ -82,6 +83,43 @@ def make_result():
     )
 
 
+def test_preserves_input_identity_and_record_reference_despite_repository_mismatch(tmp_path):
+    input_dto = replace(
+        make_failure_input(tmp_path),
+        base_branch="release/baseline",
+        implementation_branch="impl/expected",
+        base_commit="expected-commit",
+        test_execution_record_path=tmp_path / "test_execution.json",
+    )
+    repository = RecordingEvidenceRepository()
+    use_case = CollectImplementationEvidenceUseCase(
+        repository_state_provider=FakeRepositoryStateProvider(RepositoryState(
+            branch="impl/actual", base_commit="actual-commit",
+            git_status="", git_diff="", created_files=(),
+            modified_files=(), deleted_files=(),
+        )),
+        test_state_provider=FakeTestStateProvider(ExecutionTestState(
+            tests_created_or_modified=(), test_commands=(),
+            initial_test_status="COMPLETED", initial_test_result="FAIL",
+            target_test_status="COMPLETED", target_test_result="PASS",
+            full_test_status="COMPLETED", full_test_result="PASS",
+            errors=(), warnings=(),
+        )),
+        evidence_repository=repository,
+    )
+
+    output = use_case.execute(input_dto)
+
+    assert output.success is True
+    evidence = repository.saved_evidence
+    assert evidence.identity.base_branch == "release/baseline"
+    assert evidence.identity.base_commit == "expected-commit"
+    assert evidence.identity.implementation_branch == "impl/expected"
+    assert evidence.verification.test_execution_record_path == input_dto.test_execution_record_path
+    assert "implementation branch mismatch: expected=impl/expected actual=impl/actual" in output.inconsistencies
+    assert "base commit mismatch: expected=expected-commit actual=actual-commit" in output.inconsistencies
+
+
 def test_collects_and_persists_complete_implementation_evidence(
     tmp_path,
 ):
@@ -141,6 +179,8 @@ def test_collects_and_persists_complete_implementation_evidence(
 
     output = use_case.execute(
         CollectImplementationEvidenceInput(
+            base_branch="release/baseline",
+            test_execution_record_path=Path("evidence/test_execution.json"),
             implementation_id=implementation_id,
             implementation_kind="INITIAL",
             previous_evidence_id=None,
@@ -235,6 +275,8 @@ def make_failure_input(tmp_path):
     )
 
     return CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=uuid4(),
         implementation_kind="INITIAL",
         previous_evidence_id=None,
@@ -412,6 +454,8 @@ def test_invalid_generation_combination_returns_failure(
         uuid4() if has_previous_evidence else None
     )
     input_dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=input_dto.implementation_id,
         implementation_kind=implementation_kind,
         previous_evidence_id=previous_evidence_id,
@@ -457,6 +501,8 @@ def test_nonexistent_previous_evidence_returns_failure(
     input_dto = make_failure_input(tmp_path)
     previous_evidence_id = uuid4()
     input_dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=input_dto.implementation_id,
         implementation_kind="CORRECTION",
         previous_evidence_id=previous_evidence_id,
@@ -508,6 +554,8 @@ def test_current_evidence_self_reference_returns_failure(
     evidence_id = uuid4()
     input_dto = make_failure_input(tmp_path)
     input_dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=input_dto.implementation_id,
         implementation_kind="CORRECTION",
         previous_evidence_id=evidence_id,
@@ -804,6 +852,8 @@ def test_valid_later_generation_preserves_previous_evidence(
     original_input = make_failure_input(tmp_path)
 
     input_dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=original_input.implementation_id,
         implementation_kind=implementation_kind,
         previous_evidence_id=previous_evidence_id,
@@ -868,6 +918,8 @@ def test_missing_result_and_scope_are_preserved_as_partial_evidence(
     original_input = make_failure_input(tmp_path)
 
     input_dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=original_input.implementation_id,
         implementation_kind="INITIAL",
         previous_evidence_id=None,
@@ -1094,6 +1146,8 @@ def test_invalid_implementation_kind_fails_before_collection(
     original_input = make_failure_input(tmp_path)
 
     input_dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=original_input.implementation_id,
         implementation_kind="UNKNOWN",
         previous_evidence_id=None,
@@ -1140,6 +1194,8 @@ def test_previous_evidence_lookup_exception_returns_failure(
     previous_evidence_id = uuid4()
 
     input_dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=original_input.implementation_id,
         implementation_kind="CORRECTION",
         previous_evidence_id=previous_evidence_id,

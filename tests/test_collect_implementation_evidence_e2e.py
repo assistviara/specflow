@@ -238,6 +238,8 @@ def test_collects_evidence_with_real_infrastructure(
 
     output = use_case.execute(
         CollectImplementationEvidenceInput(
+            base_branch="release/baseline",
+            test_execution_record_path=record_path,
             implementation_id=implementation_id,
             implementation_kind="INITIAL",
             previous_evidence_id=None,
@@ -308,6 +310,15 @@ def test_collects_evidence_with_real_infrastructure(
         output.evidence_id
     )
     assert restored == evidence
+    assert restored.identity.base_branch == "release/baseline"
+    assert restored.identity.base_commit == base_commit
+    assert restored.identity.implementation_branch == "developer"
+    assert restored.verification.test_execution_record_path == record_path
+    restored_test_state = JsonTestStateProvider(
+        record_path=restored.verification.test_execution_record_path,
+        expected_implementation_id=restored.identity.implementation_id,
+    ).get_state()
+    assert restored_test_state.full_test_result == "PASS"
 
     saved_diff = output.git_diff_path.read_text(
         encoding="utf-8"

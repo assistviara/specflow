@@ -28,6 +28,8 @@ def _make_input(
     )
 
     return CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=uuid4(),
         implementation_kind="INITIAL",
         previous_evidence_id=None,

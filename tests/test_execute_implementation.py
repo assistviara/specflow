@@ -215,6 +215,7 @@ def test_successful_implementation_moves_to_implementation_completed(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=implementation_id,
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -246,6 +247,7 @@ def test_successful_implementation_moves_to_implementation_completed(
         "warnings",
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is True
     assert output.implementation_id == implementation_id
     assert output.test_execution_record_path == record_path
@@ -335,6 +337,7 @@ def test_invalid_specification_approval_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -359,6 +362,7 @@ def test_invalid_specification_approval_blocks_implementation(
         output.implementation_plan_approval_validation_result.is_valid
         is True
     )
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.implementation_result is None
     assert output.current_state == "implementation_ready"
@@ -433,6 +437,7 @@ def test_invalid_implementation_plan_approval_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -457,6 +462,7 @@ def test_invalid_implementation_plan_approval_blocks_implementation(
         output.implementation_plan_approval_validation_result.is_valid
         is False
     )
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.implementation_result is None
     assert output.current_state == "implementation_ready"
@@ -526,6 +532,7 @@ def test_codex_prompt_path_mismatch_blocks_implementation(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -544,6 +551,7 @@ def test_codex_prompt_path_mismatch_blocks_implementation(
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.implementation_result is None
     assert output.current_state == "implementation_ready"
@@ -646,6 +654,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -662,6 +671,7 @@ NONE
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is True
     assert output.current_state == "implementation_completed"
     assert output.technical_retry_required is False
@@ -765,6 +775,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -781,6 +792,7 @@ NONE
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -927,6 +939,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -944,6 +957,7 @@ NONE
     )
 
     assert adapter.call_count == 2
+    assert output.base_branch == "release/baseline"
     assert output.success is True
     assert output.current_state == "implementation_completed"
     assert output.technical_retry_required is False
@@ -1057,6 +1071,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -1074,6 +1089,7 @@ NONE
     )
 
     assert adapter.call_count == 2
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -1176,6 +1192,7 @@ Database schema change is required outside the approved scope.
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -1192,6 +1209,7 @@ Database schema change is required outside the approved scope.
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "critical_approval_pending"
     assert output.technical_retry_required is False
@@ -1298,6 +1316,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -1314,6 +1333,7 @@ NONE
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -1420,6 +1440,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -1436,6 +1457,7 @@ NONE
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -1542,6 +1564,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -1558,6 +1581,7 @@ NONE
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -1698,6 +1722,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=implementation_id,
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -1724,6 +1749,7 @@ NONE
     )
     assert output.test_execution_record_path == record_path
 
+    assert output.base_branch == "release/baseline"
     assert output.success is True
     assert output.current_state == "implementation_completed"
     assert output.technical_retry_required is False
@@ -1830,6 +1856,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -1846,6 +1873,7 @@ NONE
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is True
     assert output.current_state == "implementation_completed"
     assert output.technical_retry_required is False
@@ -1926,6 +1954,7 @@ def test_runner_exception_fails_without_automatic_retry(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -1943,6 +1972,7 @@ def test_runner_exception_fails_without_automatic_retry(
     )
 
     assert adapter.call_count == 1
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.implementation_result is None
     assert output.current_state == "implementation_failed"
@@ -2027,6 +2057,7 @@ application/example.py
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -2044,6 +2075,7 @@ application/example.py
     )
 
     assert adapter.call_count == 1
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.implementation_result is None
     assert output.current_state == "implementation_failed"
@@ -2159,6 +2191,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -2176,6 +2209,7 @@ NONE
     )
 
     assert adapter.call_count == 2
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -2296,6 +2330,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -2313,6 +2348,7 @@ NONE
     )
 
     assert adapter.call_count == 2
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -2458,6 +2494,7 @@ Change outside approved implementation scope.
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -2475,6 +2512,7 @@ Change outside approved implementation scope.
     )
 
     assert adapter.call_count == 2
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "critical_approval_pending"
     assert output.technical_retry_required is False
@@ -2619,6 +2657,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -2636,6 +2675,7 @@ NONE
     )
 
     assert adapter.call_count == 2
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -2786,6 +2826,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -2803,6 +2844,7 @@ NONE
     )
 
     assert adapter.call_count == 1
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -2909,6 +2951,7 @@ NONE
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -2926,6 +2969,7 @@ NONE
     )
 
     assert adapter.call_count == 1
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -2999,6 +3043,7 @@ def test_implementation_does_not_start_from_invalid_current_state(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=uuid4(),
             specification_path=specification_path,
             specification_approval_id="spec-approval-001",
@@ -3016,6 +3061,7 @@ def test_implementation_does_not_start_from_invalid_current_state(
     )
 
     assert adapter.call_count == 0
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.current_state == "plan_approved"
     assert output.technical_retry_required is False
@@ -3117,6 +3163,7 @@ def test_test_execution_record_failure_prevents_implementation_completion(
 
     output = use_case.execute(
         ExecuteImplementationInput(
+            base_branch="release/baseline",
             implementation_id=implementation_id,
             specification_path=specification_path,
             specification_approval_id=(
@@ -3145,6 +3192,7 @@ def test_test_execution_record_failure_prevents_implementation_completion(
         )
     )
 
+    assert output.base_branch == "release/baseline"
     assert output.success is False
     assert output.implementation_id == implementation_id
     assert output.test_execution_record_path is None

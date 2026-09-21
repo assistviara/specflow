@@ -8,6 +8,9 @@ from application.implementation_result_parser import ImplementationResult
 
 @dataclass(frozen=True)
 class EvidenceIdentity:
+    base_branch: str
+    base_commit: str
+    implementation_branch: str
     evidence_id: UUID
     implementation_id: UUID
     implementation_kind: str
@@ -118,6 +121,7 @@ class EvidenceChanges:
 
 @dataclass(frozen=True)
 class EvidenceVerification:
+    test_execution_record_path: Path
     commands: tuple[str, ...]
     tests_created_or_modified: tuple[str, ...]
     test_commands: tuple[str, ...]

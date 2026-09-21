@@ -142,6 +142,7 @@ class ExecuteImplementationUseCase:
             or not implementation_plan_validation.is_valid
         ):
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -169,6 +170,7 @@ class ExecuteImplementationUseCase:
             != input_dto.implementation_plan_path
         ):
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -193,6 +195,7 @@ class ExecuteImplementationUseCase:
 
         if current_state != "implementation_ready":
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -250,6 +253,7 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -297,6 +301,7 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -338,6 +343,7 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -374,6 +380,7 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -433,6 +440,7 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        base_branch=input_dto.base_branch,
                         implementation_id=input_dto.implementation_id,
                         test_execution_record_path=None,
                         success=False,
@@ -478,6 +486,7 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        base_branch=input_dto.base_branch,
                         implementation_id=input_dto.implementation_id,
                         test_execution_record_path=None,
                         success=False,
@@ -522,6 +531,7 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        base_branch=input_dto.base_branch,
                         implementation_id=input_dto.implementation_id,
                         test_execution_record_path=None,
                         success=False,
@@ -558,6 +568,7 @@ class ExecuteImplementationUseCase:
                     )
 
                     return ExecuteImplementationOutput(
+                        base_branch=input_dto.base_branch,
                         implementation_id=input_dto.implementation_id,
                         test_execution_record_path=None,
                         success=False,
@@ -594,6 +605,7 @@ class ExecuteImplementationUseCase:
                 )
 
                 return ExecuteImplementationOutput(
+                    base_branch=input_dto.base_branch,
                     implementation_id=input_dto.implementation_id,
                     test_execution_record_path=None,
                     success=False,
@@ -632,6 +644,7 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -671,6 +684,7 @@ class ExecuteImplementationUseCase:
             )
 
             return ExecuteImplementationOutput(
+                base_branch=input_dto.base_branch,
                 implementation_id=input_dto.implementation_id,
                 test_execution_record_path=None,
                 success=False,
@@ -752,6 +766,7 @@ class ExecuteImplementationUseCase:
                 )
 
                 return ExecuteImplementationOutput(
+                    base_branch=input_dto.base_branch,
                     implementation_id=(
                         input_dto.implementation_id
                     ),
@@ -799,6 +814,7 @@ class ExecuteImplementationUseCase:
         )
 
         return ExecuteImplementationOutput(
+            base_branch=input_dto.base_branch,
             implementation_id=input_dto.implementation_id,
             test_execution_record_path=(
                 test_execution_record_path

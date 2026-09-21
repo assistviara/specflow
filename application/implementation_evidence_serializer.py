@@ -23,6 +23,9 @@ def implementation_evidence_to_dict(
 
     return {
         "identity": {
+            "base_branch": evidence.identity.base_branch,
+            "base_commit": evidence.identity.base_commit,
+            "implementation_branch": evidence.identity.implementation_branch,
             "evidence_id": str(evidence.identity.evidence_id),
             "implementation_id": str(
                 evidence.identity.implementation_id
@@ -81,6 +84,9 @@ def implementation_evidence_to_dict(
             "change_summary": evidence.changes.change_summary,
         },
         "verification": {
+            "test_execution_record_path": (
+                evidence.verification.test_execution_record_path.as_posix()
+            ),
             "commands": list(evidence.verification.commands),
             "tests_created_or_modified": list(
                 evidence.verification.tests_created_or_modified
@@ -174,6 +180,9 @@ def implementation_evidence_from_dict(
 
     return ImplementationEvidence(
         identity=EvidenceIdentity(
+            base_branch=identity["base_branch"],
+            base_commit=identity["base_commit"],
+            implementation_branch=identity["implementation_branch"],
             evidence_id=UUID(identity["evidence_id"]),
             implementation_id=UUID(
                 identity["implementation_id"]
@@ -246,6 +255,9 @@ def implementation_evidence_from_dict(
             change_summary=changes["change_summary"],
         ),
         verification=EvidenceVerification(
+            test_execution_record_path=Path(
+                verification["test_execution_record_path"]
+            ),
             commands=tuple(
                 verification["commands"]
             ),
