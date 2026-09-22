@@ -12,14 +12,22 @@ class SemanticStagedReviewUseCase:
         self._ai_service = ai_service
         self._batch = ReviewImplementationUseCase(ai_service)
 
-    def execute(self, prepared: PrepareReviewInputOutput, *, mode: str) -> StagedReviewOutput:
+    def execute(self, prepared: PrepareReviewInputOutput, *, mode: str, stop_on_execution_error: bool = False) -> StagedReviewOutput:
         if mode not in ('BATCH', 'STAGED'):
             raise ValueError('Explicit BATCH or STAGED mode is required')
         if mode == 'BATCH':
             return StagedReviewOutput(mode, prepared, batch=self._batch.execute(prepared))
         if prepared.review_input is None:
             return StagedReviewOutput(mode, prepared)
-        stages = tuple(self._run(individual_context(prepared, stage)) for stage in STAGES[:4])
+        completed_stages = []
+        for stage in STAGES[:4]:
+            execution = self._run(individual_context(prepared, stage))
+            completed_stages.append(execution)
+            # Target 5 stops after unrecovered AI execution, retaining prior results.
+            # The default Target 3 execution contract remains unchanged.
+            if stop_on_execution_error and execution.execution_error:
+                return StagedReviewOutput(mode, prepared, tuple(completed_stages))
+        stages = tuple(completed_stages)
         integration = self._run(integration_context(prepared, stages))
         return StagedReviewOutput(mode, prepared, stages, integration)
 
