@@ -37,7 +37,10 @@ def individual_context(prepared: PrepareReviewInputOutput, stage: str) -> dict:
             key: data['repository_state'][key]
             for key in ('branch', 'base_commit', 'git_diff', 'created_files', 'modified_files', 'deleted_files', 'unavailable_evidence')
         }
-    return {'stage': stage, 'input': selected, 'mechanical': mechanical_context(prepared)}
+    context = {'stage': stage, 'input': selected, 'mechanical': mechanical_context(prepared)}
+    if prepared.history_context is not None:
+        context['history_context'] = prepared.history_context
+    return context
 
 
 def _resolve(reference: str, context: dict):
@@ -58,7 +61,10 @@ def integration_context(prepared: PrepareReviewInputOutput, stages: tuple[StageE
             for finding in stage.assessment.findings
         ] if stage.assessment is not None else []
         results.append(result)
-    return {'stage': 'Integration Review', 'stages': results, 'mechanical': mechanical_context(prepared)}
+    context = {'stage': 'Integration Review', 'stages': results, 'mechanical': mechanical_context(prepared)}
+    if prepared.history_context is not None:
+        context['history_context'] = prepared.history_context
+    return context
 
 
 def build_stage_prompt(context: dict) -> PromptResult:

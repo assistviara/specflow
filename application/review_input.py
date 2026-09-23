@@ -55,3 +55,4 @@ class PrepareReviewInputOutput:
     missing_information: tuple[str, ...]
     acquisition_errors: tuple[str, ...]
     mismatches: tuple[ReviewMismatch, ...]
+    history_context: dict | None = None
