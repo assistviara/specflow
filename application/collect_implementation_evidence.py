@@ -288,6 +288,9 @@ class CollectImplementationEvidenceUseCase:
 
         evidence = ImplementationEvidence(
             identity=EvidenceIdentity(
+                base_branch=input_dto.base_branch,
+                base_commit=input_dto.base_commit,
+                implementation_branch=input_dto.implementation_branch,
                 evidence_id=evidence_id,
                 implementation_id=input_dto.implementation_id,
                 implementation_kind=input_dto.implementation_kind,
@@ -307,6 +310,7 @@ class CollectImplementationEvidenceUseCase:
                 change_summary=change_summary,
             ),
             verification=EvidenceVerification(
+                test_execution_record_path=input_dto.test_execution_record_path,
                 commands=commands,
                 tests_created_or_modified=(
                     test_state.tests_created_or_modified

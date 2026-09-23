@@ -1,3 +1,4 @@
+from pathlib import Path
 from dataclasses import FrozenInstanceError
 
 import pytest
@@ -7,6 +8,7 @@ from application.implementation_evidence import EvidenceVerification
 
 def test_evidence_verification_is_frozen_dataclass() -> None:
     verification = EvidenceVerification(
+        test_execution_record_path=Path("evidence/test_execution.json"),
         commands=("python -m pytest tests/test_example.py",),
         tests_created_or_modified=("tests/test_example.py",),
         test_commands=("python -m pytest tests/test_example.py",),
@@ -49,6 +51,7 @@ def test_evidence_verification_rejects_invalid_test_status(
     field_name: str,
 ) -> None:
     values = {
+        "test_execution_record_path": Path("evidence/test_execution.json"),
         "commands": (),
         "tests_created_or_modified": (),
         "test_commands": (),
@@ -81,6 +84,7 @@ def test_evidence_verification_rejects_invalid_test_result(
     field_name: str,
 ) -> None:
     values = {
+        "test_execution_record_path": Path("evidence/test_execution.json"),
         "commands": (),
         "tests_created_or_modified": (),
         "test_commands": (),
@@ -117,6 +121,7 @@ def test_evidence_verification_rejects_invalid_status_result_pair(
 ) -> None:
     with pytest.raises(ValueError):
         EvidenceVerification(
+            test_execution_record_path=Path("evidence/test_execution.json"),
             commands=(),
             tests_created_or_modified=(),
             test_commands=(),
@@ -146,6 +151,7 @@ def test_evidence_verification_accepts_valid_status_result_pair(
     result: str,
 ) -> None:
     verification = EvidenceVerification(
+        test_execution_record_path=Path("evidence/test_execution.json"),
         commands=(),
         tests_created_or_modified=(),
         test_commands=(),

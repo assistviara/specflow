@@ -45,6 +45,9 @@ def make_implementation_result() -> ImplementationResult:
 def test_implementation_evidence_is_frozen_dataclass_with_typed_blocks() -> None:
     evidence = ImplementationEvidence(
         identity=EvidenceIdentity(
+            base_branch="release/baseline",
+            base_commit="abc123",
+            implementation_branch="impl/example",
             evidence_id=uuid4(),
             implementation_id=uuid4(),
             implementation_kind="INITIAL",
@@ -82,6 +85,7 @@ def test_implementation_evidence_is_frozen_dataclass_with_typed_blocks() -> None
             change_summary="example change",
         ),
         verification=EvidenceVerification(
+            test_execution_record_path=Path("evidence/test_execution.json"),
             commands=("python -m pytest",),
             tests_created_or_modified=("tests/test_example.py",),
             test_commands=("python -m pytest",),
@@ -133,6 +137,9 @@ def test_implementation_evidence_scope_allows_none() -> None:
 def test_implementation_evidence_preserves_unavailable_scope_as_none() -> None:
     evidence = ImplementationEvidence(
         identity=EvidenceIdentity(
+            base_branch="release/baseline",
+            base_commit="abc123",
+            implementation_branch="impl/example",
             evidence_id=uuid4(),
             implementation_id=uuid4(),
             implementation_kind="INITIAL",
@@ -166,6 +173,7 @@ def test_implementation_evidence_preserves_unavailable_scope_as_none() -> None:
             change_summary="scope unavailable",
         ),
         verification=EvidenceVerification(
+            test_execution_record_path=Path("evidence/test_execution.json"),
             commands=(),
             tests_created_or_modified=(),
             test_commands=(),

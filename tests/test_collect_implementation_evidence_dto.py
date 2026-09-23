@@ -17,6 +17,8 @@ def test_collect_implementation_evidence_input_is_frozen_dataclass() -> None:
     previous_evidence_id = uuid4()
 
     dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=implementation_id,
         implementation_kind="CORRECTION",
         previous_evidence_id=previous_evidence_id,
@@ -76,6 +78,8 @@ def test_collect_implementation_evidence_input_preserves_codex_prompt_path() -> 
     )
 
     dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=uuid4(),
         implementation_kind="INITIAL",
         previous_evidence_id=None,
@@ -105,6 +109,8 @@ def test_collect_implementation_evidence_input_preserves_approved_scope() -> Non
     )
 
     dto = CollectImplementationEvidenceInput(
+        base_branch="release/baseline",
+        test_execution_record_path=Path("evidence/test_execution.json"),
         implementation_id=uuid4(),
         implementation_kind="INITIAL",
         previous_evidence_id=None,

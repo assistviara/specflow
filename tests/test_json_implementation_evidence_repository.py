@@ -26,6 +26,9 @@ def make_evidence() -> ImplementationEvidence:
 
     return ImplementationEvidence(
         identity=EvidenceIdentity(
+            base_branch="release/baseline",
+            base_commit="abc123",
+            implementation_branch="impl/example",
             evidence_id=evidence_id,
             implementation_id=uuid4(),
             implementation_kind="INITIAL",
@@ -67,6 +70,7 @@ def make_evidence() -> ImplementationEvidence:
             change_summary="example change",
         ),
         verification=EvidenceVerification(
+            test_execution_record_path=Path("evidence/test_execution.json"),
             commands=("python -m pytest",),
             tests_created_or_modified=("tests/test_example.py",),
             test_commands=("python -m pytest",),

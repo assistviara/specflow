@@ -23,6 +23,9 @@ def test_evidence_identity_is_frozen_dataclass() -> None:
     previous_evidence_id = uuid4()
 
     identity = EvidenceIdentity(
+        base_branch="release/baseline",
+        base_commit="abc123",
+        implementation_branch="impl/example",
         evidence_id=evidence_id,
         implementation_id=implementation_id,
         implementation_kind="CORRECTION",
@@ -60,6 +63,9 @@ def test_evidence_identity_accepts_defined_values(
     )
 
     identity = EvidenceIdentity(
+        base_branch="release/baseline",
+        base_commit="abc123",
+        implementation_branch="impl/example",
         evidence_id=uuid4(),
         implementation_id=uuid4(),
         implementation_kind=implementation_kind,
@@ -87,6 +93,9 @@ def test_evidence_identity_rejects_undefined_values(
 ) -> None:
     with pytest.raises(ValueError):
         EvidenceIdentity(
+            base_branch="release/baseline",
+            base_commit="abc123",
+            implementation_branch="impl/example",
             evidence_id=uuid4(),
             implementation_id=uuid4(),
             implementation_kind=implementation_kind,
@@ -99,6 +108,9 @@ def test_evidence_identity_rejects_undefined_values(
 def test_initial_evidence_rejects_previous_evidence_id() -> None:
     with pytest.raises(ValueError):
         EvidenceIdentity(
+            base_branch="release/baseline",
+            base_commit="abc123",
+            implementation_branch="impl/example",
             evidence_id=uuid4(),
             implementation_id=uuid4(),
             implementation_kind="INITIAL",
@@ -120,6 +132,9 @@ def test_non_initial_evidence_requires_previous_evidence_id(
 ) -> None:
     with pytest.raises(ValueError):
         EvidenceIdentity(
+            base_branch="release/baseline",
+            base_commit="abc123",
+            implementation_branch="impl/example",
             evidence_id=uuid4(),
             implementation_id=uuid4(),
             implementation_kind=implementation_kind,
@@ -140,6 +155,9 @@ def test_evidence_identity_requires_timezone_aware_created_at() -> None:
     )
 
     identity = EvidenceIdentity(
+        base_branch="release/baseline",
+        base_commit="abc123",
+        implementation_branch="impl/example",
         evidence_id=uuid4(),
         implementation_id=uuid4(),
         implementation_kind="INITIAL",
@@ -156,6 +174,9 @@ def test_evidence_identity_requires_timezone_aware_created_at() -> None:
 def test_evidence_identity_rejects_naive_created_at() -> None:
     with pytest.raises(ValueError):
         EvidenceIdentity(
+            base_branch="release/baseline",
+            base_commit="abc123",
+            implementation_branch="impl/example",
             evidence_id=uuid4(),
             implementation_id=uuid4(),
             implementation_kind="INITIAL",
