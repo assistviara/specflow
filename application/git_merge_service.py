@@ -38,9 +38,16 @@ class GitMergeVerification:
     integrated: bool = False
     errors: tuple[str, ...] = ()
 
+    expected_tree: str | None = None
+    actual_tree: str | None = None
+    content_matched: bool = False
+    approved_content_retained: bool = False
+
     @property
     def verified(self) -> bool:
-        return self.integrated and not self.errors
+        return (self.integrated and not self.errors and self.content_matched
+                and self.approved_content_retained and bool(self.expected_tree)
+                and self.expected_tree == self.actual_tree)
 
 
 class GitMergeService(Protocol):
@@ -59,5 +66,5 @@ class GitMergeService(Protocol):
     def merge(self, source_branch: str, approved_commit: str, target_commit: str) -> GitMergeResult:
         ...
 
-    def verify_merge(self, result: GitMergeResult) -> GitMergeVerification:
+    def verify_merge(self, result: GitMergeResult, *, base_commit: str) -> GitMergeVerification:
         ...

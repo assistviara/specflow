@@ -69,8 +69,10 @@ class GitCliMergeService:
                 raise ValueError('Repository changed after merge checkout')
             # Pin the approved commit; disable stash and reuse of conflict
             # resolutions. Never repair a conflict or modify the source branch.
+            options = self._content_options()
             result = replace(result, command_started=True)
-            command = self._command('-c', 'rerere.enabled=false', 'merge', '--ff',
+            command = self._command(*options, '-c', 'branch.developer.mergeoptions=',
+                '-c', 'rerere.enabled=false', 'merge', '--ff',
                 '--no-squash', '--commit', '--no-edit', '--no-autostash', approved_commit, check=False)
             result = replace(result, returncode=command.returncode, stdout=command.stdout,
                 stderr=command.stderr, warnings=(command.stderr,) if command.returncode == 0 and command.stderr else ())
@@ -101,10 +103,12 @@ class GitCliMergeService:
             result = replace(result, errors=(*result.errors, f'Post-merge repository unavailable: {exc}'))
         return result
 
-    def verify_merge(self, result: GitMergeResult) -> GitMergeVerification:
+    def verify_merge(self, result: GitMergeResult, *, base_commit: str) -> GitMergeVerification:
         errors = []
         state = head = target = source = pending = None
         integrated = False
+        expected_tree = actual_tree = None
+        content_matched = retained_content = False
         if (not result.command_success or result.errors or result.conflicts
                 or result.target_branch != 'developer' or not result.post_commit
                 or result.repository != str(self._working_directory)):
@@ -143,7 +147,55 @@ class GitCliMergeService:
                     errors.append('Pre-merge developer history is not retained: ' + retained.stderr)
             except Exception as exc:
                 errors.append(f'Integration verification failed: {exc}')
-        return GitMergeVerification(state, head, target, source, pending, integrated, tuple(errors))
+        if not errors:
+            try:
+                # Object-only calculation: never checkout or run a trial merge.
+                expected_tree = self._merge_tree(result.pre_commit, result.approved_commit)
+                actual_tree = self._command('rev-parse', '--verify',
+                    f'{result.post_commit}^{{tree}}').stdout.strip()
+                content_matched = bool(actual_tree) and expected_tree == actual_tree
+                if not content_matched:
+                    errors.append('Post-merge content differs from expected merge content')
+                # Natural merge alone accepts an already-integrated but reverted
+                # change. Reintroducing the approved delta from its saved base
+                # must be conflict-free and leave the actual tree unchanged.
+                if self._command('merge-base', '--is-ancestor', base_commit,
+                        result.approved_commit, check=False).returncode != 0:
+                    raise ValueError('Approved base is not an ancestor of approved commit')
+                retained_tree = self._merge_tree(result.post_commit, result.approved_commit,
+                    base_commit=base_commit)
+                retained_content = retained_tree == actual_tree
+                if not retained_content:
+                    errors.append('Approved content is missing or reverted in post-merge result')
+            except Exception as exc:
+                errors.append(f'Content verification unavailable: {exc}')
+        return GitMergeVerification(state, head, target, source, pending, integrated, tuple(errors),
+            expected_tree, actual_tree, content_matched, retained_content)
+
+    def _merge_tree(self, target: str, approved: str, *, base_commit: str | None = None) -> str:
+        arguments = ['merge-tree', '--write-tree']
+        if base_commit is not None:
+            arguments.append(f'--merge-base={base_commit}')
+        result = self._command(*self._content_options(), *arguments, target, approved, check=False)
+        if result.returncode != 0:
+            raise ValueError('Conflict-free expected content unavailable: ' + result.stdout + result.stderr)
+        lines = result.stdout.splitlines()
+        if not lines:
+            raise ValueError('Expected tree identifier unavailable')
+        tree = lines[0].strip()
+        # Validate the returned object instead of trusting an arbitrary output line.
+        resolved = self._command('rev-parse', '--verify', f'{tree}^{{tree}}').stdout.strip()
+        if not resolved or resolved != tree:
+            raise ValueError('Invalid expected tree identifier')
+        return tree
+
+    def _content_options(self) -> tuple[str, ...]:
+        # A configured external driver could silently discard changes or resolve
+        # conflicts. Do not execute it to calculate (or produce) approved content.
+        drivers = self._command('config', '--get-regexp', r'^merge\..*\.driver$', check=False)
+        if drivers.returncode != 1:
+            raise ValueError('Cannot establish ordinary merge content with custom or unreadable merge drivers')
+        return ('-c', 'merge.default=text', '-c', 'merge.union.driver=false')
 
     def _command(self, *arguments: str, check: bool = True) -> subprocess.CompletedProcess:
         return subprocess.run(['git', *arguments], cwd=self._working_directory,

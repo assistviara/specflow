@@ -56,7 +56,7 @@ class MergeExecutionUseCase:
                 raise ValueError('Merge operation does not identify the approved source and target')
             if not operation.command_success or operation.errors or operation.conflicts:
                 return MergeExecutionOutput(request, refreshed, operation, failures=('Git merge operation failed',))
-            verification = self._git.verify_merge(operation)
+            verification = self._git.verify_merge(operation, base_commit=artifact.base_commit)
             if not isinstance(verification, GitMergeVerification) or not verification.verified:
                 return MergeExecutionOutput(request, refreshed, operation, verification,
                     ('Post-merge verification failed',))

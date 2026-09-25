@@ -47,7 +47,8 @@ def execution_case(merge_case):
     git.verify_merge.return_value = GitMergeVerification(
         repository_state=replace(git.get_state.return_value, branch='developer'),
         current_head=artifact.head_commit, target_head=artifact.head_commit,
-        source_head=artifact.head_commit, pending_operations=(), integrated=True)
+        source_head=artifact.head_commit, pending_operations=(), integrated=True,
+        expected_tree='tree', actual_tree='tree', content_matched=True, approved_content_retained=True)
     return ready, git, approvals
 
 
@@ -164,3 +165,18 @@ def test_command_warnings_are_retained(execution_case):
     output = execute(execution_case)
     assert output.succeeded
     assert output.operation.warnings == ('Git warning',)
+
+
+@pytest.mark.parametrize('field,value', [('content_matched', False),
+    ('approved_content_retained', False), ('expected_tree', None), ('actual_tree', 'other')])
+def test_content_verification_failure_blocks_execution_and_completion(execution_case, field, value):
+    from application.phase_six_completion import PhaseSixCompletionUseCase
+    ready, git, approvals = execution_case
+    git.verify_merge.return_value = replace(git.verify_merge.return_value, **{field: value})
+    merged = execute(execution_case)
+    assert merged.operation.command_success and not merged.succeeded
+    completed = PhaseSixCompletionUseCase(approvals).execute(merged)
+    assert not completed.completed and completed.transition is None
+    assert completed.final_state == 'final_approval_pending'
+    git.verify_merge.assert_called_once_with(merged.operation,
+        base_commit=ready.request.request.decision.request.target.artifact.base_commit)
