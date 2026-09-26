@@ -127,6 +127,8 @@ class ExecuteImplementationInput:
     working_directory: Path
     state_file: Path
     state_history_dir: Path
+    tdd_required: bool | None = None
+    no_tdd_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -142,7 +144,7 @@ class ExecuteImplementationOutput:
     base_commit: str
     specification_approval_validation_result: ApprovalValidationResult
     implementation_plan_approval_validation_result: ApprovalValidationResult
-    current_state: str
+    current_state: str | None
     technical_retry_required: bool
     critical_change_required: bool
     stop_reason: str | None = None
