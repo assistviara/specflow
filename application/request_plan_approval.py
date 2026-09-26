@@ -35,8 +35,12 @@ class RequestPlanApprovalUseCase:
 
         self._approval_repository.save(approval_record)
 
+        saved_record = self._approval_repository.get(input_dto.approval_id)
+        if saved_record != approval_record:
+            raise ValueError("Saved Approval differs from the Human Decision record.")
+
         approval_validation_result = validate_approval_result(
-            approval_record,
+            saved_record,
             str(input_dto.implementation_plan_path),
             "implementation_plan",
         )
