@@ -41,7 +41,7 @@ class MergePreconditionsUseCase:
         self._git = git
         self._approvals = approvals
 
-    def execute(self, request: FinalApprovalRoutingOutput) -> MergePreconditionsOutput:
+    def validate_approval(self, request: FinalApprovalRoutingOutput) -> MergePreconditionsOutput:
         failures = []
         def fail(code, detail):
             failures.append(PreconditionFailure(code, detail))
@@ -113,6 +113,20 @@ class MergePreconditionsUseCase:
         if failures:
             return MergePreconditionsOutput(request, approval_record=record,
                 approval_validation=validation, failures=tuple(failures))
+
+        return MergePreconditionsOutput(request, approval_record=record, approval_validation=validation)
+
+    def execute(self, request: FinalApprovalRoutingOutput) -> MergePreconditionsOutput:
+        validated = self.validate_approval(request)
+        if validated.failures:
+            return validated
+        record, validation = validated.approval_record, validated.approval_validation
+        target = request.request.decision.request.target
+        artifact = target.artifact
+        approved_diff = target.request.entry.repository_state.git_diff
+        failures = []
+        def fail(code, detail):
+            failures.append(PreconditionFailure(code, detail))
 
         # Retain independent observations, including those acquired when another
         # operation fails. Never replace saved identity with these current facts.

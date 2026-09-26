@@ -51,6 +51,12 @@ class GitMergeVerification:
 
 
 class GitMergeService(Protocol):
+    def get_repository_identity(self) -> str:
+        ...
+
+    def retry_merge(self, failed: GitMergeResult) -> GitMergeResult:
+        ...
+
     def get_state(self, base_commit: str) -> RepositoryState:
         ...
 

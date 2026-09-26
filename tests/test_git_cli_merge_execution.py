@@ -273,3 +273,45 @@ def test_already_integrated_content_with_independent_developer_change_is_valid(g
     before = run_git(repo, 'rev-parse', 'HEAD')
     verification = git.verify_merge(claimed_result(repo, approved, before), base_commit=base)
     assert verification.verified and verification.approved_content_retained
+
+
+def test_retry_merge_on_developer_rechecks_same_target_without_checkout(git_case, monkeypatch):
+    import subprocess
+    repo, base, approved, git = git_case
+    original = git._command
+    def fail_merge(*args, **kwargs):
+        if 'merge' in args:
+            return subprocess.CompletedProcess(args, 128, 'initial output', 'temporary error')
+        return original(*args, **kwargs)
+    monkeypatch.setattr(git, '_command', fail_merge)
+    failed = git.merge('impl/approved', approved, base)
+    assert not failed.command_success
+    assert run_git(repo, 'branch', '--show-current') == 'developer'
+    calls = []
+    def observe(*args, **kwargs):
+        calls.append(args)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(git, '_command', observe)
+    result = git.retry_merge(failed)
+    assert result.command_success
+    assert git.verify_merge(result, base_commit=base).verified
+    assert not any('checkout' in args for args in calls)
+    assert result.approved_commit == failed.approved_commit and result.pre_commit == failed.pre_commit
+
+
+def test_retry_merge_refuses_changed_developer_and_preserves_worktree(git_case, monkeypatch):
+    import subprocess
+    repo, base, approved, git = git_case
+    original = git._command
+    def fail_merge(*args, **kwargs):
+        if 'merge' in args:
+            return subprocess.CompletedProcess(args, 128, '', 'failure')
+        return original(*args, **kwargs)
+    monkeypatch.setattr(git, '_command', fail_merge)
+    failed = git.merge('impl/approved', approved, base)
+    monkeypatch.setattr(git, '_command', original)
+    (repo / 'dirty.txt').write_text('do not modify', encoding='utf-8')
+    result = git.retry_merge(failed)
+    assert not result.command_started and not result.command_success
+    assert (repo / 'dirty.txt').read_text() == 'do not modify'
+    assert run_git(repo, 'rev-parse', 'HEAD') == base

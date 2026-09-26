@@ -14,6 +14,7 @@ class MergeExecutionOutput:
     operation: GitMergeResult | None = None
     verification: GitMergeVerification | None = None
     failures: tuple[str, ...] = ()
+    retry_history: dict | None = None
 
     @property
     def succeeded(self) -> bool:

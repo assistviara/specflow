@@ -10,8 +10,11 @@ from infrastructure.git_repository_state_provider import GitRepositoryStateProvi
 
 class GitCliMergeService:
     def __init__(self, working_directory: Path) -> None:
-        self._working_directory = working_directory
-        self._repository = GitRepositoryStateProvider(working_directory)
+        self._working_directory = working_directory.resolve()
+        self._repository = GitRepositoryStateProvider(self._working_directory)
+
+    def get_repository_identity(self) -> str:
+        return str(self._working_directory)
 
     def get_state(self, base_commit: str) -> RepositoryState:
         return self._repository.get_state(base_commit)
@@ -50,17 +53,30 @@ class GitCliMergeService:
         return tuple(pending)
 
     def merge(self, source_branch: str, approved_commit: str, target_commit: str) -> GitMergeResult:
+        return self._execute_merge(source_branch, approved_commit, target_commit)
+
+    def retry_merge(self, failed: GitMergeResult) -> GitMergeResult:
+        if (failed.repository != self.get_repository_identity() or failed.operation != 'merge'
+                or failed.target_branch != 'developer' or failed.command_success):
+            raise ValueError('Same failed merge operation required')
+        return self._execute_merge(failed.source_branch, failed.approved_commit, failed.pre_commit, retry=True)
+
+    def _execute_merge(self, source_branch: str, approved_commit: str, target_commit: str,
+                       *, retry: bool = False) -> GitMergeResult:
         result = GitMergeResult(str(self._working_directory), source_branch, 'developer',
             approved_commit, target_commit)
         try:
             state = self.get_state(target_commit)
-            if (state.unavailable_evidence or state.git_status or state.branch != source_branch
+            on_target = retry and state.branch == 'developer'
+            if (state.unavailable_evidence or state.git_status
+                    or state.branch not in ((source_branch, 'developer') if retry else (source_branch,))
                     or self.get_pending_operations()
-                    or self.get_current_head() != approved_commit
+                    or self.get_current_head() != (target_commit if on_target else approved_commit)
                     or self.get_branch_head(source_branch) != approved_commit
                     or self.get_branch_head('developer') != target_commit):
                 raise ValueError('Repository changed before merge checkout')
-            self._command('checkout', '--no-guess', 'developer')
+            if not on_target:
+                self._command('checkout', '--no-guess', 'developer')
             state = self.get_state(target_commit)
             if (state.unavailable_evidence or state.git_status or state.branch != 'developer'
                     or self.get_pending_operations() or self.get_current_head() != target_commit
