@@ -3644,3 +3644,40 @@ command traceは、
 
 Implementation Evidence JSONを、
 Version 1の正式なEvidence記録の正本として扱う。
+
+
+
+## Decision 54 — Review Handoff State Boundary
+
+**Human Decision #79**
+
+Phase 7 Target 4におけるReview Handoff完成時点の
+Application Stateについて、以下をHuman Decisionとして確定する。
+
+Phase 7 Target 4で完全なReview Handoffが成立しても、
+Application Stateは `implementation_completed` を維持する。
+
+Target 4では、Review Handoff完成を理由として
+`reviewing` へ遷移しない。
+
+Target 4では、`reviewing` へのState transitionおよび
+そのtransitionに伴うHistory記録を行わない。
+
+`reviewing` への遷移は、
+Target 5で実際にReviewを開始する時点の責務とする。
+
+Review Handoffが完成したことと、
+Reviewが開始されたことを別の事実として扱う。
+
+Target 4の成功条件は、
+既存契約に従ったEvidence生成・保存・validationと、
+Phase 5の完全な8-input Review Handoff成立までとする。
+
+Target 4成功を理由として、
+Review実行・Review Result生成・Correction等へ
+自動的に進んではならない。
+
+新しいApplication Stateは追加しない。
+
+既存Correction Cycleにおける
+Re-Review開始時の `reviewing` 遷移の意味は変更しない。
