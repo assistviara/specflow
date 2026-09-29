@@ -37,17 +37,19 @@ class GenerateImplementationPlanUseCase:
             input_dto.state_file
         )
 
-        transition_state(
-            input_dto.state_file,
-            input_dto.state_history_dir,
-            {
-                "transition_id": str(uuid4()),
-                "from_state": current_state["status"],
-                "to_state": "plan_generating",
-                "occurred_at": datetime.now().astimezone().isoformat(),
-                "reason": "Implementation Plan generation started",
-            },
-        )
+        # Workflow entry may already have persisted this transition.
+        if current_state["status"] != "plan_generating":
+            transition_state(
+                input_dto.state_file,
+                input_dto.state_history_dir,
+                {
+                    "transition_id": str(uuid4()),
+                    "from_state": current_state["status"],
+                    "to_state": "plan_generating",
+                    "occurred_at": datetime.now().astimezone().isoformat(),
+                    "reason": "Implementation Plan generation started",
+                },
+            )
 
         prompt_result = self._plan_prompt_generator.generate(
             constitution_path=input_dto.constitution_path,

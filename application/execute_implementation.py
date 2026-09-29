@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+import json
 import subprocess
 from uuid import uuid4
 
@@ -115,6 +116,12 @@ class ExecuteImplementationUseCase:
         self,
         input_dto: ExecuteImplementationInput,
     ) -> ExecuteImplementationOutput:
+        execution_prompt = input_dto.codex_prompt
+        if input_dto.tdd_required is not None:
+            execution_prompt += '\n\n## Explicit Initial Implementation TDD Applicability\n' + json.dumps({
+                'tdd_required': input_dto.tdd_required,
+                'no_tdd_reason': input_dto.no_tdd_reason,
+            }, ensure_ascii=False)
         specification_record = self._approval_repository.get(
             input_dto.specification_approval_id
         )
@@ -230,7 +237,7 @@ class ExecuteImplementationUseCase:
 
         try:
             raw_result = self._implementation_adapter.run(
-                prompt=input_dto.codex_prompt,
+                prompt=execution_prompt,
                 working_directory=input_dto.working_directory,
             )
         except Exception as exc:
@@ -421,7 +428,7 @@ class ExecuteImplementationUseCase:
             if technical_retry_allowed:
                 try:
                     raw_result = self._implementation_adapter.run(
-                        prompt=input_dto.codex_prompt,
+                        prompt=execution_prompt,
                         working_directory=input_dto.working_directory,
                     )
                 except Exception as exc:
@@ -733,13 +740,13 @@ class ExecuteImplementationUseCase:
                         tests_created_or_modified=(),
                         errors=raw_result.errors,
                         warnings=(),
-                        no_tdd_reason=None,
+                        no_tdd_reason=input_dto.no_tdd_reason,
                         unavailable_evidence=(
                             "tests_created_or_modified",
                             "warnings",
                             *(
                                 ("no_tdd_reason",)
-                                if not implementation_result.test_required
+                                if not implementation_result.test_required and input_dto.no_tdd_reason is None
                                 else ()
                             ),
                         ),
@@ -801,17 +808,28 @@ class ExecuteImplementationUseCase:
                     error_message=str(exc),
                 )
 
-        transition_state(
-            input_dto.state_file,
-            input_dto.state_history_dir,
-            {
-                "transition_id": str(uuid4()),
-                "from_state": current_state,
-                "to_state": "implementation_completed",
-                "occurred_at": datetime.now().astimezone().isoformat(),
-                "reason": "Implementation execution completed",
-            },
-        )
+        persistence_error = None
+        try:
+            transition_state(
+                input_dto.state_file,
+                input_dto.state_history_dir,
+                {
+                    "transition_id": str(uuid4()),
+                    "from_state": current_state,
+                    "to_state": "implementation_completed",
+                    "occurred_at": datetime.now().astimezone().isoformat(),
+                    "reason": "Implementation execution completed",
+                },
+            )
+            current_state = "implementation_completed"
+        except Exception as exc:
+            # Preserve acquired results even if State or History persistence
+            # failed. State may already have changed; do not infer rollback.
+            persistence_error = f"{type(exc).__name__}: {exc}"
+            try:
+                current_state = load_current_state(input_dto.state_file)["status"]
+            except Exception:
+                current_state = None
 
         return ExecuteImplementationOutput(
             base_branch=input_dto.base_branch,
@@ -819,7 +837,7 @@ class ExecuteImplementationUseCase:
             test_execution_record_path=(
                 test_execution_record_path
             ),
-            success=True,
+            success=persistence_error is None,
             implementation_result=implementation_result,
             specification_path=input_dto.specification_path,
             implementation_plan_path=input_dto.implementation_plan_path,
@@ -831,7 +849,12 @@ class ExecuteImplementationUseCase:
             implementation_plan_approval_validation_result=(
                 implementation_plan_validation
             ),
-            current_state="implementation_completed",
+            current_state=current_state,
             technical_retry_required=False,
             critical_change_required=False,
+            stop_reason=(
+                "Implementation completion State / History persistence failed."
+                if persistence_error else None
+            ),
+            error_message=persistence_error,
         )

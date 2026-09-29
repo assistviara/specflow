@@ -419,6 +419,53 @@ Codexの自己申告のみでWorkflowを進行させない。
 
 ---
 
+### Decision 13：Initial Implementation TDD Applicability
+
+Phase 7 Target 3におけるInitial Implementationの
+TDD適用要否について、以下をHuman Decisionとして確定する。
+
+Initial ImplementationにおけるTDD適用要否は、
+Codex / Runnerが独自判断してはならない。
+
+Target 3は、承認対象に紐づいた構造化入力として、
+TDD適用要否を明示的に受け取る。
+
+TDD適用の場合は、
+tdd_required = trueとし、
+既存Specification / Implementation Planが要求する
+Initial FAIL → implementation → GREEN等の
+TDD evidenceを満たす。
+
+TDD非適用の場合は、
+tdd_required = falseとし、
+非適用理由を明示的に保持する。
+Codex / Runner自身が非適用理由を生成してはならない。
+
+tdd_requiredまたは必要な非適用理由が
+未指定・不明・矛盾している場合はSTOPする。
+
+RunnerのTEST_REQUIREDは、
+TDD適用要否の正本として使用しない。
+Decision 9のTEST_REQUIREDと、
+本DecisionのTDD applicabilityは別概念として扱う。
+
+Decision 9のTEST_REQUIREDおよび
+Test Execution Status = NOT_RUNに関する契約は変更しない。
+TDD非適用を、test不要・validation不要・Target 3成功と
+自動的に解釈してはならない。
+Test Execution等の要件は、
+既存Specification / Implementation Planに従う。
+
+本DecisionはInitial ImplementationのTDD applicabilityを確定するものであり、
+Correction側の既存ReTestPlan等の意味は変更しない。
+
+新しいApplication Stateは追加しない。
+
+Target 3はこの明示入力を検証・接続するだけで、
+新しいTDD判定ルールを作らない。
+
+---
+
 # Closing
 
 本Decisionにより、
