@@ -22,6 +22,7 @@ from test_final_approval_workflow import review_ready, final_case, approve, conf
 from test_git_repository_state_provider import run_git
 from core.ai.ai_response import AIResponse
 from test_workflow_entry import workflow
+from test_workflow_trace import assert_stop_contract
 
 
 def review_outputs(review):
@@ -32,7 +33,9 @@ def review_outputs(review):
 
 
 def trace(flow, outputs):
-    return WorkflowTraceUseCase().execute(WorkflowTraceInput(flow.state, flow.history, tuple(outputs)))
+    result = WorkflowTraceUseCase().execute(WorkflowTraceInput(flow.state, flow.history, tuple(outputs)))
+    assert_stop_contract(result)
+    return result
 
 
 def test_mvp_e2e_correction_to_verified_completion_preserves_approval_and_evidence_lineage(correction_flow):
@@ -144,6 +147,7 @@ def test_mvp_entry_failure_stops_plan_and_preserves_saved_approval(workflow, fai
     generator.execute.assert_not_called()
     observed = WorkflowTraceUseCase().execute(WorkflowTraceInput(
         request.state_file, request.history_dir, (stopped, rejected)))
+    assert_stop_contract(observed)
     assert not observed.success and not observed.completed
     assert observed.current_state['status'] == 'specification_ready'
     assert observed.stops and observed.stops[0].reason
@@ -274,6 +278,7 @@ def test_mvp_human_review_stops_final_approval_without_losing_artifacts(review_f
     assert observed.success and not observed.completed
     assert observed.waiting == ('REVIEW_HUMAN_HANDOFF',)
     assert observed.stops[-1].required_human_action == result.handoff.required_human_action
+    assert observed.stops[-1].fields['restart_point'].status == 'human_decision_pending'
     assert observed.stops[-1].artifact_references
     git = Mock()
     final = FinalApprovalWorkflowUseCase(git, c.case.flow.repo, c.case.repository, JsonMergeRetryRepository)
@@ -293,6 +298,7 @@ def test_mvp_early_stop_does_not_execute_correction_or_invent_human_decision(cor
     observed = trace(c.c.case.flow, (*review_outputs(c.first), stopped))
     assert observed.success and not observed.completed, observed.diagnostics
     assert observed.waiting == ('REVIEW_HUMAN_HANDOFF',)
+    assert observed.stops[-1].fields['restart_point'].status == 'human_decision_pending'
     assert observed.stops[-1].reason == stopped.handoff.reason
     assert c.target4.collection.evidence_path.is_file()
 
@@ -314,6 +320,7 @@ def test_mvp_correction_limit_handoff_cannot_enter_final_approval(correction_flo
     observed = trace(c.c.case.flow, (*review_outputs(c.first), stopped))
     assert observed.success and not observed.completed, observed.diagnostics
     assert observed.waiting == ('REVIEW_HUMAN_HANDOFF',)
+    assert observed.stops[-1].fields['restart_point'].status == 'human_decision_pending'
 
 
 @pytest.mark.parametrize('failure', ['missing_human', 'changed_target', 'dirty', 'dirty_at_execution',
@@ -339,6 +346,7 @@ def test_mvp_final_gate_failures_never_become_successful_completion(final_case, 
     observed = trace(c.case.flow, (*review_outputs(review), waiting, result))
     assert not result.completed and not observed.completed
     assert observed.current_state == result.current_state
+    assert observed.stops[-1].fields['restart_point'].status == 'human_decision_pending'
     if failure == 'missing_human':
         assert result.waiting_for_human and result.approval is None
         assert observed.waiting == ('FINAL_APPROVAL',)
@@ -369,6 +377,7 @@ def test_mvp_final_human_route_retains_target_without_automatic_destination_exec
     assert result.approval is None and not observed.completed
     assert observed.current_state['status'] == state
     assert observed.stops[-1].restart_point == (None if selection == 'Cancellation' else result.routing.destination)
+    assert observed.stops[-1].fields['restart_point'].status == ('terminal' if selection == 'Cancellation' else 'known')
     assert waiting.target.request.artifact_path.is_file()
     git.merge.assert_not_called()
 
@@ -385,6 +394,9 @@ def test_mvp_human_authorized_retry_preserves_approval_evidence_and_correction_c
         git.verify_merge.return_value = replace(successful_verification, content_matched=False)
     failed = final.resume(waiting.snapshot_path, approve())
     assert not failed.success and failed.merge.operation_id
+    stopped_trace = trace(c.case.flow, (*review_outputs(review), waiting, failed))
+    assert stopped_trace.waiting == ('MERGE_RETRY_AUTHORIZATION',)
+    assert stopped_trace.stops[-1].fields['restart_point'].status == 'human_decision_pending'
     if failure == 'verification':
         # Merge already succeeded: model the actual post-merge Git facts before
         # asking to repeat verification. Retaining pre-merge facts must fail.

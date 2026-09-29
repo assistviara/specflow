@@ -52,6 +52,35 @@ def observe(request):
     return WorkflowTraceUseCase().execute(request)
 
 
+def assert_stop_contract(trace):
+    """Human Decisions 1/2: unknown is explained, never promoted to permission."""
+    for stop in trace.stops:
+        assert set(stop.fields) == {'reason', 'actual_state', 'affected_scope',
+                                    'required_human_action', 'restart_point'}
+        for name, item in stop.fields.items():
+            assert item.status in ('known', 'unresolved', 'human_decision_pending', 'terminal', 'unavailable')
+            assert item.explanation and item.references
+            for ref in item.references:
+                assert ref.source and ref.value is not None
+                if ref.source.startswith('outputs.'):
+                    parts = ref.source.split('.')
+                    value = trace.stages[int(parts[1])].snapshot
+                    for part in parts[2:]:
+                        value = value[int(part)] if isinstance(value, (list, tuple)) else value[part]
+                    assert ref.value == value
+            if item.status == 'known':
+                assert item.value is not None
+            else:
+                assert item.value is None
+                if item.status != 'terminal':
+                    assert item.required_human_action
+        assert stop.fields['actual_state'].value == trace.current_state
+        assert stop.fields['reason'].value == stop.reason
+        assert stop.fields['affected_scope'].value == stop.affected_scope
+        assert stop.fields['required_human_action'].value == stop.required_human_action
+        assert stop.fields['restart_point'].value == stop.restart_point
+
+
 @pytest.mark.parametrize('damage', ['missing_first', 'missing_middle', 'missing_last',
     'broken_json', 'wrong_id', 'wrong_state', 'state_unreadable', 'state_missing', 'wrong_history_root'])
 def test_damaged_persistence_cannot_be_a_successful_trace(completed_case, damage):
@@ -112,6 +141,8 @@ def test_partial_completed_state_does_not_override_failed_completion(final_case,
     assert any(t.history_status == 'not_saved' for t in trace.transitions)
     assert trace.stops[-1].reason == result.stop_reason
     assert trace.stops[-1].required_human_action == result.completion.required_human_action
+    assert_stop_contract(trace)
+    assert trace.stops[-1].fields['restart_point'].status == 'human_decision_pending'
 
 
 def test_plan_waiting_uses_stage_and_result_and_retains_unknowns(flow):
@@ -121,7 +152,16 @@ def test_plan_waiting_uses_stage_and_result_and_retains_unknowns(flow):
     assert trace.success and trace.waiting == ('PLAN_APPROVAL',)
     assert trace.stops[-1].affected_scope is None
     assert trace.stops[-1].restart_point is None
-    assert trace.stops[-1].required_human_action is None
+    assert trace.stops[-1].reason == 'PLAN_APPROVAL_PENDING'
+    assert trace.stops[-1].required_human_action
+    fields = trace.stops[-1].fields
+    assert fields['affected_scope'].status == 'unresolved'
+    assert fields['restart_point'].status == 'human_decision_pending'
+    assert fields['restart_point'].value is None
+    for field in fields.values():
+        assert field.explanation and field.references
+        if field.status != 'known':
+            assert field.required_human_action
     assert trace.stops[-1].artifact_references
     assert not observe(WorkflowTraceInput(flow.state, flow.history, (flow.entry,))).waiting
 
@@ -130,6 +170,9 @@ def test_final_waiting_is_not_merge_authorization(final_case):
     trace = observe(trace_input(final_case, final_case[4]))
     assert trace.success and trace.waiting == ('FINAL_APPROVAL',)
     assert not trace.completed
+    assert_stop_contract(trace)
+    assert trace.stops[-1].reason == 'FINAL_APPROVAL_PENDING'
+    assert trace.stops[-1].fields['restart_point'].status == 'human_decision_pending'
 
 
 def test_retry_authorization_and_correction_are_separate(final_case):
@@ -162,6 +205,8 @@ def test_stop_reason_is_not_reclassified_and_snapshots_are_detached(flow):
     trace = observe(WorkflowTraceInput(flow.state, flow.history, (failed,)))
     assert not trace.success
     assert trace.stops[-1].reason is None
+    assert_stop_contract(trace)
+    assert trace.stops[-1].fields['reason'].status == 'unresolved'
     trace.stages[0].snapshot['current_state']['status'] = 'tampered'
     assert failed.current_state['status'] == 'plan_generating'
 
@@ -200,6 +245,8 @@ def test_review_human_handoff_preserves_reason_action_and_references(review_flow
     assert trace.waiting == ('REVIEW_HUMAN_HANDOFF',)
     assert trace.stops[-1].reason == result.handoff.reason
     assert trace.stops[-1].required_human_action == result.handoff.required_human_action
+    assert_stop_contract(trace)
+    assert trace.stops[-1].fields['restart_point'].status == 'human_decision_pending'
     assert any(r.value == result.handoff.artifact_references for r in trace.stops[-1].artifact_references)
 
 
@@ -220,6 +267,9 @@ def test_critical_change_waiting_uses_structured_execution_result(implementation
     assert not trace.success and trace.waiting == ('CRITICAL_CHANGE',)
     assert trace.current_state['status'] == 'critical_approval_pending'
     assert trace.stops[-1].reason == result.stop_reason
+    assert_stop_contract(trace)
+    assert trace.stops[-1].required_human_action == ('Scope expansion needs Human',)
+    assert trace.stops[-1].fields['affected_scope'].status == 'unresolved'
 
 
 def test_correction_preserves_old_evidence_and_new_generation(correction_flow):
@@ -355,3 +405,35 @@ def test_cancellation_is_a_terminal_result_not_a_restart_point(final_case):
     assert trace.current_state['status'] == 'cancelled'
     assert trace.stops[-1].reason == 'Human cancelled this workflow'
     assert trace.stops[-1].restart_point is None
+    assert_stop_contract(trace)
+    assert trace.stops[-1].fields['restart_point'].status == 'terminal'
+    assert trace.stops[-1].fields['required_human_action'].status == 'terminal'
+
+
+@pytest.mark.parametrize('decision', ['revision_requested', 'cancelled'])
+def test_plan_return_is_observed_without_inventing_a_restart(flow, decision):
+    from application.workflow_trace import WorkflowTraceInput
+    draft = flow.use_case.generate(flow.entry, flow.generation, flow.plan_path)
+    result = flow.use_case.decide(draft, replace(flow.decision, human_decision=decision))
+    before = {p: p.read_bytes() for p in flow.tmp_path.rglob('*') if p.is_file()}
+    trace = observe(WorkflowTraceInput(flow.state, flow.history, (flow.entry, draft, result)))
+    assert trace.success
+    assert_stop_contract(trace)
+    stop = trace.stops[-1]
+    assert stop.fields['restart_point'].status == ('terminal' if decision == 'cancelled' else 'known')
+    assert stop.restart_point == (None if decision == 'cancelled' else 'Plan revision')
+    assert before == {p: p.read_bytes() for p in flow.tmp_path.rglob('*') if p.is_file()}
+
+
+def test_unavailable_state_is_distinct_from_unresolved_scope_and_pending_restart(flow):
+    from application.workflow_trace import WorkflowTraceInput
+    draft = flow.use_case.generate(flow.entry, flow.generation, flow.plan_path)
+    flow.state.write_text('{')
+    trace = observe(WorkflowTraceInput(flow.state, flow.history, (flow.entry, draft)))
+    assert not trace.success
+    assert_stop_contract(trace)
+    fields = trace.stops[-1].fields
+    assert fields['actual_state'].status == 'unavailable'
+    assert fields['affected_scope'].status == 'unresolved'
+    assert fields['restart_point'].status == 'human_decision_pending'
+    assert 'STATE_UNAVAILABLE' in fields['actual_state'].explanation

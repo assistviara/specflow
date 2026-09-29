@@ -4,7 +4,7 @@ Callers retain each result (including failed attempts and revised generations).
 References are paths into detached result snapshots, not new artifact identities.
 No approval, correction, retry or completion decision is made here.
 """
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from itertools import groupby
 from datetime import datetime
 from pathlib import Path
@@ -64,6 +64,16 @@ class StageObservation:
 
 
 @dataclass(frozen=True)
+class StopField:
+    # Observation metadata only; these are not Workflow States or permissions.
+    status: str  # known / unresolved / human_decision_pending / terminal / unavailable
+    value: object
+    explanation: str
+    references: tuple[TraceReference, ...]
+    required_human_action: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class StopObservation:
     stage: str
     reason: object
@@ -72,7 +82,8 @@ class StopObservation:
     required_human_action: object = None
     restart_point: object = None
     artifact_references: tuple[TraceReference, ...] = ()
-    # None means unavailable, never a policy inferred from an exception string.
+    fields: dict[str, StopField] = field(default_factory=dict)
+    # Legacy values remain unchanged when unknown; fields explain why.
 
 
 @dataclass(frozen=True)
@@ -109,6 +120,47 @@ def _reference(path):
                        'history_path', 'correction_count', 'retry_count', 'handoff',
                        'report', 'classification', 'verification', 'operation',
                        'approval_record', 'head_commit', 'state_file', 'history_dir'))
+
+
+def _stop_fields(root, snapshot, state, state_file, diagnostics,
+                 reason, scope, action, restart, terminal):
+    """Explain missing facts without choosing a recovery route or impact scope.
+
+    Human Decisions 1/2: unresolved facts require a reason, retained basis and
+    next Human action. A stopped stage is never assumed safe to restart.
+    """
+    basis = (TraceReference(root, snapshot),)
+    actions = tuple(action) if isinstance(action, (list, tuple)) else (action,)
+    scope_action = ('Determine the affected scope from the retained result and referenced artifacts; do not assume the target is the full impact.',)
+    resume_action = ('Decide the next direction after inspecting the retained stop and artifacts; establish a restart point only under the existing Workflow contract.',)
+    result = {
+        'reason': StopField('known' if reason else 'unresolved', reason,
+            'Retained stop or explicit waiting/decision result.' if reason else
+            'The supplied Workflow output does not establish a stop reason.', basis,
+            () if reason else ('Identify the stop cause from the retained output and artifacts.',)),
+        'actual_state': StopField('known' if state is not None else 'unavailable', state,
+            'Current persisted State read at trace observation time.' if state is not None else
+            'State could not be read: ' + '; '.join(d for d in diagnostics if d.startswith('STATE_UNAVAILABLE')),
+            (TraceReference('request.state_file', state_file),),
+            () if state is not None else ('Inspect the State storage failure and establish the actual State without inferring it from an attempted transition.',)),
+        'affected_scope': StopField('known' if scope is not None else 'unresolved', scope,
+            'Explicit upstream impact reference.' if scope is not None else
+            'No explicit affected scope is established by this stop output; artifact identity alone does not establish impact.',
+            (scope,) if isinstance(scope, TraceReference) else basis,
+            () if scope is not None else scope_action),
+        'required_human_action': StopField('known', action,
+            'Existing Human request or inspection required for this stopped stage; no Human decision is supplied.', basis),
+        'restart_point': StopField('known' if restart is not None else 'human_decision_pending', restart,
+            'Destination of the retained explicit Human decision; execution remains subject to existing gates.' if restart is not None else
+            'No Human decision and existing contract establish a safe concrete restart point for this stop.',
+            basis, () if restart is not None else (*actions, *resume_action)),
+    }
+    if terminal:
+        result['restart_point'] = StopField('terminal', None,
+            'Not Applicable: explicit Cancellation terminates this Workflow.', basis)
+        result['required_human_action'] = StopField('terminal', None,
+            'Not Applicable: no resume action is required for the explicit terminal decision.', basis)
+    return result
 
 
 class WorkflowTraceUseCase:
@@ -236,19 +288,41 @@ class WorkflowTraceUseCase:
                             and output.current_state and output.current_state.get('status') == 'plan_approval_pending')
             human_return = (stage == 'final_approval' and output.routing is not None
                             and output.routing.routed and not output.routing.request.decision.is_final_approval)
-            if not ok or getattr(output, 'waiting_for_human', False) or plan_waiting or human_return:
+            plan_return = (stage == 'plan' and ok and output.approval_result is not None
+                           and output.approval_result.decision in ('revision_requested', 'cancelled'))
+            if not ok or getattr(output, 'waiting_for_human', False) or plan_waiting or human_return or plan_return:
                 reason = snapshot.get('stop_reason') or snapshot.get('failures') or None
                 handoff = snapshot.get('handoff') or {}
                 if reason is None:
                     reason = handoff.get('reason')
                 action = handoff.get('required_human_action') or None
                 scope, restart = None, None
+                terminal = False
+                if plan_waiting:
+                    reason = reason or 'PLAN_APPROVAL_PENDING'
+                    action = ('Human must approve, request revision of, or cancel the retained Plan Draft.',)
+                if plan_return:
+                    decision = output.approval_result
+                    reason = decision.revision_request or decision.decision
+                    terminal = decision.cancelled
+                    if not terminal:
+                        restart = 'Plan revision'
+                        action = ('Provide the recorded revision request to the existing Plan revision workflow; the revised draft requires new Human Approval.',)
+                if stage == 'implementation' and output.execution and output.execution.critical_change_required:
+                    execution = snapshot.get('execution') or {}
+                    requirement = (execution.get('implementation_result') or {}).get('human_approval_required')
+                    if requirement and requirement.strip() != 'NONE':
+                        action = (requirement,)
                 critical = (handoff.get('request') or {}).get('critical_change')
                 if critical and critical.get('impact_reference'):
                     scope = TraceReference(f'{root}.handoff.request.critical_change.impact_reference',
                                            critical['impact_reference'])
                 if stage == 'final_approval':
+                    if ok and output.waiting_for_human and output.target:
+                        reason = reason or 'FINAL_APPROVAL_PENDING'
+                        action = ('Human must select Final Approval or an existing return route for the retained Final Approval Target.',)
                     if human_return:
+                        terminal = output.routing.destination == 'cancelled'
                         restart = (output.routing.destination
                                    if output.routing.destination != 'cancelled' else None)
                         if reason is None:
@@ -256,8 +330,19 @@ class WorkflowTraceUseCase:
                     for nested in (output.completion, output.merge):
                         if nested is not None and nested.required_human_action:
                             action = nested.required_human_action
+                if action is None:
+                    action = ({
+                        'entry': 'Inspect Specification and saved Approval diagnostics; provide a valid approval for the current artifact before entering Plan generation.',
+                        'plan': 'Inspect the Plan/Prompt result and approval diagnostics; determine the required repair or Human decision before continuing.',
+                        'implementation': 'Inspect the implementation, Test and technical failure records; decide whether safe Technical Retry or another Human-directed route is appropriate.',
+                        'evidence': 'Inspect Evidence collection and artifact diagnostics; establish the missing or inconsistent review basis before continuing.',
+                        'review': 'Inspect Review inputs, report and continuation diagnostics; resolve the identified Human questions before choosing the next direction.',
+                        'final_approval': 'Inspect the Final Approval target, validation and repository diagnostics; decide the next direction without assuming Merge or Retry authorization.',
+                    }[stage],)
+                fields = _stop_fields(root, snapshot, state, request.state_file,
+                    diagnostics, reason, scope, action, restart, terminal)
                 stops.append(StopObservation(stage, reason, state,
-                    scope, action, restart, tuple(stage_refs)))
+                    scope, None if terminal else action, restart, tuple(stage_refs), fields))
 
         latest = request.outputs[-1] if request.outputs else None
         if latest is not None and type(latest) in _STAGES:
