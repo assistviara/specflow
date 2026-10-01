@@ -5,9 +5,23 @@ import sqlite3
 from uuid import UUID
 
 from human_control.models import Project, Workflow, require_text, require_uuid
+from human_control.models import CONSTITUTION_FIELDS, ConstitutionItem
 
 
 _SCHEMA = (
+    '''CREATE TABLE project_focus (
+        project_id TEXT PRIMARY KEY NOT NULL REFERENCES projects(project_id),
+        is_active INTEGER NOT NULL CHECK(is_active IN (0, 1)),
+        last_slept_at TEXT)''',
+    'CREATE UNIQUE INDEX one_active_project ON project_focus(is_active) WHERE is_active = 1',
+    '''CREATE TABLE constitution (
+        project_id TEXT NOT NULL REFERENCES projects(project_id),
+        field TEXT NOT NULL CHECK(field IN ('purpose', 'values', 'rules')),
+        value TEXT, confirmed INTEGER NOT NULL CHECK(confirmed IN (0, 1)),
+        PRIMARY KEY(project_id, field))''',
+    '''CREATE TABLE existing_projects (
+        project_id TEXT PRIMARY KEY REFERENCES projects(project_id),
+        reference TEXT NOT NULL)''',
     'CREATE TABLE projects (project_id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL)',
     '''CREATE TABLE workflows (
         workflow_id TEXT PRIMARY KEY NOT NULL,
@@ -21,6 +35,7 @@ _SCHEMA = (
         PRIMARY KEY (workflow_id, role))''',
 )
 _APPLICATION_ID = 0x53463841
+_SCHEMA_VERSION = 3
 
 
 class HumanControlRepository:
@@ -29,7 +44,7 @@ class HumanControlRepository:
         # Opening never creates or upgrades a database.
         with self._connection() as db:
             if (db.execute('PRAGMA application_id').fetchone()[0] != _APPLICATION_ID
-                    or db.execute('PRAGMA user_version').fetchone()[0] != 1):
+                    or db.execute('PRAGMA user_version').fetchone()[0] != _SCHEMA_VERSION):
                 raise ValueError('Not a supported Human Control database; no migration performed')
 
     @staticmethod
@@ -45,7 +60,7 @@ class HumanControlRepository:
                 for statement in _SCHEMA:
                     db.execute(statement)
                 db.execute(f'PRAGMA application_id = {_APPLICATION_ID}')
-                db.execute('PRAGMA user_version = 1')
+                db.execute(f'PRAGMA user_version = {_SCHEMA_VERSION}')
         finally:
             db.close()
         # On failure the file is retained; do not silently replace or retry it.
@@ -60,10 +75,91 @@ class HumanControlRepository:
         finally:
             db.close()
 
-    def add_project(self, project: Project) -> None:
+    def add_project(self, project: Project, *, existing_reference: str | None = None) -> None:
         with self._connection() as db:
             db.execute('INSERT INTO projects VALUES (?, ?)',
                        (require_uuid(project.project_id), project.name))
+            if existing_reference is not None:
+                db.execute('INSERT INTO existing_projects VALUES (?, ?)',
+                           (str(project.project_id), require_text(existing_reference)))
+
+    def existing_project_reference(self, project_id: UUID) -> str | None:
+        self.get_project(project_id)
+        with self._connection() as db:
+            row = db.execute('SELECT reference FROM existing_projects WHERE project_id = ?',
+                             (str(project_id),)).fetchone()
+        return row[0] if row else None
+
+    def activate_project(self, project_id: UUID) -> None:
+        self.get_project(project_id)
+        with self._connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('UPDATE project_focus SET is_active = 0 WHERE is_active = 1')
+            db.execute('''INSERT INTO project_focus VALUES (?, 1, NULL)
+                ON CONFLICT(project_id) DO UPDATE SET is_active = 1''', (str(project_id),))
+
+    def sleep_project(self, project_id: UUID, occurred_at: str) -> None:
+        self.get_project(project_id)
+        with self._connection() as db:
+            db.execute('''INSERT INTO project_focus VALUES (?, 0, ?)
+                ON CONFLICT(project_id) DO UPDATE SET is_active = 0, last_slept_at = excluded.last_slept_at''',
+                (str(project_id), occurred_at))
+
+    def active_project(self) -> Project | None:
+        with self._connection() as db:
+            row = db.execute('''SELECT p.project_id, p.name FROM projects p
+                JOIN project_focus f ON p.project_id = f.project_id WHERE f.is_active = 1''').fetchone()
+        return Project(UUID(row[0]), row[1]) if row else None
+
+    def sleeping_projects(self, *, recent: bool = False) -> tuple[Project, ...]:
+        # Absence of an explicit activation never makes a new project Active.
+        query = '''SELECT p.project_id, p.name FROM projects p
+            LEFT JOIN project_focus f ON p.project_id = f.project_id
+            WHERE COALESCE(f.is_active, 0) = 0'''
+        query += (' AND f.last_slept_at IS NOT NULL ORDER BY f.last_slept_at DESC, p.project_id LIMIT 3'
+                  if recent else ' ORDER BY p.project_id')
+        with self._connection() as db:
+            rows = db.execute(query).fetchall()
+        return tuple(Project(UUID(row[0]), row[1]) for row in rows)
+
+    def constitution(self, project_id: UUID) -> dict[str, ConstitutionItem]:
+        self.get_project(project_id)
+        with self._connection() as db:
+            rows = db.execute('SELECT field, value, confirmed FROM constitution WHERE project_id = ?',
+                              (str(project_id),)).fetchall()
+        result = {field: ConstitutionItem(None, False) for field in CONSTITUTION_FIELDS}
+        result.update({field: ConstitutionItem(value, bool(confirmed)) for field, value, confirmed in rows})
+        return result
+
+    def update_constitution(self, project_id: UUID, field: str, value: str | None) -> bool:
+        self.get_project(project_id)
+        if field not in CONSTITUTION_FIELDS:
+            raise ValueError('Unknown Constitution item')
+        if value is not None and not isinstance(value, str):
+            raise TypeError('Constitution value must be text or None')
+        with self._connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT value FROM constitution WHERE project_id = ? AND field = ?',
+                             (str(project_id), field)).fetchone()
+            if (row[0] if row else None) == value:
+                return False
+            db.execute('''INSERT INTO constitution VALUES (?, ?, ?, 0)
+                ON CONFLICT(project_id, field) DO UPDATE SET value = excluded.value, confirmed = 0''',
+                (str(project_id), field, value))
+        return True
+
+    def confirm_constitution(self, project_id: UUID, field: str, expected_value: str,
+                             *, human_confirmed: bool) -> None:
+        self.get_project(project_id)
+        if human_confirmed is not True or field not in CONSTITUTION_FIELDS:
+            raise ValueError('Explicit Human confirmation of a known item required')
+        require_text(expected_value)
+        with self._connection() as db:
+            changed = db.execute('''UPDATE constitution SET confirmed = 1
+                WHERE project_id = ? AND field = ? AND value = ?''',
+                (str(project_id), field, expected_value))
+            if changed.rowcount != 1:
+                raise ValueError('Constitution content changed or is missing; reconfirm current content')
 
     def get_project(self, project_id: UUID) -> Project:
         with self._connection() as db:

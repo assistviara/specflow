@@ -2,6 +2,23 @@
 from dataclasses import dataclass
 from uuid import UUID
 
+CONSTITUTION_FIELDS = ('purpose', 'values', 'rules')
+
+
+@dataclass(frozen=True)
+class ConstitutionItem:
+    value: str | None
+    confirmed: bool
+
+
+@dataclass(frozen=True)
+class WorkflowStartGate:
+    unconfirmed: tuple[str, ...]
+
+    @property
+    def allowed(self) -> bool:
+        return not self.unconfirmed
+
 
 def require_uuid(value: UUID) -> str:
     if not isinstance(value, UUID):
