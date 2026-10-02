@@ -201,6 +201,31 @@ class HumanControlRepository:
                               (require_uuid(project_id),)).fetchall()
         return tuple(self._workflow(row) for row in rows)
 
+    def all_workflows(self) -> tuple[Workflow, ...]:
+        """Read identities across Projects to detect shared output references."""
+        with self._connection() as db:
+            rows = db.execute('SELECT * FROM workflows ORDER BY workflow_id').fetchall()
+        return tuple(self._workflow(row) for row in rows)
+
+    def register_workflow(self, workflow: Workflow, references: dict[str, str]) -> None:
+        """Atomically register the index only; no filesystem transaction implied."""
+        with self._connection() as db:
+            db.execute('INSERT INTO workflows VALUES (?, ?, ?, ?, ?, ?, ?, ?)', (
+                require_uuid(workflow.workflow_id), require_uuid(workflow.project_id),
+                workflow.name, workflow.specification_path, workflow.specification_hash,
+                workflow.approval_id, workflow.state_path, workflow.history_path))
+            db.executemany('INSERT INTO artifact_references VALUES (?, ?, ?)',
+                [(str(workflow.workflow_id), require_text(role), require_text(path))
+                 for role, path in references.items()])
+
+    def set_artifact_references(self, workflow_id: UUID, references: dict[str, str]) -> None:
+        self.get_workflow(workflow_id)
+        with self._connection() as db:
+            db.executemany('''INSERT INTO artifact_references VALUES (?, ?, ?)
+                ON CONFLICT(workflow_id, role) DO UPDATE SET path = excluded.path''',
+                [(require_uuid(workflow_id), require_text(role), require_text(path))
+                 for role, path in references.items()])
+
     def rename_workflow(self, workflow_id: UUID, name: str) -> None:
         with self._connection() as db:
             changed = db.execute('UPDATE workflows SET name = ? WHERE workflow_id = ?',
