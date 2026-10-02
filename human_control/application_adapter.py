@@ -48,6 +48,14 @@ class DelegatedInputs:
 
 
 @dataclass(frozen=True)
+class WorkflowObservation:
+    """Detached actual results; not a checkpoint or execution authorization."""
+    project_id: UUID
+    workflow_id: UUID
+    outputs: tuple
+
+
+@dataclass(frozen=True)
 class AdapterResult:
     workflow_id: UUID
     success: bool
@@ -269,6 +277,8 @@ class ApplicationAdapter:
             # Phase 7 owns decision receipt, routing, Merge preconditions/retry and completion.
             # This call uses its existing waiting checkpoint, not a T5 Resume implementation.
             self._final = self._keep(self.ports.final.resume(self._final.snapshot_path, human))
+            self._references(final_result=self._final.diagnostic_path,
+                             merge_checkpoint=self._final.retry_snapshot_path)
             if not self._final.success:
                 return self._stop(self._final.stop_reason)
             if self._final.completed:
@@ -277,6 +287,9 @@ class ApplicationAdapter:
                                 'Inspect the existing routing destination and missing information.')
         except Exception as exc:
             return self._stop(exc)
+
+    def observation(self) -> WorkflowObservation:
+        return WorkflowObservation(self.project_id, self.workflow_id, deepcopy(tuple(self._outputs)))
 
     def trace(self):
         # Observation is not execution authorization. A changed Specification
