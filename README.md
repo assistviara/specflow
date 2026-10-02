@@ -224,6 +224,35 @@ python -m pip install -r requirements.txt
 
 ### Flaskの起動
 
+Phase 8A T8内①では、Human Control DBのpathを明示します。通常起動は既存DBを開くだけで、DB作成・移行は行いません。
+初回だけ、未使用のpathを指定して独立した初期化操作を実行してください。親フォルダは事前に用意します。
+
+```powershell
+python -m flask --app app init-human-control-db --path C:\path\to\human-control.sqlite3
+$env:SPECFLOW_HUMAN_CONTROL_DB = 'C:\path\to\human-control.sqlite3'
+python app.py
+```
+
+`C:\path\to\...`はHumanが指定する実際の保存先へ置き換えます。既存ファイルは初期化で上書きしません。
+DB未指定・未存在・旧schema・別application DB・open失敗時はHTTP 503で対象pathと安全な理由を表示し、操作を停止します。
+失敗した初期化の対象ファイルも自動削除しません。既存DBを消して起動し直す処理やmigrationはありません。
+
+テストや依存接続では`create_app(db_path)`で明示できます。`app.extensions['human_control']`がruntimeです。
+`require_repository()`でDB利用可否を確認し、`target(project_id, workflow_id)`でUUID・所属を確認します。
+後続serviceでも所属・正式Artifactを再検証してください。
+
+form token基盤は`runtime.forms.issue/consume`を利用します。tokenはform本文で渡し、URLへ含めません。
+操作・UUID・session・server側で再取得したrevisionへ紐付け、一回のPOSTで消費します。
+再表示した同一対象のformは以前のtokenを無効にします。`revision`にPOSTされたhashをそのまま渡してはいけません。
+tokenの検証成功はApprovalや実行許可ではなく、既存serviceの検証が引き続き必要です。
+実業務POSTへの接続は後続T8単位で行います。
+
+`runtime.outputs`は実`WorkflowObservation`のコピーをWorkflow UUID別に保持するprocess内メモリです。
+`put/get/clear`を提供し、不明Workflowは`None`を返します。DB保存・Output合成・再起動後の復元はしません。
+正式な実行用Adapterの接続は後続単位です。T8内①は8画面完成やWorkflow実行を提供しません。
+既存legacy画面は残っており、SQLite Projectの管理画面としては扱いません。
+直接起動ではdebug/reloaderと並行request処理を無効にしています。
+
 ```powershell
 python app.py
 ```

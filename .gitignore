@@ -38,6 +38,12 @@ Thumbs.db
 # Local databases
 *.sqlite3
 *.db
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Build artifacts
 build/

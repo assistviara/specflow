@@ -20,7 +20,7 @@
                 <td>{{ project.name }}</td>
                 <td>{{ project.status }}</td>
                 <td>
-                    <a class="button" href="{{ url_for('project_detail', project_name=project.name) }}">
+                    <a class="button" href="{{ url_for('legacy.project_detail', project_name=project.name) }}">
                         開く
                     </a>
                 </td>

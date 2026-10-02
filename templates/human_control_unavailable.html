@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Human Controlを利用できません - SpecFlow{% endblock %}
+{% block content %}
+<div class="card" role="alert">
+    <h1>Human Controlを利用できません</h1>
+    <p>対象DB: {{ failure.path }}</p>
+    <p>理由: {{ failure.reason }}</p>
+    <p>DBの自動作成・移行・削除・置換は行っていません。操作を停止しています。</p>
+    <p>明示したpathと既存DBを確認してください。新規DBの初期化は通常起動とは別の操作です。</p>
+</div>
+{% endblock %}
