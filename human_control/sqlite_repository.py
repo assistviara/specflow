@@ -4,11 +4,19 @@ from pathlib import Path
 import sqlite3
 from uuid import UUID
 
-from human_control.models import Project, Workflow, require_text, require_uuid
+from human_control.models import Project, Workflow, Reminder, require_text, require_uuid
 from human_control.models import CONSTITUTION_FIELDS, ConstitutionItem
 
 
 _SCHEMA = (
+    '''CREATE TABLE reminders (
+        reminder_id TEXT PRIMARY KEY NOT NULL,
+        project_id TEXT NOT NULL REFERENCES projects(project_id),
+        workflow_id TEXT REFERENCES workflows(workflow_id),
+        text TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK(kind IN ('不具合', '改善案', '新機能候補', '将来構想', '要検討')),
+        location TEXT,
+        provenance TEXT NOT NULL CHECK(provenance IN ('human_direct', 'ai_proposed_human_saved')))''',
     '''CREATE TABLE human_intents (
         workflow_id TEXT PRIMARY KEY NOT NULL REFERENCES workflows(workflow_id),
         text TEXT NOT NULL)''',
@@ -38,7 +46,7 @@ _SCHEMA = (
         PRIMARY KEY (workflow_id, role))''',
 )
 _APPLICATION_ID = 0x53463841
-_SCHEMA_VERSION = 4
+_SCHEMA_VERSION = 5
 
 
 class HumanControlRepository:
@@ -127,6 +135,63 @@ class HumanControlRepository:
             row = db.execute('SELECT reference FROM existing_projects WHERE project_id = ?',
                              (str(project_id),)).fetchone()
         return row[0] if row else None
+
+    @staticmethod
+    def _reminder_project(db, project_id):
+        identity = require_uuid(project_id)
+        if db.execute('SELECT 1 FROM projects WHERE project_id = ?', (identity,)).fetchone() is None:
+            raise KeyError(project_id)
+        return identity
+
+    @staticmethod
+    def _reminder(row):
+        return Reminder(UUID(row[0]), UUID(row[1]), UUID(row[2]) if row[2] else None, *row[3:])
+
+    def add_reminder(self, reminder: Reminder) -> None:
+        # T7 has only a Human direct writer. The other provenance is representable,
+        # but not an alternative registration route or inferred Human approval.
+        if reminder.provenance != 'human_direct':
+            raise ValueError('Only Human direct registration is supported')
+        with self._connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            project = self._reminder_project(db, reminder.project_id)
+            if reminder.workflow_id is not None:
+                owner = db.execute('SELECT project_id FROM workflows WHERE workflow_id = ?',
+                                   (require_uuid(reminder.workflow_id),)).fetchone()
+                if owner is None or owner[0] != project:
+                    raise ValueError('Reminder Project / Workflow ownership mismatch')
+            db.execute('INSERT INTO reminders VALUES (?, ?, ?, ?, ?, ?, ?)', (
+                require_uuid(reminder.reminder_id), project,
+                require_uuid(reminder.workflow_id) if reminder.workflow_id is not None else None,
+                reminder.text, reminder.kind, reminder.location, reminder.provenance))
+
+    def get_reminder(self, project_id: UUID, reminder_id: UUID) -> Reminder:
+        with self._connection() as db:
+            project = self._reminder_project(db, project_id)
+            row = db.execute('SELECT * FROM reminders WHERE project_id = ? AND reminder_id = ?',
+                             (project, require_uuid(reminder_id))).fetchone()
+            if row is None:
+                raise KeyError('Reminder missing or owned by another Project')
+            return self._reminder(row)
+
+    def list_reminders(self, project_id: UUID) -> tuple[Reminder, ...]:
+        with self._connection() as db:
+            project = self._reminder_project(db, project_id)
+            # Stable identity order has no priority or importance meaning.
+            return tuple(self._reminder(row) for row in db.execute(
+                'SELECT * FROM reminders WHERE project_id = ? ORDER BY reminder_id', (project,)))
+
+    def unlink_reminder_workflow(self, project_id: UUID, reminder_id: UUID) -> Reminder:
+        with self._connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            project = self._reminder_project(db, project_id)
+            identity = require_uuid(reminder_id)
+            changed = db.execute('UPDATE reminders SET workflow_id = NULL WHERE project_id = ? AND reminder_id = ?',
+                                 (project, identity))
+            if changed.rowcount != 1:
+                raise KeyError('Reminder missing or owned by another Project')
+            return self._reminder(db.execute('SELECT * FROM reminders WHERE reminder_id = ?',
+                                            (identity,)).fetchone())
 
     def activate_project(self, project_id: UUID) -> None:
         self.get_project(project_id)

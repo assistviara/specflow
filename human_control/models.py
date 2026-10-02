@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from uuid import UUID
 
 CONSTITUTION_FIELDS = ('purpose', 'values', 'rules')
+REMINDER_KINDS = ('不具合', '改善案', '新機能候補', '将来構想', '要検討')
+REMINDER_PROVENANCES = ('human_direct', 'ai_proposed_human_saved')
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,31 @@ class Project:
     def __post_init__(self):
         require_uuid(self.project_id)
         require_text(self.name)
+
+
+@dataclass(frozen=True)
+class Reminder:
+    """Human management context, never execution or Approval authority."""
+    reminder_id: UUID
+    project_id: UUID
+    workflow_id: UUID | None
+    text: str
+    kind: str
+    location: str | None
+    provenance: str
+
+    def __post_init__(self):
+        require_uuid(self.reminder_id)
+        require_uuid(self.project_id)
+        if self.workflow_id is not None:
+            require_uuid(self.workflow_id)
+        require_text(self.text)
+        if self.kind not in REMINDER_KINDS:
+            raise ValueError('One explicit Human-selected Reminder kind is required')
+        if self.location is not None and not isinstance(self.location, str):
+            raise TypeError('Reminder location must be text or None')
+        if self.provenance not in REMINDER_PROVENANCES:
+            raise ValueError('Unknown Reminder provenance')
 
 
 @dataclass(frozen=True)

@@ -57,10 +57,11 @@ def test_intents_do_not_cross_workflows(control):
     assert c.repository.human_intent(c.project.project_id, c.work.workflow_id) == 'First'
 
 
-def test_schema_four_and_old_database_untouched(control):
+def test_current_schema_and_version_three_database_untouched(control):
     c = control
     with sqlite3.connect(c.db) as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0] == 4
+        assert db.execute('PRAGMA user_version').fetchone()[0] == 5
+        db.execute('DROP TABLE reminders')
         db.execute('DROP TABLE human_intents')
         db.execute('PRAGMA user_version = 3')
     before = c.db.read_bytes()
