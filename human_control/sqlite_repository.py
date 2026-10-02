@@ -9,6 +9,9 @@ from human_control.models import CONSTITUTION_FIELDS, ConstitutionItem
 
 
 _SCHEMA = (
+    '''CREATE TABLE human_intents (
+        workflow_id TEXT PRIMARY KEY NOT NULL REFERENCES workflows(workflow_id),
+        text TEXT NOT NULL)''',
     '''CREATE TABLE project_focus (
         project_id TEXT PRIMARY KEY NOT NULL REFERENCES projects(project_id),
         is_active INTEGER NOT NULL CHECK(is_active IN (0, 1)),
@@ -35,7 +38,7 @@ _SCHEMA = (
         PRIMARY KEY (workflow_id, role))''',
 )
 _APPLICATION_ID = 0x53463841
-_SCHEMA_VERSION = 3
+_SCHEMA_VERSION = 4
 
 
 class HumanControlRepository:
@@ -82,6 +85,41 @@ class HumanControlRepository:
             if existing_reference is not None:
                 db.execute('INSERT INTO existing_projects VALUES (?, ?)',
                            (str(project.project_id), require_text(existing_reference)))
+
+    @staticmethod
+    def _intent_owner(db, project_id: UUID, workflow_id: UUID) -> str:
+        project, workflow = require_uuid(project_id), require_uuid(workflow_id)
+        row = db.execute('SELECT project_id FROM workflows WHERE workflow_id = ?',
+                         (workflow,)).fetchone()
+        if row is None or row[0] != project:
+            raise ValueError('Project / Workflow ownership mismatch')
+        if db.execute('SELECT 1 FROM projects WHERE project_id = ?', (project,)).fetchone() is None:
+            raise ValueError('Project is missing')
+        return workflow
+
+    def human_intent(self, project_id: UUID, workflow_id: UUID) -> str | None:
+        with self._connection() as db:
+            workflow = self._intent_owner(db, project_id, workflow_id)
+            row = db.execute('SELECT text FROM human_intents WHERE workflow_id = ?',
+                             (workflow,)).fetchone()
+        return row[0] if row else None
+
+    def save_human_intent(self, project_id: UUID, workflow_id: UUID, text: str) -> None:
+        if not isinstance(text, str):
+            raise TypeError('Human Intent must be text')
+        with self._connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            workflow = self._intent_owner(db, project_id, workflow_id)
+            if text.strip():
+                db.execute('''INSERT INTO human_intents VALUES (?, ?)
+                    ON CONFLICT(workflow_id) DO UPDATE SET text = excluded.text''',
+                    (workflow, text))
+
+    def delete_human_intent(self, project_id: UUID, workflow_id: UUID) -> None:
+        with self._connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            workflow = self._intent_owner(db, project_id, workflow_id)
+            db.execute('DELETE FROM human_intents WHERE workflow_id = ?', (workflow,))
 
     def existing_project_reference(self, project_id: UUID) -> str | None:
         self.get_project(project_id)
