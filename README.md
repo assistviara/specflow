@@ -266,6 +266,14 @@ T8内④ではProject画面の一覧からWorkflowを明示的に開けます。
 End WorkはWorkflow取消・Focus変更ではありません。Activeの場合だけ「進行中のままにする」「寝かせる」を別途明示操作できます。
 Sleepingの暗黙Activateはありません。次工程の実行接続は後続対応であり、この画面から処理を自動開始しません。
 
+T8内⑤では`/control/reminders`で全ProjectのReminderを、`/control/projects/<Project UUID>/reminders`でProjectのReminderを確認できます。
+HomeはActive Projectの一覧への導線と全一覧への導線を提供し、Sleepingの内容を現在のReminderとして代替表示しません。
+Workflow画面からはそのWorkflowとの関連で絞り込めます。登録画面では文脈を候補として示すだけで、Workflowを初期選択しません。
+Humanが内容と既存5種類の1つを明示入力し、残しておくと確認するとT7で直接登録します。locationは任意の自由入力です。
+Workflow関連は任意で、選択と明示確認および所属検証が必要です。関連解除も明示POSTのみで、内容・Project・由来は保持します。
+由来はHuman直接登録とAI提案をHumanが保存したものを区別して表示しますが、今回の登録入口はHuman直接登録だけです。
+Reminder削除、AI Candidate生成、priority、実行指示への変換はありません。登録・解除はform tokenと最新の対象情報でstale・再送・対象不一致を拒否します。
+
 `require_repository()`でDB利用可否を確認し、`target(project_id, workflow_id)`でUUID・所属を確認します。
 後続serviceでも所属・正式Artifactを再検証してください。
 

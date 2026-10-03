@@ -23,8 +23,8 @@
 </section>
 <section class="card"><h2>思い出しておくこと</h2>
 {% if active %}<p>「{{ active.name }}」：このプロジェクトに関連する思い出しておくこと</p>
-<button type="button" disabled>関連する思い出しておくこと（未接続）</button>{% endif %}
-<p><button type="button" disabled>すべての思い出しておくこと（未接続）</button></p>
-<p>後続対応で内容の表示と画面への移動を有効にします。</p></section>
+<a href="{{ url_for('human_reminders.project_reminders', project_id=active.project_id) }}">関連する思い出しておくことを見る</a>{% endif %}
+<p><a href="{{ url_for('human_reminders.all_reminders') }}">すべての思い出しておくこと</a></p>
+<p>必要なときに一覧で確認できます。保存は優先順位の決定ではありません。</p></section>
 <p><a class="button" href="{{ url_for('human_projects.new') }}">新しいプロジェクト・既存開発物の登録</a></p>
 {% endblock %}

@@ -4,6 +4,8 @@
 <p><a href="{{ url_for('human_projects.detail', project_id=project.project_id) }}">Projectへ戻る</a></p>
 <h1>{{ '作業終了（End Work）' if ending else '作業（Workflow）' }}</h1>
 <h2>{{ project.name }} / {{ work.name }}</h2>
+<p><a href="{{ url_for('human_reminders.project_reminders', project_id=project.project_id, workflow_id=work.workflow_id) }}">このWorkflowに関連する思い出しておくこと</a>
+ · <a href="{{ url_for('human_reminders.new', project_id=project.project_id, workflow_id=work.workflow_id) }}">思い出しておくことを残す</a></p>
 <details><summary>作業の識別情報</summary><p>{{ work.workflow_id }}</p></details>
 <section class="card"><h2>{{ '今日到達した地点' if ending else '前回ここまで' }}</h2>
 {% if result.success and point %}

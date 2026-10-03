@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}思い出しておくことを残す - SpecFlow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('human_reminders.project_reminders', project_id=project.project_id) }}">Reminder一覧へ戻る</a></p>
+<h1>思い出しておくことを残す</h1><h2>Project：{{ project.name }}</h2>
+<p>Humanが直接入力して残します。保存は実装・優先順位の決定ではありません。</p>
+{% if candidate %}<p>関連付け候補：{{ candidate.name }}。関連付ける場合だけ、以下で選択し確認してください。</p>{% endif %}
+<form method="post" action="{{ url_for('human_reminders.new', project_id=project.project_id) }}">
+<input type="hidden" name="token" value="{{ token }}">
+<p><label>種類（1つ選択）<select name="kind" required><option value="">選択してください</option>{% for kind in kinds %}<option value="{{ kind }}">{{ kind }}</option>{% endfor %}</select></label></p>
+<label>内容<textarea name="text" required></textarea></label>
+<p><label>場所・文脈（任意）<input name="location" type="text"></label></p>
+<p><label>関連するWorkflow（任意）<select name="workflow_id"><option value="">関連付けない</option>{% for work in works %}<option value="{{ work.workflow_id }}">{{ work.name }} — {{ work.workflow_id }}</option>{% endfor %}</select></label></p>
+<p><label><input type="checkbox" name="confirm_workflow" value="yes">選択したWorkflowとの関連を確認しました</label></p>
+<p>関連は発見時の文脈です。実装先や再開指示にはなりません。</p>
+<p><label><input type="checkbox" name="human_confirmed" value="yes" required>この内容を残しておくと決めました</label></p>
+<button class="button" type="submit">残しておく</button></form>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}思い出しておくこと - SpecFlow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('human_focus.home') }}">ホームへ戻る</a>
+{% if selected %} · <a href="{{ url_for('human_projects.detail', project_id=selected.project_id) }}">Projectへ戻る</a> · <a href="{{ url_for('human_reminders.all_reminders') }}">すべての思い出しておくこと</a>{% endif %}</p>
+<h1>思い出しておくこと（Reminders）</h1>
+<p>残しておくことは、重要度・優先順位・実装の決定ではありません。表示順は推奨順位ではありません。</p>
+{% if workflow %}<p>「{{ workflow.name }}」との関連がある項目を表示しています。関連は発見時の文脈であり、実装先や再開指示ではありません。</p>
+<a href="{{ url_for('human_workflows.detail', project_id=selected.project_id, workflow_id=workflow.workflow_id) }}">Workflowへ戻る</a>{% endif %}
+{% for group in groups %}
+<section class="card"><h2>{{ group.project.name }}</h2>
+<p><a href="{{ url_for('human_reminders.new', project_id=group.project.project_id, workflow_id=workflow.workflow_id if workflow else none) }}">このProjectに思い出しておくことを残す</a></p>
+{% for row in group.rows %}{% set item = row.item %}
+<article><h3>{{ item.kind }}</h3><p style="white-space: pre-wrap">{{ item.text }}</p>
+{% if item.location %}<p>場所・文脈：{{ item.location }}</p>{% endif %}
+<p>由来：{{ provenance[item.provenance] }}</p>
+{% if item.workflow_id %}
+<p>関連する作業：<a href="{{ url_for('human_workflows.detail', project_id=item.project_id, workflow_id=item.workflow_id) }}">{{ row.workflow_name }}</a></p>
+<form method="post" action="{{ url_for('human_reminders.detach', project_id=item.project_id, reminder_id=item.reminder_id) }}">
+<input type="hidden" name="token" value="{{ row.token }}">
+<label><input type="checkbox" name="human_confirmed" value="yes" required>このWorkflowとの関連だけを解除します</label>
+<button type="submit">Workflowとの関連を解除する</button></form>
+{% else %}<p>Workflowとの関連：なし</p>{% endif %}
+</article>{% else %}<p>該当する思い出しておくことはありません。</p>{% endfor %}
+</section>{% else %}<p>まだProjectはありません。</p><a href="{{ url_for('human_projects.new') }}">Projectを作成する</a>{% endfor %}
+{% endblock %}

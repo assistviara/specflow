@@ -10,6 +10,7 @@ from human_control.sqlite_repository import HumanControlRepository
 from human_control.project_ui import pages as project_pages
 from human_control.focus_ui import pages as focus_pages
 from human_control.workflow_ui import pages as workflow_pages, continuity
+from human_control.reminder_ui import pages as reminder_pages
 
 legacy = Blueprint('legacy', __name__)
 
@@ -88,6 +89,7 @@ def create_app(db_path=None, *, approvals_dir=None, evidence_dir=None):
     application.register_blueprint(project_pages)
     application.register_blueprint(focus_pages)
     application.register_blueprint(workflow_pages)
+    application.register_blueprint(reminder_pages)
 
     @application.before_request
     def database_boundary():

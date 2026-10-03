@@ -7,6 +7,7 @@
 <p>プロジェクト識別子（UUID）: {{ project.project_id }}</p>
 <p>{{ '進行中（Active）' if active else '寝かせています（Sleeping）' }}</p>
 {% include "focus_form.html" %}
+<p><a href="{{ url_for('human_reminders.project_reminders', project_id=project.project_id) }}">このProjectの思い出しておくこと</a></p>
 <section><h2>作業（Workflow）</h2>
 {% if workflows %}<p>確認する作業を選んでください。現在のWorkflowは自動選択しません。</p>
 <ul>{% for work in workflows %}<li><a href="{{ url_for('human_workflows.detail', project_id=project.project_id, workflow_id=work.workflow_id) }}">{{ work.name }} — {{ work.workflow_id }}</a></li>{% endfor %}</ul>

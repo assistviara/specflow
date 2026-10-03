@@ -184,15 +184,15 @@ def test_focus_write_failure_is_not_success(ui, monkeypatch):
     assert service.active_project() is None
 
 
-def test_reminders_are_unconnected_not_broken_links(ui):
+def test_home_reminder_navigation_preserves_active_context(ui):
     client, repo, service, _ = ui
     p = service.create('Active context')
     service.activate(p.project_id, human_confirmed=True)
     body = client.get('/').get_data(as_text=True)
     assert 'このプロジェクトに関連する思い出しておくこと' in body
     assert 'すべての思い出しておくこと' in body
-    assert 'href="/reminder' not in body
-    assert '未接続' in body
+    assert f'href="/control/projects/{p.project_id}/reminders"' in body
+    assert 'href="/control/reminders"' in body
 
 
 @pytest.mark.parametrize('url', ['/', '/control/projects/sleeping'])
