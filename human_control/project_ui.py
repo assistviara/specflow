@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 
 from human_control.projects import ProjectService
 from human_control.web_runtime import BoundaryError
+from human_control.focus_ui import focus_controls
 
 
 pages = Blueprint('human_projects', __name__, url_prefix='/control/projects')
@@ -102,7 +103,7 @@ def detail(project_id):
                           for action in ('edit', 'confirm')} for field in FIELDS}
         return render_template('human_project.html', project=project, fields=FIELDS, items=items,
             gate=gate, active=active is not None and active.project_id == identity,
-            reference=reference, tokens=tokens)
+            reference=reference, tokens=tokens, focus=focus_controls(runtime, project, active))
     except Exception:
         return problem('保存済み情報を取得できません。変更せずに操作を停止しました。', 503)
 

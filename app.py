@@ -8,6 +8,7 @@ import click
 from human_control.web_runtime import Runtime
 from human_control.sqlite_repository import HumanControlRepository
 from human_control.project_ui import pages as project_pages
+from human_control.focus_ui import pages as focus_pages
 
 legacy = Blueprint('legacy', __name__)
 
@@ -30,7 +31,7 @@ def save_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-@legacy.route("/")
+@legacy.route("/legacy")
 def index():
     projects = []
     if PROJECTS_DIR.exists():
@@ -81,6 +82,7 @@ def create_app(db_path=None):
     application.extensions['human_control'] = runtime
     application.register_blueprint(legacy)
     application.register_blueprint(project_pages)
+    application.register_blueprint(focus_pages)
 
     @application.before_request
     def database_boundary():

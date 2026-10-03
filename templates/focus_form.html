@@ -1,0 +1,12 @@
+<form method="post" action="{{ url_for('human_focus.change', project_id=focus.project.project_id, action=focus.action) }}">
+<input type="hidden" name="token" value="{{ focus.token }}">
+{% if focus.action == 'activate' %}
+{% if focus.previous %}<p>現在進行中の「{{ focus.previous.name }}」は寝かせた状態になります。</p>{% endif %}
+<label><input type="checkbox" name="human_confirmed" value="yes" required>「{{ focus.project.name }}」を作業対象にすると決めました</label>
+<button class="button" type="submit">進行中にする</button>
+{% else %}
+<label><input type="checkbox" name="human_confirmed" value="yes" required>「{{ focus.project.name }}」を寝かせると決めました</label>
+<button class="button" type="submit">寝かせる</button>
+{% endif %}
+<p>作業対象の変更は、仕事の取消や正式な記録の変更ではありません。</p>
+</form>

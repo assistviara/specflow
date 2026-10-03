@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}寝かせたプロジェクト - SpecFlow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('human_focus.home') }}">ホームへ戻る</a></p>
+<h1>寝かせたプロジェクト（Sleeping Project List）</h1>
+<p>一覧や詳細を開くだけでは、進行中の作業対象は変わりません。</p>
+{% for project in projects %}
+<section class="card"><h2>{{ project.name }}</h2>
+<p><a href="{{ url_for('human_projects.detail', project_id=project.project_id) }}">プロジェクトを開く</a></p>
+{% with focus=controls[project.project_id] %}{% include "focus_form.html" %}{% endwith %}
+</section>
+{% else %}<p>寝かせているプロジェクトはありません。</p>{% endfor %}
+<p><a href="{{ url_for('human_projects.new') }}">新しいプロジェクト・既存開発物の登録</a></p>
+{% endblock %}

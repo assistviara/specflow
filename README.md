@@ -247,6 +247,14 @@ T8内②では一覧の「新しいプロジェクト・既存開発物の登録
 基本方針の開始条件が成立しても、この画面ではWorkflowを開始しません。
 Constitution変更時の進行中Workflowに対する判断材料は画面へ返しますが、判断の永続管理や状態遷移は行いません。
 
+T8内③では`/`がHuman Controlのホームです。SQLiteから現在進行中のProjectと、明示的に寝かせた日時順の最大3件を表示します。
+`/control/projects/sleeping`で全Sleeping Projectを開き、明示確認して「進行中にする」を選べます。
+Project画面にも「進行中にする」「寝かせる」を追加しています。閲覧だけではFocusは変わりません。
+Active切替は既存serviceに委譲し、以前のActiveをSleepingにしますが、新しい明示Sleep日時は記録しません。
+tokenは対象・操作・現在Activeの表示内容に結び付け、POST時に再読込します。古い画面や再送は拒否されます。
+判断待ち・再開情報・過去Intent・Reminderの内容は未接続と表示し、未実装画面へのリンクは作りません。
+従来のフォルダ一覧は`/legacy`へ移し、既存の`/projects/<project_name>`は保持しています。HomeのProject authorityには使いません。
+
 `require_repository()`でDB利用可否を確認し、`target(project_id, workflow_id)`でUUID・所属を確認します。
 後続serviceでも所属・正式Artifactを再検証してください。
 

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}ホーム - SpecFlow{% endblock %}
+{% block content %}
+<h1>ホーム（Home）</h1>
+<section class="card"><h2>あなたの判断が必要</h2>
+<p>判断が必要な内容の表示は未接続です。後続対応で正式な判断材料を表示します。判断の有無はまだ確認できません。</p></section>
+<section class="card"><h2>現在進行中</h2>
+{% if active %}
+<h3>{{ active.name }}</h3><p>進行中（Active）</p>
+<a class="button" href="{{ url_for('human_projects.detail', project_id=active.project_id) }}">プロジェクトを開く</a>
+{% else %}
+<p>現在進行中のプロジェクトはありません。</p>
+<a href="{{ url_for('human_focus.sleeping') }}">寝かせているプロジェクトから選ぶ</a>
+{% endif %}
+<p>「前回ここまで」「次に考えていたこと」は未接続です。後続対応で正式な記録と過去の意図を表示します。</p>
+</section>
+<section class="card" id="recent-sleeping"><h2>最近寝かせたプロジェクト</h2>
+{% if recent %}<ul>{% for project in recent %}
+<li><a href="{{ url_for('human_projects.detail', project_id=project.project_id) }}">{{ project.name }}</a></li>
+{% endfor %}</ul>{% else %}<p>最近寝かせたプロジェクトはありません。</p>{% endif %}
+<p>明示的に「寝かせる」を選んだ日時の新しい順に、最大3件を表示します。</p>
+<a href="{{ url_for('human_focus.sleeping') }}">寝かせているプロジェクトをすべて見る</a>
+</section>
+<section class="card"><h2>思い出しておくこと</h2>
+{% if active %}<p>「{{ active.name }}」：このプロジェクトに関連する思い出しておくこと</p>
+<button type="button" disabled>関連する思い出しておくこと（未接続）</button>{% endif %}
+<p><button type="button" disabled>すべての思い出しておくこと（未接続）</button></p>
+<p>後続対応で内容の表示と画面への移動を有効にします。</p></section>
+<p><a class="button" href="{{ url_for('human_projects.new') }}">新しいプロジェクト・既存開発物の登録</a></p>
+{% endblock %}

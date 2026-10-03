@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} - SpecFlow{% endblock %}
 {% block content %}
-<p><a href="{{ url_for('legacy.index') }}">一覧へ戻る</a> · <a href="{{ url_for('human_projects.new') }}">新しいプロジェクト</a></p>
+<p><a href="{{ url_for('human_focus.home') }}">ホームへ戻る</a> · <a href="{{ url_for('human_focus.sleeping') }}">寝かせたプロジェクト一覧</a> · <a href="{{ url_for('human_projects.new') }}">新しいプロジェクト</a></p>
 <div class="card">
 <h1>{{ project.name }}</h1>
 <p>プロジェクト識別子（UUID）: {{ project.project_id }}</p>
 <p>{{ '進行中（Active）' if active else '寝かせています（Sleeping）' }}</p>
+{% include "focus_form.html" %}
 {% if reference %}<p>既存開発物の参照: {{ reference }}</p>{% endif %}
 <h2>仕事の開始条件（Workflow Start Gate）</h2>
 {% if gate.allowed %}<p>基本方針の3項目は確認済みです。基本方針の開始条件を満たしています。</p>
