@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ '今日はここまで' if ending else work.name }} - SpecFlow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('human_projects.detail', project_id=project.project_id) }}">Projectへ戻る</a></p>
+<h1>{{ '作業終了（End Work）' if ending else '作業（Workflow）' }}</h1>
+<h2>{{ project.name }} / {{ work.name }}</h2>
+<details><summary>作業の識別情報</summary><p>{{ work.workflow_id }}</p></details>
+<section class="card"><h2>{{ '今日到達した地点' if ending else '前回ここまで' }}</h2>
+{% if result.success and point %}
+<p>{{ point }}</p><p>再開地点を確認できました。現在地は確認できています。実行接続は後続で行います。</p>
+{% if projection.resume_point == 'HUMAN_HANDOFF' %}<p>Human Handoff：返却先と未解決事項を確認してください。処理は開始していません。</p>{% endif %}
+{% else %}
+<p role="alert">STOP / Human Handoff：安全な現在地・再開地点を確認できません。</p>
+<p>以下の不足・不整合を確認し、正式情報と対象をHumanが確認してください。推測による補完や実行はしていません。</p>
+{% endif %}
+{% if result.diagnostics %}<h3>止まった理由</h3><ul>{% for item in result.diagnostics %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}
+{% if projection %}
+{% if projection.required_human_action %}<h3>Humanに必要な確認</h3><ul>{% for item in projection.required_human_action %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}
+{% if projection.recorded_return %}<h3>記録された返却内容</h3><dl>{% for key, value in projection.recorded_return.items() %}<dt>{{ key }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>{% endif %}
+<details><summary>正式情報の診断（T5の観測結果）</summary>
+<p>観測された記録は、再開可能・完了の証明とは限りません。</p>
+{% for fact in projection.facts %}<p>{{ fact }}</p>{% endfor %}
+<pre>{{ projection.observed_state }}</pre></details>
+{% endif %}
+</section>
+<section class="card"><h2>次に考えていたこと（Human Intent）</h2>
+<p>{{ intent if intent is not none else 'まだ記録はありません。' }}</p>
+<p>過去の意図は今の判断を拘束しません。実行指示ではなく、自動実行されません。</p>
+<form method="post" action="{{ url_for('human_workflows.change', project_id=project.project_id, workflow_id=work.workflow_id, action='intent') }}">
+<input type="hidden" name="token" value="{{ tokens['intent'] }}">
+<input type="hidden" name="return_to" value="{{ 'end-work' if ending else 'workflow' }}">
+<label>次に考えること<textarea name="intent"></textarea></label><p>空欄で送信した場合は変更しません。</p>
+<label><input type="checkbox" name="human_confirmed" value="yes" required>この内容を保存します</label>
+<button type="submit">意図を保存する</button></form>
+<form method="post" action="{{ url_for('human_workflows.change', project_id=project.project_id, workflow_id=work.workflow_id, action='delete-intent') }}">
+<input type="hidden" name="token" value="{{ tokens['delete-intent'] }}">
+<input type="hidden" name="return_to" value="{{ 'end-work' if ending else 'workflow' }}">
+<label><input type="checkbox" name="human_confirmed" value="yes" required>過去の意図を削除すると決めました</label><button type="submit">意図を削除する</button></form>
+</section>
+{% if ending %}
+<section class="card"><h2>現在の作業対象（Focus）</h2>
+{% if active %}<p>このProjectは進行中です。</p>
+{% for action, label in [('keep-active', '進行中のままにする'), ('sleep', '寝かせる')] %}
+<form method="post" action="{{ url_for('human_workflows.change', project_id=project.project_id, workflow_id=work.workflow_id, action=action) }}">
+<input type="hidden" name="token" value="{{ tokens[action] }}">
+<label><input type="checkbox" name="human_confirmed" value="yes" required>「{{ label }}」と決めました</label><button type="submit">{{ label }}</button></form>
+{% endfor %}
+{% else %}<p>このProjectは寝かせた状態です。進行中にするには明示的にProject画面で切り替えてください。</p>{% endif %}
+<p>作業終了だけではFocusや正式な作業状態は変わりません。</p></section>
+{% else %}
+<form method="post" action="{{ url_for('human_workflows.change', project_id=project.project_id, workflow_id=work.workflow_id, action='end-work') }}">
+<input type="hidden" name="token" value="{{ tokens['end-work'] }}">
+<label><input type="checkbox" name="human_confirmed" value="yes" required>現在の操作から戻り、今日の作業を終了します</label>
+<button type="submit">今日はここまで</button><p>Workflowの取消ではありません。Focusは自動変更しません。</p></form>
+{% endif %}
+{% endblock %}

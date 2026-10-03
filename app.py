@@ -9,6 +9,7 @@ from human_control.web_runtime import Runtime
 from human_control.sqlite_repository import HumanControlRepository
 from human_control.project_ui import pages as project_pages
 from human_control.focus_ui import pages as focus_pages
+from human_control.workflow_ui import pages as workflow_pages, continuity
 
 legacy = Blueprint('legacy', __name__)
 
@@ -74,15 +75,19 @@ def project_detail(project_name: str):
     )
 
 
-def create_app(db_path=None):
+def create_app(db_path=None, *, approvals_dir=None, evidence_dir=None):
     application = Flask(__name__)
     application.secret_key = secrets.token_bytes(32)
     application.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Strict')
     runtime = Runtime(db_path)
     application.extensions['human_control'] = runtime
+    if runtime.failure is None:
+        application.extensions['human_continuity'] = continuity(
+            runtime.require_repository(), approvals_dir, evidence_dir)
     application.register_blueprint(legacy)
     application.register_blueprint(project_pages)
     application.register_blueprint(focus_pages)
+    application.register_blueprint(workflow_pages)
 
     @application.before_request
     def database_boundary():
@@ -102,7 +107,9 @@ def create_app(db_path=None):
     return application
 
 
-app = create_app(os.environ.get('SPECFLOW_HUMAN_CONTROL_DB'))
+app = create_app(os.environ.get('SPECFLOW_HUMAN_CONTROL_DB'),
+    approvals_dir=os.environ.get('SPECFLOW_APPROVALS_DIR'),
+    evidence_dir=os.environ.get('SPECFLOW_EVIDENCE_DIR'))
 
 if __name__ == "__main__":
     app.run(debug=False, threaded=False)

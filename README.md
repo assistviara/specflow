@@ -255,6 +255,17 @@ tokenは対象・操作・現在Activeの表示内容に結び付け、POST時�
 判断待ち・再開情報・過去Intent・Reminderの内容は未接続と表示し、未実装画面へのリンクは作りません。
 従来のフォルダ一覧は`/legacy`へ移し、既存の`/projects/<project_name>`は保持しています。HomeのProject authorityには使いません。
 
+T8内④ではProject画面の一覧からWorkflowを明示的に開けます。0件でも新規開始せず、1件でも複数件でも選択を永続化しません。
+`/control/projects/<Project UUID>/workflows/<Workflow UUID>`は既存T5 Resumeの正式情報再検証とT6のHuman Intent表示に接続します。
+正式Approval保存先を`SPECFLOW_APPROVALS_DIR`、Review / Final検証に必要なEvidence保存先を`SPECFLOW_EVIDENCE_DIR`で明示してください。
+既存のJSON repositoryを読み取りに使用し、保存先の探索・作成・Approval生成は行いません。未設定や情報不足はSTOP / Human Handoffです。
+埋め込み起動では`create_app(db_path, approvals_dir=..., evidence_dir=...)`で同じ依存先を渡せます。
+同一processの実Outputは既存runtime holderから受け取り、再起動後はT5が対応する正式checkpointだけを検証します。Outputを保存・推測復元しません。
+「前回ここまで」はT5の表示時の結果です。「次に考えていたこと」はWorkflowごとの最新Intentで、空欄は変更なし、削除は別の明示操作です。
+「今日はここまで」は同期操作がUIへ戻った後のT6 End Workです。POST後に`/end-work`へ移動し、正式情報を再確認します。GETだけではEnd Workを実行しません。
+End WorkはWorkflow取消・Focus変更ではありません。Activeの場合だけ「進行中のままにする」「寝かせる」を別途明示操作できます。
+Sleepingの暗黙Activateはありません。次工程の実行接続は後続対応であり、この画面から処理を自動開始しません。
+
 `require_repository()`でDB利用可否を確認し、`target(project_id, workflow_id)`でUUID・所属を確認します。
 後続serviceでも所属・正式Artifactを再検証してください。
 

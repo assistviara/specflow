@@ -103,7 +103,8 @@ def detail(project_id):
                           for action in ('edit', 'confirm')} for field in FIELDS}
         return render_template('human_project.html', project=project, fields=FIELDS, items=items,
             gate=gate, active=active is not None and active.project_id == identity,
-            reference=reference, tokens=tokens, focus=focus_controls(runtime, project, active))
+            reference=reference, tokens=tokens, focus=focus_controls(runtime, project, active),
+            workflows=service.repository.list_workflows(identity))
     except Exception:
         return problem('保存済み情報を取得できません。変更せずに操作を停止しました。', 503)
 
