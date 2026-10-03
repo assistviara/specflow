@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} - SpecFlow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('legacy.index') }}">一覧へ戻る</a> · <a href="{{ url_for('human_projects.new') }}">新しいプロジェクト</a></p>
+<div class="card">
+<h1>{{ project.name }}</h1>
+<p>プロジェクト識別子（UUID）: {{ project.project_id }}</p>
+<p>{{ '進行中（Active）' if active else '寝かせています（Sleeping）' }}</p>
+{% if reference %}<p>既存開発物の参照: {{ reference }}</p>{% endif %}
+<h2>仕事の開始条件（Workflow Start Gate）</h2>
+{% if gate.allowed %}<p>基本方針の3項目は確認済みです。基本方針の開始条件を満たしています。</p>
+{% else %}<p>まだ仕事を開始できません。未確認の項目：</p><ul>{% for field in gate.unconfirmed %}<li>{{ fields[field] }}</li>{% endfor %}</ul>{% endif %}
+<p>これは基本方針の確認結果です。仕様書の承認や実行許可ではありません。この画面から仕事を開始することはありません。</p>
+</div>
+<div class="card"><h2>基本方針（Constitution）</h2>
+<p>以下は現在の保存内容です。正式文書への自動生成・同期は行いません。</p>
+{% for field, label in fields.items() %}
+<section><h3>{{ label }}</h3>
+<p>{{ '確認済み' if items[field].confirmed else '未確認・再確認待ち' }}</p>
+<form method="post" action="{{ url_for('human_projects.constitution', project_id=project.project_id, field=field, action='edit') }}">
+<input type="hidden" name="token" value="{{ tokens[field]['edit'] }}">
+<label for="{{ field }}">保存内容</label>
+<textarea id="{{ field }}" name="value" style="min-height: 80px">{{ items[field].value or '' }}</textarea>
+<button type="submit" class="button">{{ label }}を保存する</button>
+</form>
+<form method="post" action="{{ url_for('human_projects.constitution', project_id=project.project_id, field=field, action='confirm') }}">
+<input type="hidden" name="token" value="{{ tokens[field]['confirm'] }}">
+<input type="hidden" name="expected_value" value="{{ items[field].value or '' }}">
+<p>確認対象（保存済みの内容）：</p><pre>{{ items[field].value or '未入力' }}</pre>
+<label><input type="checkbox" name="human_confirmed" value="yes" required>上の保存済み内容を検討し、明示確認します</label>
+<button type="submit" class="button">{{ label }}を確認する</button>
+</form></section>
+{% endfor %}</div>
+{% endblock %}

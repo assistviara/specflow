@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}新しいプロジェクト - SpecFlow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('legacy.index') }}">一覧へ戻る</a></p>
+<div class="card">
+<h1>新しいプロジェクト（New Project）</h1>
+<p>基本方針が未完成でも保存できます。作成だけでは仕事を開始しません。</p>
+<form method="post" action="{{ url_for('human_projects.new') }}">
+<input type="hidden" name="token" value="{{ token }}">
+<input type="hidden" name="draft_id" value="{{ draft_id }}">
+<p><label>プロジェクト名 <input name="name" required></label></p>
+<fieldset><legend>作成方法</legend>
+<label><input type="radio" name="mode" value="new" checked>新しく作成する</label>
+<label><input type="radio" name="mode" value="existing">既存の開発物を登録する</label>
+<p><label>既存開発物の参照 <input name="reference"></label></p>
+<label><input type="checkbox" name="register_confirmed" value="yes">この既存開発物を、これからSpecFlowで管理すると決めました</label>
+<p>過去の履歴は取り込みません。参照先のファイルは変更しません。</p>
+</fieldset>
+<h2>基本方針（Constitution）</h2>
+<p>入力と確認は別です。未決の項目は空欄・未確認のまま保存してください。「現時点では特になし」も、実際に入力して明示確認した場合に有効です。</p>
+{% for field, label in fields.items() %}
+<p><label for="{{ field }}">{{ label }}</label></p>
+<textarea id="{{ field }}" name="{{ field }}" style="min-height: 80px"></textarea>
+<label><input type="checkbox" name="confirm_{{ field }}" value="yes">この内容を検討し、明示確認しました</label>
+{% endfor %}
+<p><button class="button" type="submit">プロジェクトを作成・登録する</button></p>
+</form></div>
+{% endblock %}

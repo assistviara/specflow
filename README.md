@@ -238,6 +238,15 @@ DB未指定・未存在・旧schema・別application DB・open失敗時はHTTP 5
 失敗した初期化の対象ファイルも自動削除しません。既存DBを消して起動し直す処理やmigrationはありません。
 
 テストや依存接続では`create_app(db_path)`で明示できます。`app.extensions['human_control']`がruntimeです。
+
+T8内②では一覧の「新しいプロジェクト・既存開発物の登録」から`/control/projects/new`を開けます。
+未完成の基本方針でも作成でき、既存開発物の登録には参照と明示確認が必要です。
+作成後は`/control/projects/<Project UUID>`で基本方針を項目別に保存・確認できます。
+入力だけでは確認済みになりません。古い画面・再送は拒否されるため、現在の画面を再表示してください。
+作成後に一部の保存・確認が失敗した場合は、作成済みProjectへ戻り、現在値と確認状態を確認して続けます。
+基本方針の開始条件が成立しても、この画面ではWorkflowを開始しません。
+Constitution変更時の進行中Workflowに対する判断材料は画面へ返しますが、判断の永続管理や状態遷移は行いません。
+
 `require_repository()`でDB利用可否を確認し、`target(project_id, workflow_id)`でUUID・所属を確認します。
 後続serviceでも所属・正式Artifactを再検証してください。
 

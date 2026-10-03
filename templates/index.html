@@ -4,6 +4,8 @@
 {% block content %}
 <div class="card">
     <h1>プロジェクト一覧</h1>
+    <p><a class="button" href="{{ url_for('human_projects.new') }}">新しいプロジェクト・既存開発物の登録</a></p>
+    <p class="muted">以下は従来のフォルダ一覧です。登録済みプロジェクトの管理一覧ではありません。</p>
 
     {% if projects %}
     <table>

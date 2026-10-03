@@ -7,6 +7,7 @@ import click
 
 from human_control.web_runtime import Runtime
 from human_control.sqlite_repository import HumanControlRepository
+from human_control.project_ui import pages as project_pages
 
 legacy = Blueprint('legacy', __name__)
 
@@ -79,6 +80,7 @@ def create_app(db_path=None):
     runtime = Runtime(db_path)
     application.extensions['human_control'] = runtime
     application.register_blueprint(legacy)
+    application.register_blueprint(project_pages)
 
     @application.before_request
     def database_boundary():

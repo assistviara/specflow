@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}操作を停止しました - SpecFlow{% endblock %}
+{% block content %}
+<div class="card" role="alert"><h1>操作を停止しました</h1><p>{{ message }}</p>
+<p><a href="{{ url_for('legacy.index') }}">一覧へ戻る</a></p></div>
+{% endblock %}
