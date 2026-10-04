@@ -4,6 +4,7 @@
 <p><a href="{{ url_for('human_workflows.detail', project_id=p, workflow_id=w) }}">正式記録・再開地点を確認する</a>
  · <a href="{{ url_for('human_projects.detail', project_id=p) }}">Projectへ戻る</a></p>
 <h1>{{ work.name }}</h1><p>Workflow UUID: {{ w }} / Project UUID: {{ p }}</p>
+<p><a href="{{ url_for('human_decisions.detail', project_id=p, workflow_id=w) }}">人の判断・判断材料・最終承認を確認する</a></p>
 <p>Workflowは登録済みです。登録だけでは処理の成功・完了を意味しません。</p>
 <p role="status">{{ message }}</p>
 {% if run %}

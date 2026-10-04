@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}人の判断 - {{ work.name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('human_workflows.detail', project_id=project.project_id, workflow_id=work.workflow_id) }}">このWorkflowへ戻る</a>
+ · <a href="{{ url_for('human_projects.detail', project_id=project.project_id) }}">Projectへ戻る</a></p>
+<h1>人の判断（Human Decision）</h1>
+<p>{{ project.name }} / {{ work.name }}</p>
+<p>Project UUID: {{ project.project_id }} / Workflow UUID: {{ work.workflow_id }}</p>
+<section class="card"><h2>何が起きたか・なぜ判断が必要か</h2>
+{% if failure %}<p role="alert">{{ failure }}</p>{% endif %}
+{% if actual and actual.completed and actual.success %}
+<p>正式な完了結果を保持しています。既存Application LayerがMergeと完了を検証しました。再実行はしません。</p>
+{% elif actual and actual.routing %}
+<p>人の判断に対する実結果です。</p>
+{% if actual.routing.request.decision.is_final_approval %}<p>最終承認後のMerge実行状況・保存状況を、以下の実結果で確認してください。一部処理済みでも完了とは扱いません。</p>
+{% else %}<p>返却先の処理は自動実行していません。</p>{% endif %}
+{% elif ready %}
+<p>最終承認対象を正式Artifactから再検証しました。内容を検討し、次の扱いを人が明示的に判断してください。</p>
+{% elif projection and projection.resume_point == 'PLAN_APPROVAL' %}
+<p>計画が生成され、人の承認・修正要求・中止判断を待っています。</p>
+{% elif projection and projection.resume_point in ('REVIEW_HANDOFF', 'HUMAN_HANDOFF') %}
+<p>Human Handoff：既存の返却内容と不足情報を確認してください。未定義の選択肢や実行操作は追加しません。</p>
+{% else %}
+<p role="alert">STOP / Human Handoff：安全な判断地点を一意に確認できません。以下の正式記録・不足情報を確認してください。</p>
+{% endif %}
+{% if projection %}
+{% for item in projection.required_human_action %}<p>{{ item }}</p>{% endfor %}
+{% if projection.diagnostics %}<h3>未解決・不足情報</h3><ul>{% for item in projection.diagnostics %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}
+{% endif %}
+</section>
+<section class="card"><h2>基本方針の変更と影響判断（8A-05）</h2>
+<p>変更後または現在の基本方針です。進行中Workflowへの継続・停止・再検討はHumanが判断します。</p>
+<dl>{% for key, label in fields.items() %}<dt>{{ label }} — {{ '確認済み' if items[key].confirmed else '未確認・再確認待ち' }}</dt><dd>{{ items[key].value or '未入力' }}</dd>{% endfor %}</dl>
+<p>{{ '新しいWorkflowの基本方針Gateは確認済みです。' if gate.allowed else '新しいWorkflowの開始Gateは閉じています。' }}</p>
+<p>再確認だけでは影響判断済みになりません。基本方針の変更・再確認によって、正式Stateを変更したり処理を自動継続したりはしません。</p>
+<p>下の正式記録と判断材料を確認してください。既存契約で受け付けられない継続・停止・再検討はHuman Handoffとし、独自のState操作には変換しません。</p>
+</section>
+<section class="card"><h2>判断材料</h2>
+{% if projection %}<p>観測した正式State（単独では実行許可・完了の証明になりません）</p><pre>{{ projection.observed_state }}</pre>
+{% for fact in projection.facts %}<p>{{ fact }}</p>{% endfor %}
+{% if projection.recorded_return %}<h3>保存された判断・返却先</h3><pre>{{ projection.recorded_return }}</pre>{% endif %}
+{% endif %}
+{% if target %}<p>Final対象SHA-256: {{ target.artifact_hash }}</p><p>既存checkpoint: {{ checkpoint }}</p>{% endif %}
+{% for label, text in materials.items() %}<details><summary>{{ label }}</summary><pre>{{ text }}</pre></details>{% endfor %}
+{% if actual %}
+{% if actual.routing %}
+<h3>判断と返却先・実行結果</h3>
+<p>判断: {{ actual.routing.request.decision.decision.value }}</p>
+<p>理由: {{ actual.routing.request.reason }}</p><p>返却先: {{ actual.routing.destination }}</p>
+{% if not actual.completed %}<p>STOP / Human Handoff：この結果はWorkflowのCompletedを意味しません。返却先の自動再実行は行いません。</p>{% endif %}
+{% endif %}
+<details><summary>実際のFinal処理結果</summary><pre>{{ actual }}</pre></details>
+{% elif observation %}<details><summary>保持している実際のApplication Layer出力</summary>{% for output in observation.outputs %}<pre>{{ output }}</pre>{% endfor %}</details>{% endif %}
+</section>
+{% if ready and token %}
+<section class="card"><h2>最終判断を送信する</h2>
+<p>最終承認（Final Approval）を送信すると、既存Application Layerが前提条件を検証し、Merge・Completedまで進む場合があります。その他の選択肢は既存の返却・中止契約へ渡します。</p>
+<form method="post" action="{{ url_for('human_decisions.final', project_id=project.project_id, workflow_id=work.workflow_id) }}">
+<input type="hidden" name="token" value="{{ token }}">
+<p><label>判断<select name="decision" required><option value="">選択してください</option>{% for value, label in choices.items() %}<option value="{{ value }}">{{ label }}（{{ value }}）</option>{% endfor %}</select></label></p>
+<label>判断理由<textarea name="reason" required></textarea></label>
+<p><label>参照情報（JSON文字列配列。参照なしは []）<input name="references" required></label></p>
+<p><label>新しいApproval ID（最終承認の場合は必須）<input name="approval_id"></label></p>
+<p><label>承認日時（approved_at・最終承認の場合は必須）<input name="approved_at"></label></p>
+<label>コメント<textarea name="comment"></textarea></label>
+<label><input type="checkbox" name="human_confirmed" value="yes" required>現在の基本方針・対象・判断材料と操作の効果を確認し、選択した判断を明示します</label>
+<button type="submit">判断を送信する</button></form></section>
+{% elif projection and projection.resume_point == 'PLAN_APPROVAL' %}
+<p><a href="{{ url_for('human_execution.detail', project_id=project.project_id, workflow_id=work.workflow_id) }}">計画の内容を確認し、判断する</a></p>
+{% endif %}
+{% endblock %}

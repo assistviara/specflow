@@ -70,6 +70,8 @@ def context(project_id, workflow_id):
 def render_screen(project_id, workflow_id, ending=False):
     try:
         data = context(project_id, workflow_id)
+        attempt = current_app.extensions['human_decisions'].get(data['work'].workflow_id)
+        data['decision_attempt'] = attempt if attempt and attempt.project_id == data['project'].project_id else None
         actions = ['intent', 'delete-intent', 'end-work']
         if ending and data['active']:
             actions += ['keep-active', 'sleep']

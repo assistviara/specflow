@@ -9,6 +9,8 @@
 {% include "focus_form.html" %}
 <p><a href="{{ url_for('human_reminders.project_reminders', project_id=project.project_id) }}">このProjectの思い出しておくこと</a></p>
 <section><h2>作業（Workflow）</h2>
+{% if workflows %}<p>基本方針を変更した場合は、各Workflowへの影響を確認してください。再確認だけでは継続・停止・再検討の判断済みにはなりません。</p>
+<ul>{% for work in workflows %}<li><a href="{{ url_for('human_decisions.detail', project_id=project.project_id, workflow_id=work.workflow_id) }}">{{ work.name }}の判断材料・影響を確認する</a></li>{% endfor %}</ul>{% endif %}
 <p><a href="{{ url_for('human_execution.new', project_id=project.project_id) }}">仕様書を指定して新しい作業を始める</a></p>
 {% if workflows %}<p>確認する作業を選んでください。現在のWorkflowは自動選択しません。</p>
 <ul>{% for work in workflows %}<li><a href="{{ url_for('human_workflows.detail', project_id=project.project_id, workflow_id=work.workflow_id) }}">{{ work.name }} — {{ work.workflow_id }}</a></li>{% endfor %}</ul>

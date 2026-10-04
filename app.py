@@ -12,6 +12,7 @@ from human_control.focus_ui import pages as focus_pages
 from human_control.workflow_ui import pages as workflow_pages, continuity
 from human_control.reminder_ui import pages as reminder_pages
 from human_control.execution_ui import pages as execution_pages, ExecutionRuntime
+from human_control.decision_ui import pages as decision_pages
 
 legacy = Blueprint('legacy', __name__)
 
@@ -84,6 +85,7 @@ def create_app(db_path=None, *, approvals_dir=None, evidence_dir=None, execution
     runtime = Runtime(db_path)
     application.extensions['human_control'] = runtime
     application.extensions['human_execution'] = ExecutionRuntime(execution_factory)
+    application.extensions['human_decisions'] = {}
     if runtime.failure is None:
         application.extensions['human_continuity'] = continuity(
             runtime.require_repository(), approvals_dir, evidence_dir)
@@ -93,6 +95,7 @@ def create_app(db_path=None, *, approvals_dir=None, evidence_dir=None, execution
     application.register_blueprint(workflow_pages)
     application.register_blueprint(reminder_pages)
     application.register_blueprint(execution_pages)
+    application.register_blueprint(decision_pages)
 
     @application.before_request
     def database_boundary():
