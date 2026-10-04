@@ -281,11 +281,16 @@ form token基盤は`runtime.forms.issue/consume`を利用します。tokenはfor
 操作・UUID・session・server側で再取得したrevisionへ紐付け、一回のPOSTで消費します。
 再表示した同一対象のformは以前のtokenを無効にします。`revision`にPOSTされたhashをそのまま渡してはいけません。
 tokenの検証成功はApprovalや実行許可ではなく、既存serviceの検証が引き続き必要です。
-実業務POSTへの接続は後続T8単位で行います。
+実業務POSTは既存Human Control UIからApplication Layerへ接続します。
 
 `runtime.outputs`は実`WorkflowObservation`のコピーをWorkflow UUID別に保持するprocess内メモリです。
 `put/get/clear`を提供し、不明Workflowは`None`を返します。DB保存・Output合成・再起動後の復元はしません。
-正式な実行用Adapterの接続は後続単位です。T8内①は8画面完成やWorkflow実行を提供しません。
+実Workflowの起動には管理DB以外の実行設定も必要です。
+標準起動は明示設定からproduction factoryを構成し、不足時は実行操作をSTOPします。
+modelは固定せず、runnerの動的選択やfallbackは行いません。
+設定一覧、外部AI送信・費用・Git変更・Final Mergeの影響、およびT9隔離環境については
+[Human Control実行用Web接続](human_control/README.md)を参照してください。
+起動だけでAI実行・Workflow開始・Approval作成・Git変更は行いません。
 既存legacy画面は残っており、SQLite Projectの管理画面としては扱いません。
 直接起動ではdebug/reloaderと並行request処理を無効にしています。
 

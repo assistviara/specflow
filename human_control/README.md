@@ -1,9 +1,74 @@
 # Human Control実行用Web接続
 
 T8内⑥の実行用依存は、`create_app(..., execution_factory=factory)` に明示的に渡す。
-環境変数から起動する標準の `app` には実行用factoryを設定していないため、
-管理情報の閲覧はできるが、新しいWorkflow開始は安全にSTOPする。
-AI service、model、runner、repository、retry authorizationを自動選択しない。
+標準の `python app.py` は `create_environment_app()` で以下の設定を読み、
+固定構成のproduction factoryを接続する。設定不足でも管理UIは利用できるが、
+Workflow開始画面・実行POST・Final判断POSTは理由を表示してSTOPする。
+既存Workflowのread-only表示は維持する。modelや保存先のfallbackはない。
+
+## 標準起動の明示設定
+
+管理UIだけを使う場合は、`SPECFLOW_HUMAN_CONTROL_DB` に明示初期化済みDBを指定する。
+新規DBの場合に限り `python -m flask --app app:app init-human-control-db --path <明示パス>`
+で初期化する。通常起動・再起動でDBを初期化・置換しない。
+
+実Workflowには次の設定も必要。directoryはHumanが事前に用意した絶対パスを指定する。
+
+| 環境変数 | 内容 |
+| --- | --- |
+| `SPECFLOW_OPENAI_MODEL` | Humanが明示するOpenAI model。Plan・Prompt・Reviewで同じ指定を利用 |
+| `OPENAI_API_KEY` | 実行processのOpenAI認証情報。UIや報告へ貼り付けない |
+| `SPECFLOW_EXECUTION_REPOSITORY` | 実装・Git・Final Mergeの対象Repository |
+| `SPECFLOW_APPROVALS_DIR` | 正式Approval保存先。Webの参照先と共通 |
+| `SPECFLOW_EVIDENCE_DIR` | 正式Evidence保存先。Webの参照先と共通 |
+| `SPECFLOW_EXECUTION_RECORDS_DIR` | Test RecordとCommand Traceの共通保存directory |
+
+設定後、同じPowerShellから `python app.py` を起動し、`http://127.0.0.1:5000` を開く。
+設定値はprocess起動時の構成として固定する。変更時はサーバー再起動が必要。
+起動・factory構築はAI実行、Workflow開始、Approval作成、Git変更を行わない。
+設定の存在確認は認証・model利用権限やGit正常性の実証ではない。実行時の失敗はSTOPする。
+
+Codex CLIとGitがこのprocessから利用可能であることが必要。
+既存コマンド `codex exec --json --ephemeral -` は変更せず、model・権限はHuman管理の
+CLI設定を利用する。Webが権限を拡大したり、別runnerへ切り替えたりしない。
+起動失敗・非ゼロ終了はSTOPし、stderrをJSONLや画面へ流さない。
+JSONLの妥当性は既存parserが検証する。非ゼロ終了の部分stdoutを成功Evidenceに変換しない。
+
+Review Retryには、安全根拠未確認として不許可を返すcallbackだけを接続する。
+正常系では呼ばれず、障害時も追加のAI試行を行わない。既存の他工程のRetry契約は変更しない。
+Merge Retry保存先は新設定にせず、既存Final契約のsnapshot親directory配下
+`retry_history` を利用する。
+
+## 実行影響とT9隔離環境
+
+明示POSTによるWorkflow実行では、正式入力を外部AIへ送信し、費用が発生し得る。
+Plan承認後の委任処理は対象RepositoryでCLI・テスト・Git操作を実行する。
+Final承認では既存Use Caseが対象の `developer` branchへMergeする場合がある。
+委任時のRepository入力と起動設定が不一致なら、Plan承認・委任前にSTOPする。
+Final POSTでも対応を再確認する。実行対象に関する他の検証は既存Phase 7に委ねる。
+
+T9実AI E2EにはSpecFlow開発Repositoryを使わず、Humanが別途承認した使い捨てRepositoryを使う。
+例（production既定値ではなく、手動準備する配置案）：
+
+```text
+<Human指定のT9ルート>/run-001/
+  target-repo/                 # 独立した.git、初期commit、developer branch、remoteなし
+  runtime/
+    human-control.sqlite3
+    approvals/
+    evidence/
+    execution-records/        # Trace / Test Recordは同じdirectory
+    workflows/<識別領域>/     # 正式入力、State、History、Plan、Prompt、Review、Final
+```
+
+Finalの `retry_history` は上記Final保存先配下に既存処理が保存する。
+この配置だけではOSアクセス隔離にはならない。CLI権限と送信対象はHumanが確認する。
+検証Repositoryのcwdから既存 `python -m infrastructure.specflow_test_wrapper` を利用できる
+Python環境・module検索pathも必要（SpecFlowコードを変更対象としてコピーしない）。
+正式Specification、保存済みApproval、既存State等はUIの入力契約どおり明示し、
+AIや起動コードが補完・承認しない。実AI E2EとFinal Mergeは別途Humanの承認後に行う。
+
+## 既存UI接続契約
 
 `factory(workflows, registered_workflow) -> ApplicationPorts` は、⑥ではWorkflow登録後に一度だけ呼ばれる。
 既存の `WorkflowEntryUseCase`、`PlanWorkflowUseCase`、`ImplementationWorkflowUseCase`、

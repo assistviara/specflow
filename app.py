@@ -115,9 +115,52 @@ def create_app(db_path=None, *, approvals_dir=None, evidence_dir=None, execution
     return application
 
 
-app = create_app(os.environ.get('SPECFLOW_HUMAN_CONTROL_DB'),
-    approvals_dir=os.environ.get('SPECFLOW_APPROVALS_DIR'),
-    evidence_dir=os.environ.get('SPECFLOW_EVIDENCE_DIR'))
+def create_environment_app(env=None):
+    """Standard startup; settings are explicit and no execution occurs here."""
+    from human_control.runtime_composition import ExecutionSettings, ProductionFactory
+    from human_control.project_ui import problem
+
+    env = os.environ if env is None else env
+    settings, failure = None, ''
+    try:
+        settings = ExecutionSettings.from_environment(env)
+    except ValueError as exc:
+        failure = str(exc)
+    except OSError:
+        failure = '実行設定のdirectoryを確認できません。'
+    application = create_app(env.get('SPECFLOW_HUMAN_CONTROL_DB'),
+        approvals_dir=settings.approvals if settings else env.get('SPECFLOW_APPROVALS_DIR'),
+        evidence_dir=settings.evidence if settings else env.get('SPECFLOW_EVIDENCE_DIR'),
+        execution_factory=ProductionFactory(settings) if settings else None)
+
+    @application.before_request
+    def execution_settings_boundary():
+        execution_post = request.blueprint == 'human_execution' and request.method == 'POST'
+        final_post = request.blueprint == 'human_decisions' and request.method == 'POST'
+        start_page = request.endpoint == 'human_execution.new'
+        if not (execution_post or final_post or start_page):
+            return None
+        if failure:
+            return problem('STOP: ' + failure, 503)
+        try:
+            if (request.endpoint == 'human_execution.act'
+                    and request.view_args.get('action') == 'decide'
+                    and request.form.get('human_decision') == 'approved'):
+                settings.check_repository(request.form.get('repository', ''))
+            if final_post:
+                runtime = application.extensions['human_control']
+                _, w = runtime.target(request.view_args['project_id'], request.view_args['workflow_id'])
+                refs = runtime.require_repository().artifact_references(w)
+                settings.check_repository(refs.get('repository', ''))
+        except (ValueError, OSError):
+            return problem('STOP: 対象RepositoryまたはProject / Workflowの対応を確認できません。', 409)
+        except Exception:
+            return problem('STOP: 実行対象の管理情報を確認できません。', 503)
+
+    return application
+
+
+app = create_environment_app()
 
 if __name__ == "__main__":
     app.run(debug=False, threaded=False)
