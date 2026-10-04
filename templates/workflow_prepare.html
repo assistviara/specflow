@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}新しい作業 - SpecFlow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('human_projects.detail', project_id=p) }}">Projectへ戻る</a></p>
+<h1>仕様を確認して新しい作業を始める</h1>
+<p>対象Repository：{{ repository }}</p>
+{% if stage == 'select' %}
+<form method="post" action="{{ url_for('human_execution.new', project_id=p) }}">
+<input type="hidden" name="token" value="{{ token }}">
+<label>使用する仕様<select name="specification_choice" required><option value="">選択してください</option><option value="configured">{{ specification }}</option></select></label>
+<p><label>今回の作業名<input name="name" required></label></p>
+<p><label>開発対象の説明<textarea name="project_description" required></textarea></label></p>
+<p><label>開発対象の版<input name="project_version" required></label></p>
+<button>仕様の内容を確認する</button></form>
+{% elif stage == 'approve' %}
+<h2>{{ selection.name }}：承認対象のSpecification</h2><pre>{{ content }}</pre>
+<p>この承認だけではWorkflowを開始しません。</p>
+<form method="post" action="{{ url_for('human_execution.approve_specification', project_id=p) }}">
+<input type="hidden" name="token" value="{{ token }}">
+<label><input type="checkbox" name="human_confirmed" value="yes" required>このSpecificationを承認する</label>
+<button>Specificationを承認する</button></form>
+{% else %}
+<h2>{{ selection.name }}：Specification承認済み</h2>
+<p>開始すると計画を生成し、HumanのPlan判断で停止します。外部AI呼び出し・費用・正式記録の保存が発生します。</p>
+<form method="post" action="{{ url_for('human_execution.start', project_id=p) }}">
+<input type="hidden" name="token" value="{{ token }}">
+<label><input type="checkbox" name="human_confirmed" value="yes" required>このSpecificationからWorkflowを開始する</label>
+<button>作業を開始する</button></form>
+{% endif %}
+{% endblock %}

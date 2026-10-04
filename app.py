@@ -132,6 +132,20 @@ def create_environment_app(env=None):
         approvals_dir=settings.approvals if settings else env.get('SPECFLOW_APPROVALS_DIR'),
         evidence_dir=settings.evidence if settings else env.get('SPECFLOW_EVIDENCE_DIR'),
         execution_factory=ProductionFactory(settings) if settings else None)
+    from human_control.workflow_preparation import PreparationSettings, WorkflowPreparation
+    application.extensions['human_preparation'] = None
+    if settings is not None:
+        try:
+            application.extensions['human_preparation'] = WorkflowPreparation(
+                PreparationSettings.from_environment(env, settings.repository))
+        except (ValueError, OSError):
+            pass  # Management remains available; preparation requests STOP.
+
+    @application.context_processor
+    def preparation_context():
+        preparation = application.extensions['human_preparation']
+        return dict(managed_preparation=True,
+                    execution_repository=preparation.settings.repository if preparation else None)
 
     @application.before_request
     def execution_settings_boundary():
@@ -146,7 +160,11 @@ def create_environment_app(env=None):
             if (request.endpoint == 'human_execution.act'
                     and request.view_args.get('action') == 'decide'
                     and request.form.get('human_decision') == 'approved'):
-                settings.check_repository(request.form.get('repository', ''))
+                # Never accept a posted replacement for the startup repository.
+                if request.form.get('repository'):
+                    settings.check_repository(request.form['repository'])
+                if application.extensions['human_preparation'] is None:
+                    return problem('STOP: 正式入力の関連付けが未設定です。', 503)
             if final_post:
                 runtime = application.extensions['human_control']
                 _, w = runtime.target(request.view_args['project_id'], request.view_args['workflow_id'])

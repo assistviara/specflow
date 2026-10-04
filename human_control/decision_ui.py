@@ -15,6 +15,7 @@ from human_control.project_ui import FIELDS, problem
 from human_control.web_runtime import BoundaryError
 from human_control.workflow_ui import context
 from human_control.workflows import WorkflowService
+from human_control.workflow_preparation import new_decision_identity, lines
 
 pages = Blueprint('human_decisions', __name__,
     url_prefix='/control/projects/<project_id>/workflows/<workflow_id>/decisions')
@@ -104,13 +105,14 @@ def human_input():
         raise ValueError('対象と判断内容のHuman明示確認が必要です。')
     choice = FinalApprovalDecision(required(request.form, 'decision'))
     reason = required(request.form, 'reason')
-    references = json.loads(required(request.form, 'references'))
+    managed = 'human_preparation' in current_app.extensions
+    references = list(lines(request.form, 'references')) if managed else json.loads(required(request.form, 'references'))
     if not isinstance(references, list) or any(not isinstance(v, str) or not v.strip() for v in references):
         raise ValueError('参照情報には文字列のJSON配列を指定してください。参照なしは [] と明示してください。')
     identity = request.form.get('approval_id', '')
     date = request.form.get('approved_at', '')
     if choice is FinalApprovalDecision.FINAL_APPROVAL:
-        identity, date = required(request.form, 'approval_id'), required(request.form, 'approved_at')
+        identity, date = new_decision_identity() if managed else (required(request.form, 'approval_id'), required(request.form, 'approved_at'))
         if approval_fact(identity) is not None:
             raise ValueError('保存済みApproval IDは上書きできません。')
     return HumanFinalDecisionInput(choice.value, reason, identity, date,

@@ -23,6 +23,49 @@ Workflow開始画面・実行POST・Final判断POSTは理由を表示してSTOP�
 | `SPECFLOW_EVIDENCE_DIR` | 正式Evidence保存先。Webの参照先と共通 |
 | `SPECFLOW_EXECUTION_RECORDS_DIR` | Test RecordとCommand Traceの共通保存directory |
 
+## T9の限定した正式入力準備
+
+標準起動では、以下の既存正式入力を事前に明示関連付けする。
+UIで毎回pathやJSONを入力するのではなく、1件の関連付け済みSpecificationを
+Humanが選択し、内容確認 → Specification承認 → Workflow開始の順に操作する。
+複数ファイルの探索、最新版選択、文書生成は行わない。
+
+| 環境変数 | 内容 |
+| --- | --- |
+| `SPECFLOW_WORKFLOW_ROOT` | 既存のWorkflow専用保存directory。正式入力ファイルは外側に置く |
+| `SPECFLOW_INPUT_SPECIFICATION` | 選択候補とする1件の既存Specification |
+| `SPECFLOW_INPUT_CONSTITUTION` | 既存の正式Constitution文書 |
+| `SPECFLOW_INPUT_PRINCIPLES` | 既存の正式Principles文書 |
+| `SPECFLOW_INPUT_DECISIONS` | 既存の正式Decisions文書 |
+| `SPECFLOW_INPUT_PLAN_TEMPLATE` | 既存Plan文書テンプレート |
+| `SPECFLOW_INPUT_PLAN_PROMPT_TEMPLATE` | 既存Plan生成Promptテンプレート |
+| `SPECFLOW_INPUT_PROMPT_TEMPLATE` | 既存Implementation Promptテンプレート |
+| `SPECFLOW_INPUT_REVISION_TEMPLATE` | 任意。Plan修正時には関連付け必須 |
+
+全pathは絶対パスで指定する。関連付け不足・ファイル不足ではSTOPし、
+旧来のpath手入力画面へfallbackしない。Projectの基本方針3項目から正式文書を生成しない。
+作業名、開発対象の説明・版はHumanが入力する。Project名は現在のProject情報、
+targetは起動設定済みRepositoryから取得する。
+
+Specification承認は専用POSTでのみ成立し、ID・UTC時刻・hashをシステムが記録する。
+このPOSTではStateやWorkflowを作らず、AIも呼ばない。
+別の明示開始POSTで承認と入力・基本方針を再検証し、新規Stateをcreate-onlyで保存して
+既存Entryへ渡す。以後のState遷移・Plan生成は既存Application Layerが担当する。
+
+保存領域はProject UUID・Specification正規化path・hashから生成したUUIDに限定し、
+同じProjectと同じSpecification内容への承認試行は再利用しない。
+承認時の専用directory予約と開始時の `start-attempt` は重複防止のみを目的とする。
+部分保存・失敗・再起動後は正式記録の確認へSTOPし、自動復旧・再実行しない。
+これらからApplication Outputを復元することはなく、汎用checkpointではない。
+既存のFinal checkpointによる再開は変更しない。
+
+State・History・Plan・Prompt・Review・Finalは予約領域内の固定配置、
+実装branchは `impl/<Workflow UUID>` とする。衝突時は既存検証でSTOPする。
+修正Planは同領域の未使用UUID名へ保存し、既存修正Use Caseだけを呼ぶ。
+Humanはscope・TDD・Review方式等を決め、対象ファイルはRepository内の相対名で指定する。
+複数項目は1行に1項目、空集合は「対象なし」で明示し、内部JSONへの変換はシステムが行う。
+Plan／Final判断のID・時刻もシステムが発行する。Finalの理由・参照内容はHumanが決める。
+
 設定後、同じPowerShellから `python app.py` を起動し、`http://127.0.0.1:5000` を開く。
 設定値はprocess起動時の構成として固定する。変更時はサーバー再起動が必要。
 起動・factory構築はAI実行、Workflow開始、Approval作成、Git変更を行わない。
@@ -44,7 +87,7 @@ Merge Retry保存先は新設定にせず、既存Final契約のsnapshot親direc
 明示POSTによるWorkflow実行では、正式入力を外部AIへ送信し、費用が発生し得る。
 Plan承認後の委任処理は対象RepositoryでCLI・テスト・Git操作を実行する。
 Final承認では既存Use Caseが対象の `developer` branchへMergeする場合がある。
-委任時のRepository入力と起動設定が不一致なら、Plan承認・委任前にSTOPする。
+委任時のRepositoryは起動設定を使用する。不一致のpathをPOSTで送っても切り替えない。
 Final POSTでも対応を再確認する。実行対象に関する他の検証は既存Phase 7に委ねる。
 
 T9実AI E2EにはSpecFlow開発Repositoryを使わず、Humanが別途承認した使い捨てRepositoryを使う。
@@ -58,15 +101,17 @@ T9実AI E2EにはSpecFlow開発Repositoryを使わず、Humanが別途承認し�
     approvals/
     evidence/
     execution-records/        # Trace / Test Recordは同じdirectory
-    workflows/<識別領域>/     # 正式入力、State、History、Plan、Prompt、Review、Final
+    inputs/                  # 既存の正式入力
+    workflows/<識別領域>/     # State、History、Plan、Prompt、Review、Final
 ```
 
 Finalの `retry_history` は上記Final保存先配下に既存処理が保存する。
 この配置だけではOSアクセス隔離にはならない。CLI権限と送信対象はHumanが確認する。
 検証Repositoryのcwdから既存 `python -m infrastructure.specflow_test_wrapper` を利用できる
 Python環境・module検索pathも必要（SpecFlowコードを変更対象としてコピーしない）。
-正式Specification、保存済みApproval、既存State等はUIの入力契約どおり明示し、
-AIや起動コードが補完・承認しない。実AI E2EとFinal Mergeは別途Humanの承認後に行う。
+正式Specification等の文書は明示関連付けし、生成しない。
+Approvalと初期Stateは上記の別々のHuman POSTを根拠に記録する。
+実AI E2EとFinal Mergeは別途Humanの承認後に行う。
 
 ## 既存UI接続契約
 
@@ -79,16 +124,17 @@ Approval / Evidence repositoryはWebの `approvals_dir` / `evidence_dir` と同�
 Git接続はHumanが指定する対象Repositoryと一致させる。factoryの失敗・必要portの欠落では
 登録済みWorkflowを残してSTOPする。
 
-開始入力には、既存Stateと正式文書、保存済みSpecification Approval ID、生成metadata、
-新しいPlan保存先が必要。基本方針の確認項目から正式文書を生成しない。
+Application Layerへの開始入力には、Stateと正式文書、保存済みSpecification Approval ID、生成metadata、
+新しいPlan保存先が必要。標準UIでは上記準備処理が機械値を供給する。
+基本方針の確認項目から正式文書を生成しない。
 入力確認後の開始POSTでtokenを消費し、登録、Entry、Plan生成・保存を同期実行する。
 次のHuman Plan判断まで自動で進む。登録の成功はApplication Layerの成功ではない。
 
 Plan承認時は、委任用入力をすべて検査した後、同じadapterの `decide_plan` に渡す。
-source / test pathとscopeは文字列のJSON配列。空配列もHumanが明示する。
+内部source / test pathとscopeは文字列のJSON配列。標準UIはHumanの入力・空集合選択を変換する。
 TDD適用、不要理由、Review方式、branch、Prompt規則等を推測・補完しない。
 Plan / Promptのhashとidentityは実際のOutputと正式記録から結び付ける。
-既存Approval IDの上書きを避けるため、Plan判断の保存先IDは未使用のものを指定する。
+既存Approval IDの上書きを避けるため、Plan判断には発行した未使用IDを使用する。
 Approvalの意味と妥当性の検証は既存Phase 7に委ねる。
 
 実adapterは `human_execution.runs` にWorkflow UUID単位で保持する。

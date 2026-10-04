@@ -23,6 +23,7 @@ from human_control.projects import ProjectService
 from human_control.project_ui import problem, revision
 from human_control.web_runtime import BoundaryError
 from human_control.workflows import WorkflowService, explicit_path
+from human_control.workflow_preparation import configured, new_decision_identity
 
 pages = Blueprint('human_execution', __name__, url_prefix='/control/projects/<project_id>/workflows')
 START_FILES = ('specification', 'state', 'constitution', 'principles', 'decisions',
@@ -136,6 +137,10 @@ def selected_start(service, p, execution):
 def new(project_id):
     try:
         runtime, execution, service, p, _ = dependencies(project_id)
+        preparation = configured()
+        if preparation is not None:
+            with execution.lock:
+                return preparation.page(runtime, service, p)
         if request.method == 'GET':
             token = runtime.forms.issue('execution:prepare', p, revision=project_stamp(service, p))
             return render_template('workflow_start.html', p=p, token=token, fields=LABELS, values=None)
@@ -152,6 +157,21 @@ def new(project_id):
         return problem(str(exc), 400)
     except Exception:
         return problem('STOP: 正式入力または保存先を確認できません。', 503)
+
+
+@pages.post('/approve-specification')
+def approve_specification(project_id):
+    try:
+        runtime, execution, service, p, _ = dependencies(project_id)
+        with execution.lock:
+            preparation = configured()
+            if preparation is None or not callable(execution.factory):
+                raise ValueError('正式入力準備・実行依存が未設定です。')
+            return preparation.approve(runtime, service, p, approvals())
+    except (ValueError, OSError) as exc:
+        return problem('STOP: ' + str(exc), 409)
+    except Exception:
+        return problem('STOP: 承認の保存結果を確認できません。自動再実行しません。', 503)
 
 
 def location(p, w):
@@ -181,10 +201,16 @@ def start(project_id):
     try:
         runtime, execution, service, p, _ = dependencies(project_id)
         with execution.lock:
-            values, paths, stamp = selected_start(service, p, execution)
-            runtime.forms.consume(request.form.get('token'), 'execution:start', p, revision=stamp)
-            if request.form.get('human_confirmed') != 'yes':
-                raise ValueError('新しいWorkflowの開始には人による明示確認が必要です。')
+            preparation = configured()
+            if preparation is not None:
+                if not callable(execution.factory):
+                    raise ValueError('実行依存が未設定です。')
+                values, paths = preparation.begin(runtime, service, p, approvals())
+            else:
+                values, paths, stamp = selected_start(service, p, execution)
+                runtime.forms.consume(request.form.get('token'), 'execution:start', p, revision=stamp)
+                if request.form.get('human_confirmed') != 'yes':
+                    raise ValueError('新しいWorkflowの開始には人による明示確認が必要です。')
             refs = {role: path for role, path in paths.items() if role not in ('specification', 'state', 'history')}
             work = service.register(p, values['name'], paths['specification'], file_fact(paths['specification']),
                 values['approval_id'], paths['state'], paths['history'], refs, human_confirmed=True)
@@ -271,15 +297,17 @@ def detail(project_id, workflow_id):
         return problem('STOP: 保存済み情報を読み取れません。', 503)
 
 
-def array_input(key):
-    value = json.loads(required(request.form, key))
+def array_input(key, form=None):
+    value = json.loads(required(request.form if form is None else form, key))
     if not isinstance(value, list) or any(not isinstance(v, str) or not v.strip() for v in value):
         raise ValueError(f'文字列のJSON配列が必要です: {key}')
     return tuple(value)
 
 
 def delegated_inputs(work, paths, approval_id):
-    refs = {key: explicit_path(required(request.form, key)) for key in
+    preparation = configured()
+    form = preparation.delegated_form(work, paths, request.form) if preparation is not None else request.form
+    refs = {key: explicit_path(required(form, key)) for key in
             ('repository', 'implementation_target', 'prompt_template', 'codex_prompt', 'review_dir', 'final_dir')}
     if not refs['repository'].is_dir() or not refs['prompt_template'].is_file():
         raise ValueError('Repositoryと正式Promptテンプレートが必要です。')
@@ -288,13 +316,13 @@ def delegated_inputs(work, paths, approval_id):
     for key in ('review_dir', 'final_dir'):
         if refs[key].exists() and not refs[key].is_dir():
             raise ValueError('Review / Final保存先にはdirectoryを指定してください。')
-    texts = {key: required(request.form, key) for key in ('tdd_rules', 'completion_conditions',
+    texts = {key: required(form, key) for key in ('tdd_rules', 'completion_conditions',
         'stop_conditions', 'execution_result_reporting_requirements', 'implementation_branch', 'review_mode', 'tdd_required')}
     if texts['review_mode'] not in ('BATCH', 'STAGED') or texts['tdd_required'] not in ('yes', 'no'):
         raise ValueError('Review方式とTDD適用の明示選択が必要です。')
-    no_tdd_reason = required(request.form, 'no_tdd_reason') if texts['tdd_required'] == 'no' else None
-    scope = EvidenceScope(array_input('target_paths'), array_input('allowed_changes'), array_input('forbidden_changes'))
-    source, tests = [tuple(explicit_path(v) for v in array_input(key)) for key in ('source_paths', 'test_paths')]
+    no_tdd_reason = required(form, 'no_tdd_reason') if texts['tdd_required'] == 'no' else None
+    scope = EvidenceScope(array_input('target_paths', form), array_input('allowed_changes', form), array_input('forbidden_changes', form))
+    source, tests = [tuple(explicit_path(v) for v in array_input(key, form)) for key in ('source_paths', 'test_paths')]
     if any(not path.is_relative_to(refs['repository']) for path in (*source, *tests)):
         raise ValueError('source / testは対象Repository内の明示pathが必要です。')
     prompt = GenerateCodexPromptInput(paths['specification'], work.approval_id, paths['plan'], approval_id,
@@ -334,7 +362,8 @@ def act(project_id, workflow_id, action):
                 choice = required(request.form, 'human_decision')
                 if choice not in ('approved', 'revision_requested', 'cancelled'):
                     raise ValueError('対応する判断を明示してください。')
-                identity, date = required(request.form, 'approval_id'), required(request.form, 'approved_at')
+                identity, date = (new_decision_identity() if configured() is not None else
+                                  (required(request.form, 'approval_id'), required(request.form, 'approved_at')))
                 if approval_fact(identity) is not None:
                     raise ValueError('このApproval IDは既に保存されています。上書きしません。')
                 comment = request.form.get('comment', '')
@@ -345,8 +374,16 @@ def act(project_id, workflow_id, action):
             else:
                 if plan.approval_result is None or plan.approval_result.decision != 'revision_requested':
                     raise BoundaryError('明示的な修正要求がありません。')
-                template = explicit_path(required(request.form, 'revision_template'))
-                revised = explicit_path(required(request.form, 'revised_plan'))
+                preparation = configured()
+                if preparation is not None:
+                    slot = preparation.binding(work, paths)
+                    template = paths.get('revision_template')
+                    if template is None:
+                        raise ValueError('正式修正テンプレートが関連付けられていません。')
+                    revised = slot / ('plan-revision-' + str(uuid4()) + '.md')
+                else:
+                    template = explicit_path(required(request.form, 'revision_template'))
+                    revised = explicit_path(required(request.form, 'revised_plan'))
                 if not template.is_file() or revised.exists():
                     raise ValueError('正式修正テンプレートと未使用のPlan保存先が必要です。')
                 refs = {'revision_template': template}

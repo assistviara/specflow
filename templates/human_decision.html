@@ -59,9 +59,13 @@
 <input type="hidden" name="token" value="{{ token }}">
 <p><label>判断<select name="decision" required><option value="">選択してください</option>{% for value, label in choices.items() %}<option value="{{ value }}">{{ label }}（{{ value }}）</option>{% endfor %}</select></label></p>
 <label>判断理由<textarea name="reason" required></textarea></label>
+{% if managed_preparation %}
+<p><label>判断の参照情報（1行に1項目）<textarea name="references"></textarea></label><label><input type="checkbox" name="references_none" value="yes">参照なし</label></p>
+{% else %}
 <p><label>参照情報（JSON文字列配列。参照なしは []）<input name="references" required></label></p>
 <p><label>新しいApproval ID（最終承認の場合は必須）<input name="approval_id"></label></p>
 <p><label>承認日時（approved_at・最終承認の場合は必須）<input name="approved_at"></label></p>
+{% endif %}
 <label>コメント<textarea name="comment"></textarea></label>
 <label><input type="checkbox" name="human_confirmed" value="yes" required>現在の基本方針・対象・判断材料と操作の効果を確認し、選択した判断を明示します</label>
 <button type="submit">判断を送信する</button></form></section>

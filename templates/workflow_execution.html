@@ -22,12 +22,24 @@
 <input type="hidden" name="token" value="{{ token }}">
 <h2>計画に対する人の判断</h2>
 <label>判断<select name="human_decision" required><option value="">選択してください</option><option value="approved">承認して委任処理を進める</option><option value="revision_requested">修正を要求する</option><option value="cancelled">中止する</option></select></label>
+{% if managed_preparation %}<p>対象Repository：{{ execution_repository }}</p>{% else %}
 <p><label>新しいPlan Approval ID <input name="approval_id" required></label></p>
 <p><label>判断日（approved_at）<input name="approved_at" required></label></p>
+{% endif %}
 <label>コメント・修正要求<textarea name="comment"></textarea></label>
 <fieldset><legend>承認して進める場合の正式な委任入力</legend>
+{% if managed_preparation %}
+<p>以下は承認時に必要です。1行に1項目ずつ入力し、該当しない項目は「対象なし」を選んでください。対象ファイルはRepository内の相対名で指定します。</p>
+{% for key, label in [('target_paths','変更対象'),('allowed_changes','許可する変更'),('forbidden_changes','禁止する変更'),('source_paths','source対象'),('test_paths','test対象')] %}
+<p><label>{{ label }}<textarea name="{{ key }}"></textarea></label><label><input type="checkbox" name="{{ key }}_none" value="yes">対象なし</label></p>
+{% endfor %}
+{% for key, label in [('tdd_rules','TDD規則'),('completion_conditions','完了条件'),('stop_conditions','停止条件'),('execution_result_reporting_requirements','報告要件')] %}
+<p><label>{{ label }}<textarea name="{{ key }}"></textarea></label></p>
+{% endfor %}
+{% else %}
 <p>以下は承認時にすべて必要です。修正要求・中止の場合は使用しません。JSON配列の空集合は [] と明示します。</p>
 {% for key, label in delegated.items() %}<p><label>{{ label }} <input name="{{ key }}"></label></p>{% endfor %}
+{% endif %}
 <p><label>TDD適用<select name="tdd_required"><option value="">選択してください</option><option value="yes">必要</option><option value="no">不要（理由必須）</option></select></label></p>
 <label>TDD不要の正式理由<textarea name="no_tdd_reason"></textarea></label>
 <p><label>Review方式<select name="review_mode"><option value="">選択してください</option><option value="BATCH">BATCH</option><option value="STAGED">STAGED</option></select></label></p>
@@ -38,8 +50,10 @@
 {% elif action == 'revise' %}
 <form method="post" action="{{ url_for('human_execution.act', project_id=p, workflow_id=w, action='revise') }}">
 <input type="hidden" name="token" value="{{ token }}">
+{% if not managed_preparation %}
 <p><label>正式修正テンプレートの絶対パス <input name="revision_template" required></label></p>
 <p><label>修正Planの新しい保存先（絶対パス） <input name="revised_plan" required></label></p>
+{% endif %}
 <label>関連情報（任意）<textarea name="related_information"></textarea></label>
 <label><input type="checkbox" name="human_confirmed" value="yes" required>受け付けた修正要求で計画を修正し、改めて内容を確認します</label>
 <button type="submit">修正した計画を生成する</button></form>
