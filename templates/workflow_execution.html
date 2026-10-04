@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ work.name }} - 作業を進める{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('human_workflows.detail', project_id=p, workflow_id=w) }}">正式記録・再開地点を確認する</a>
+ · <a href="{{ url_for('human_projects.detail', project_id=p) }}">Projectへ戻る</a></p>
+<h1>{{ work.name }}</h1><p>Workflow UUID: {{ w }} / Project UUID: {{ p }}</p>
+<p>Workflowは登録済みです。登録だけでは処理の成功・完了を意味しません。</p>
+<p role="status">{{ message }}</p>
+{% if run %}
+{% if run.failure %}<p role="alert">{{ run.failure }}</p>{% endif %}
+{% if run.result %}
+{% if not run.result.success %}<p role="alert">STOP / Human Handoff</p>{% endif %}
+<p>{{ run.result.reason }}</p><p>{{ run.result.required_human_action }}</p>
+<details><summary>保持している実際のApplication Layer出力</summary>
+{% for output in run.result.outputs %}<pre>{{ output }}</pre>{% endfor %}</details>
+{% endif %}
+{% else %}<p>STOP / Human Handoff: このprocessには実行用adapterがありません。正式記録から再開地点を確認してください。自動で開始し直すことはありません。</p>{% endif %}
+{% if content is not none %}<h2>判断対象の計画</h2><pre>{{ content }}</pre>{% endif %}
+{% if action == 'decide' %}
+<form method="post" action="{{ url_for('human_execution.act', project_id=p, workflow_id=w, action='decide') }}">
+<input type="hidden" name="token" value="{{ token }}">
+<h2>計画に対する人の判断</h2>
+<label>判断<select name="human_decision" required><option value="">選択してください</option><option value="approved">承認して委任処理を進める</option><option value="revision_requested">修正を要求する</option><option value="cancelled">中止する</option></select></label>
+<p><label>新しいPlan Approval ID <input name="approval_id" required></label></p>
+<p><label>判断日（approved_at）<input name="approved_at" required></label></p>
+<label>コメント・修正要求<textarea name="comment"></textarea></label>
+<fieldset><legend>承認して進める場合の正式な委任入力</legend>
+<p>以下は承認時にすべて必要です。修正要求・中止の場合は使用しません。JSON配列の空集合は [] と明示します。</p>
+{% for key, label in delegated.items() %}<p><label>{{ label }} <input name="{{ key }}"></label></p>{% endfor %}
+<p><label>TDD適用<select name="tdd_required"><option value="">選択してください</option><option value="yes">必要</option><option value="no">不要（理由必須）</option></select></label></p>
+<label>TDD不要の正式理由<textarea name="no_tdd_reason"></textarea></label>
+<p><label>Review方式<select name="review_mode"><option value="">選択してください</option><option value="BATCH">BATCH</option><option value="STAGED">STAGED</option></select></label></p>
+</fieldset>
+<p>承認するとPrompt生成・実装・Evidence・Reviewを同期処理し、Handoffまたは最終承認待ちで停止します。</p>
+<label><input type="checkbox" name="human_confirmed" value="yes" required>表示された計画と指定入力を確認し、上の判断を明示します</label>
+<button type="submit">判断を送信する</button></form>
+{% elif action == 'revise' %}
+<form method="post" action="{{ url_for('human_execution.act', project_id=p, workflow_id=w, action='revise') }}">
+<input type="hidden" name="token" value="{{ token }}">
+<p><label>正式修正テンプレートの絶対パス <input name="revision_template" required></label></p>
+<p><label>修正Planの新しい保存先（絶対パス） <input name="revised_plan" required></label></p>
+<label>関連情報（任意）<textarea name="related_information"></textarea></label>
+<label><input type="checkbox" name="human_confirmed" value="yes" required>受け付けた修正要求で計画を修正し、改めて内容を確認します</label>
+<button type="submit">修正した計画を生成する</button></form>
+{% endif %}
+{% endblock %}

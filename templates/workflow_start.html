@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}新しい作業 - SpecFlow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('human_projects.detail', project_id=p) }}">Projectへ戻る</a></p>
+<h1>仕様書を指定して新しい作業を始める</h1>
+<p>Project UUID: {{ p }}</p>
+<p>既存の正式入力を指定してください。ファイルは絶対パスで指定します。基本方針3項目の確認と、正式Constitution文書は別の入力です。</p>
+{% if values %}
+<h2>開始内容の確認</h2><dl>{% for key, label in fields.items() %}<dt>{{ label }}</dt><dd>{{ values[key] }}</dd>{% endfor %}</dl>
+<p>Specification SHA-256: {{ spec_hash }}</p>
+<p>新しいWorkflowを登録し、正式Approvalと入力を検証して計画を生成します。計画は人の判断を待ちます。途中で失敗した場合も登録と正式記録を保持します。</p>
+<form method="post" action="{{ url_for('human_execution.start', project_id=p) }}">
+<input type="hidden" name="token" value="{{ token }}">
+{% for key, value in values.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+<label><input type="checkbox" name="human_confirmed" value="yes" required>上の正式入力で、新しい作業を開始します</label>
+<button type="submit">作業を開始する</button></form>
+{% else %}
+<form method="post" action="{{ url_for('human_execution.new', project_id=p) }}">
+<input type="hidden" name="token" value="{{ token }}">
+{% for key, label in fields.items() %}<p><label>{{ label }} <input name="{{ key }}" required></label></p>{% endfor %}
+<button type="submit">開始内容を確認する</button></form>
+{% endif %}
+{% endblock %}

@@ -9,9 +9,10 @@
 {% include "focus_form.html" %}
 <p><a href="{{ url_for('human_reminders.project_reminders', project_id=project.project_id) }}">このProjectの思い出しておくこと</a></p>
 <section><h2>作業（Workflow）</h2>
+<p><a href="{{ url_for('human_execution.new', project_id=project.project_id) }}">仕様書を指定して新しい作業を始める</a></p>
 {% if workflows %}<p>確認する作業を選んでください。現在のWorkflowは自動選択しません。</p>
 <ul>{% for work in workflows %}<li><a href="{{ url_for('human_workflows.detail', project_id=project.project_id, workflow_id=work.workflow_id) }}">{{ work.name }} — {{ work.workflow_id }}</a></li>{% endfor %}</ul>
-{% else %}<p>まだWorkflowはありません。新しい作業の開始は後続で接続します。</p>{% endif %}</section>
+{% else %}<p>まだWorkflowはありません。</p>{% endif %}</section>
 {% if reference %}<p>既存開発物の参照: {{ reference }}</p>{% endif %}
 <h2>仕事の開始条件（Workflow Start Gate）</h2>
 {% if gate.allowed %}<p>基本方針の3項目は確認済みです。基本方針の開始条件を満たしています。</p>

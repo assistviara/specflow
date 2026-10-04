@@ -11,6 +11,7 @@ from human_control.project_ui import pages as project_pages
 from human_control.focus_ui import pages as focus_pages
 from human_control.workflow_ui import pages as workflow_pages, continuity
 from human_control.reminder_ui import pages as reminder_pages
+from human_control.execution_ui import pages as execution_pages, ExecutionRuntime
 
 legacy = Blueprint('legacy', __name__)
 
@@ -76,12 +77,13 @@ def project_detail(project_name: str):
     )
 
 
-def create_app(db_path=None, *, approvals_dir=None, evidence_dir=None):
+def create_app(db_path=None, *, approvals_dir=None, evidence_dir=None, execution_factory=None):
     application = Flask(__name__)
     application.secret_key = secrets.token_bytes(32)
     application.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Strict')
     runtime = Runtime(db_path)
     application.extensions['human_control'] = runtime
+    application.extensions['human_execution'] = ExecutionRuntime(execution_factory)
     if runtime.failure is None:
         application.extensions['human_continuity'] = continuity(
             runtime.require_repository(), approvals_dir, evidence_dir)
@@ -90,6 +92,7 @@ def create_app(db_path=None, *, approvals_dir=None, evidence_dir=None):
     application.register_blueprint(focus_pages)
     application.register_blueprint(workflow_pages)
     application.register_blueprint(reminder_pages)
+    application.register_blueprint(execution_pages)
 
     @application.before_request
     def database_boundary():
