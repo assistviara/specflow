@@ -11,7 +11,7 @@ from test_plan_workflow import flow
 from test_human_control_workflow_execution_ui import launch, hidden
 from human_control.workflow_preparation import (
     PreparationSettings, WorkflowPreparation, lines, new_decision_identity)
-from human_control.workflows import WorkflowService
+from human_control.workflows import WorkflowBoundaryError, WorkflowService
 from human_control.projects import ProjectService
 from human_control.decision_ui import human_input
 from core.approval_validation import validate_approval_result
@@ -123,8 +123,12 @@ def test_approval_post_is_one_use_across_sessions_and_restart(prepared):
     response, data = approve(x)
     assert response.status_code == 200
     assert x.client.post(x.base + '/approve-specification', data=data).status_code == 409
+    old, = x.preparation.selections.values()
     x.preparation.selections.clear()  # No restored preparation Output after restart.
-    assert select(x).status_code == 409
+    assert select(x).status_code == 200
+    fresh, = x.preparation.selections.values()
+    assert fresh['workflow_id'] != old['workflow_id']
+    assert old['slot'].is_dir()
     assert not list(x.preparation.settings.root.rglob('state.json'))
 
 
@@ -158,9 +162,13 @@ def test_approval_write_failure_reserves_attempt_without_retry(prepared, monkeyp
     response = select(x)
     data = hidden(response, x.base + '/approve-specification')
     data['human_confirmed'] = 'yes'
+    failed, = x.preparation.selections.values()
     monkeypatch.setattr(type(x.f.repo), 'save', Mock(side_effect=OSError('disk unavailable')))
     assert x.client.post(x.base + '/approve-specification', data=data).status_code == 409
-    assert select(x).status_code == 409
+    assert select(x).status_code == 200
+    fresh, = x.preparation.selections.values()
+    assert fresh['workflow_id'] != failed['workflow_id']
+    assert failed['slot'].is_dir()
     assert not list(x.preparation.settings.root.rglob('state.json'))
 
 
@@ -174,7 +182,9 @@ def test_registration_failure_does_not_reinitialize_or_retry(prepared, monkeypat
     state, = x.preparation.settings.root.rglob('state.json')
     before = state.read_bytes()
     assert x.client.post(x.base + '/start', data=data).status_code == 409
-    assert select(x).status_code == 409
+    assert select(x).status_code == 200
+    fresh, = x.preparation.selections.values()
+    assert fresh['slot'] != state.parent
     assert state.read_bytes() == before
     x.factory.assert_not_called()
 
@@ -343,3 +353,87 @@ def test_revision_does_not_ask_for_storage_or_template_paths(prepared):
     assert x.client.post(url + '/revise', data=data).status_code == 303
     files = list(Path(work.state_path).parent.glob('plan-revision-*.md'))
     assert len(files) == 1
+
+
+def test_same_specification_starts_independent_workflows_without_changing_a(prepared, monkeypatch):
+    x = prepared
+    a, _, _ = begin(x)
+    a_paths = WorkflowService(x.repo).binding(a.project_id, a.workflow_id)[1]
+    a_slot = Path(a.state_path).parent
+    before = {p: p.read_bytes() for p in a_slot.rglob('*') if p.is_file()}
+    approval_a = x.f.repo.get(a.approval_id)
+    refs_a = x.repo.artifact_references(a.workflow_id)
+
+    response, _ = approve(x)
+    assert response.status_code == 200
+    selection, = x.preparation.selections.values()
+    prepared_id = selection['workflow_id']
+    assert prepared_id != a.workflow_id
+    assert selection['slot'] == x.preparation.settings.root / str(prepared_id)
+    assert selection['identity'] != str(prepared_id)
+    data = hidden(response, x.base + '/start')
+    data['human_confirmed'] = 'yes'
+    # Registration must consume the identity already issued during Preparation.
+    monkeypatch.setattr('human_control.workflows.uuid4', Mock(side_effect=AssertionError('UUID reissued')))
+    response = x.client.post(x.base + '/start', data=data)
+    assert response.status_code == 303, response.get_data(as_text=True)
+    b, = [w for w in x.repo.list_workflows(a.project_id) if w.workflow_id != a.workflow_id]
+    assert b.workflow_id == prepared_id
+    assert b.specification_path == a.specification_path
+    assert b.specification_hash == a.specification_hash
+    assert Path(b.state_path).parent != a_slot
+    service = WorkflowService(x.repo)
+    b_paths = service.binding(b.project_id, b.workflow_id)[1]
+    assert x.preparation.binding(a, a_paths) == a_slot
+    assert x.preparation.binding(b, b_paths) == Path(b.state_path).parent
+    for work in (a, b):
+        assert validate_approval_result(x.f.repo.get(work.approval_id),
+                                       work.specification_path, 'specification').is_valid
+    assert x.repo.get_workflow(a.workflow_id) == a
+    assert x.repo.artifact_references(a.workflow_id) == refs_a
+    assert x.f.repo.get(a.approval_id) == approval_a
+    assert before == {p: p.read_bytes() for p in a_slot.rglob('*') if p.is_file()}
+    with pytest.raises(WorkflowBoundaryError, match='Cross-workflow'):
+        service.record_references(b.project_id, b.workflow_id, {'plan': a_paths['plan']})
+    assert x.client.get(response.location).status_code == 200
+    assert x.factory.call_count == 2
+
+
+def test_abandoned_preparation_identity_is_not_reused(prepared):
+    x = prepared
+    assert select(x).status_code == 200
+    abandoned, = x.preparation.selections.values()
+    x.preparation.selections.clear()
+    assert select(x).status_code == 200
+    fresh, = x.preparation.selections.values()
+    assert fresh['workflow_id'] != abandoned['workflow_id']
+    assert fresh['slot'] != abandoned['slot']
+    assert not x.repo.list_workflows(x.project.project_id)
+    x.factory.assert_not_called()
+
+
+def test_legacy_preparation_slot_remains_bound_without_migration(prepared):
+    from dataclasses import replace
+    x = prepared
+    work, _, _ = begin(x)
+    paths = WorkflowService(x.repo).binding(work.project_id, work.workflow_id)[1]
+    legacy = x.preparation.settings.root / work.approval_id
+    legacy.mkdir()
+    marker = legacy / 'start-attempt'
+    marker.write_text(work.approval_id, encoding='utf-8')
+    legacy_work = replace(work, state_path=str(legacy / 'state.json'))
+    legacy_paths = dict(paths, state=legacy / 'state.json')
+    before = marker.read_bytes()
+    assert x.preparation.binding(legacy_work, legacy_paths) == legacy
+    assert marker.read_bytes() == before
+
+
+def test_preparation_binding_rejects_another_workflow_identity(prepared):
+    from human_control.web_runtime import BoundaryError
+    x = prepared
+    work, _, _ = begin(x)
+    paths = WorkflowService(x.repo).binding(work.project_id, work.workflow_id)[1]
+    marker = paths['state'].parent / 'start-attempt'
+    marker.write_text(str(uuid4()), encoding='utf-8')
+    with pytest.raises(BoundaryError, match='identity mismatch'):
+        x.preparation.binding(work, paths)

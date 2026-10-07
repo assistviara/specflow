@@ -95,6 +95,25 @@ def generate_draft(flow):
     return flow.use_case.generate(flow.entry, flow.generation, flow.plan_path)
 
 
+def test_repository_change_discards_plan_and_stops_before_approval(flow):
+    from core.ai.ai_service import AIService
+    from infrastructure.plan_codex_runner import PlanCodexRunner
+    from test_git_repository_state_provider import make_clean_repository
+    from test_plan_codex_runner import completed
+    root, _ = make_clean_repository(flow.tmp_path)
+    executor = Mock()
+    def execute(*args, **kwargs):
+        (root / 'tracked.txt').write_text('changed')
+        return completed()
+    executor.run.side_effect = execute
+    flow.use_case._generation._ai_service = AIService(PlanCodexRunner(executor, root, lambda path: None))
+    result = generate_draft(flow)
+    assert not result.success and 'tracked.txt' in result.stop_reason
+    assert not flow.plan_path.exists()
+    assert result.current_state['status'] == 'plan_generating'
+    flow.prompt_ai.run.assert_not_called()
+
+
 def approve_draft(flow):
     return flow.use_case.decide(generate_draft(flow), flow.decision)
 

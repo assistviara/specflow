@@ -17,6 +17,42 @@ from core.ai.ai_response import AIResponse
 from core.prompt_builder import PromptResult
 
 
+@pytest.mark.parametrize('target', [None, '', 'relative', 'missing', 'other', 123])
+def test_invalid_target_never_calls_ai_or_prompt_generator(tmp_path, target):
+    from dataclasses import replace
+    from test_plan_workflow import flow as flow_fixture
+    from human_control.runtime_composition import ExecutionSettings
+    f = flow_fixture.__wrapped__(tmp_path)
+    execution = tmp_path / 'execution'
+    execution.mkdir()
+    settings = ExecutionSettings('model', execution, tmp_path, tmp_path, tmp_path)
+    if target == 'missing':
+        target = str(tmp_path / 'missing')
+    elif target == 'other':
+        target = str(tmp_path)
+    metadata = {} if target is None else {'target_path': target}
+    generation = GenerateImplementationPlanUseCase(f.plan_generator, f.plan_ai, settings.check_repository)
+    result = generation.execute(replace(f.generation, project_metadata=metadata))
+    assert not result.success and result.implementation_plan_draft is None
+    f.plan_ai.run.assert_not_called()
+    f.plan_generator.generate.assert_not_called()
+    assert json.loads(f.state.read_text())['status'] == 'plan_generating'
+
+
+def test_valid_target_calls_ai_and_runner_failure_does_not_enter_approval(tmp_path):
+    from dataclasses import replace
+    from test_plan_workflow import flow as flow_fixture
+    from human_control.runtime_composition import ExecutionSettings
+    f = flow_fixture.__wrapped__(tmp_path)
+    settings = ExecutionSettings('model', tmp_path, tmp_path, tmp_path, tmp_path)
+    f.plan_ai.run.return_value = AIResponse('', False, 'Repository changed; STOP.')
+    generation = GenerateImplementationPlanUseCase(f.plan_generator, f.plan_ai, settings.check_repository)
+    result = generation.execute(replace(f.generation, project_metadata={'target_path': str(tmp_path)}))
+    assert not result.success
+    f.plan_ai.run.assert_called_once()
+    assert json.loads(f.state.read_text())['status'] == 'plan_generating'
+
+
 
 def test_invalid_specification_approval_does_not_start_plan_generation(
     tmp_path: Path,

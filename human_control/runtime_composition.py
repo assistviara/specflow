@@ -23,6 +23,7 @@ from core.plan_prompt_generator import PlanPromptGenerator
 from core.codex_prompt_generator import CodexPromptGenerator
 from infrastructure.subprocess_command_executor import SubprocessCommandExecutor
 from infrastructure.codex_jsonl_parser import parse_codex_jsonl
+from infrastructure.plan_codex_runner import PlanCodexRunner
 from infrastructure.git_implementation_preparation import GitImplementationPreparation
 from infrastructure.git_repository_state_provider import GitRepositoryStateProvider
 from infrastructure.git_cli_merge_service import GitCliMergeService
@@ -88,8 +89,10 @@ class ProductionFactory:
         except Exception:
             raise ValueError('OpenAI client構成に失敗しました。認証設定を確認してください。') from None
         generator = PlanPromptGenerator()
+        plan_ai = AIService(PlanCodexRunner(SubprocessCommandExecutor(), s.repository,
+                                           s.check_repository))
         plans = PlanWorkflowUseCase(approvals,
-            GenerateImplementationPlanUseCase(generator, ai), RequestPlanApprovalUseCase(approvals),
+            GenerateImplementationPlanUseCase(generator, plan_ai, s.check_repository), RequestPlanApprovalUseCase(approvals),
             ReviseImplementationPlanUseCase(generator, ai),
             GenerateCodexPromptUseCase(approvals, CodexPromptGenerator(), ai))
         recorder = JsonTestExecutionRecorder(

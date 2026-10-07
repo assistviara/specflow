@@ -213,7 +213,8 @@ def start(project_id):
                     raise ValueError('新しいWorkflowの開始には人による明示確認が必要です。')
             refs = {role: path for role, path in paths.items() if role not in ('specification', 'state', 'history')}
             work = service.register(p, values['name'], paths['specification'], file_fact(paths['specification']),
-                values['approval_id'], paths['state'], paths['history'], refs, human_confirmed=True)
+                values['approval_id'], paths['state'], paths['history'], refs, human_confirmed=True,
+                workflow_id=values.get('workflow_id'))
             run = execution.runs[work.workflow_id] = Run()
             try:
                 ports = execution.factory(service, work)

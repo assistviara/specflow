@@ -76,13 +76,14 @@ class WorkflowService:
 
     def register(self, project_id: UUID, name: str, specification_path: Path,
                  specification_hash: str, approval_id: str, state_path: Path,
-                 history_path: Path, references: dict[str, Path], *, human_confirmed: bool) -> Workflow:
+                 history_path: Path, references: dict[str, Path], *, human_confirmed: bool,
+                 workflow_id: UUID | None = None) -> Workflow:
         if human_confirmed is not True:
             raise WorkflowBoundaryError('Explicit Human selection of a new Workflow is required.')
         self.repository.get_project(project_id)
         if not ProjectService(self.repository).workflow_start_gate(project_id).allowed:
             raise WorkflowBoundaryError('Project Constitution confirmation is incomplete.')
-        work = Workflow(uuid4(), project_id, name, str(explicit_path(specification_path)),
+        work = Workflow(workflow_id if workflow_id is not None else uuid4(), project_id, name, str(explicit_path(specification_path)),
             specification_hash, approval_id, str(explicit_path(state_path)), str(explicit_path(history_path)))
         refs = {role: str(explicit_path(path)) for role, path in references.items()}
         self._isolation(work, refs)

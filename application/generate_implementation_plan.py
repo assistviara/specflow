@@ -1,5 +1,6 @@
 from datetime import datetime
 from uuid import uuid4
+from pathlib import Path
 
 from application.current_state_repository import load_current_state
 from application.dto import (
@@ -16,9 +17,11 @@ class GenerateImplementationPlanUseCase:
         self,
         plan_prompt_generator,
         ai_service,
+        repository_validator=None,
     ) -> None:
         self._plan_prompt_generator = plan_prompt_generator
         self._ai_service = ai_service
+        self._repository_validator = repository_validator
 
     def execute(
         self,
@@ -32,6 +35,22 @@ class GenerateImplementationPlanUseCase:
 
         if not is_valid:
             return None
+
+        if self._repository_validator is not None:
+            try:
+                target = input_dto.project_metadata.get('target_path')
+                if not isinstance(target, str) or not target.strip():
+                    raise ValueError('target_path must be a nonempty string')
+                path = Path(target)
+                if not path.is_absolute() or not path.is_dir():
+                    raise ValueError('target_path must be an existing absolute directory')
+                self._repository_validator(target)
+            except Exception:
+                return GenerateImplementationPlanOutput(
+                    success=False, implementation_plan_draft=None,
+                    specification_path=input_dto.specification_path,
+                    error_message='Plan target_path Repository validation failed; STOP.',
+                )
 
         current_state = load_current_state(
             input_dto.state_file

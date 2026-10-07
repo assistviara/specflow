@@ -82,6 +82,12 @@ def test_production_ports_share_formal_stores_without_ai_git_or_writes(env, monk
     assert recorder._trace_repository._evidence_dir == recorder._record_repository._evidence_dir == factory.settings.records
     assert ports.final._retry_repositories is composition.JsonMergeRetryRepository
     assert ports.review._reviewer._retry._ai_service._runner._model == env['SPECFLOW_OPENAI_MODEL']
+    assert isinstance(ports.plans._generation._ai_service._runner, composition.PlanCodexRunner)
+    assert ports.plans._generation._ai_service._runner._repository == factory.settings.repository
+    assert ports.plans._generation._repository_validator is not None
+    assert ports.plans._revision._ai_service is ports.plans._prompt._ai_service
+    assert ports.plans._revision._ai_service is ports.review._reviewer._retry._ai_service
+    assert ports.plans._generation._ai_service is not ports.plans._revision._ai_service
     client.responses.create.assert_not_called()
     process.assert_not_called()
     assert before == sorted(str(p) for p in tmp_path.rglob('*'))

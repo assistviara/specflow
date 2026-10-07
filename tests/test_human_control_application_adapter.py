@@ -106,6 +106,27 @@ def test_delegated_normal_path_reaches_final_human_gate_without_next_clicks(conn
     assert trace.current_state['status'] == 'final_approval_pending'
 
 
+def test_plan_repository_change_is_handed_to_human_without_next_stage(connected):
+    from infrastructure.plan_codex_runner import PlanCodexRunner
+    from test_plan_codex_runner import completed
+    x = connected
+    executor = Mock()
+    def execute(*args, **kwargs):
+        (x.root / 'tracked.txt').write_text('changed')
+        return completed()
+    executor.run.side_effect = execute
+    x.c.f.use_case._generation._ai_service = AIService(PlanCodexRunner(executor, x.root, lambda path: None))
+    result = x.adapter.start(x.c.f.generation)
+    assert not result.success and result.waiting_for_human
+    assert 'tracked.txt' in result.reason
+    assert not x.c.f.plan_path.exists()
+    assert json.loads(x.c.f.state.read_text())['status'] == 'plan_generating'
+    x.implementation.execute.assert_not_called()
+    x.evidence.execute.assert_not_called()
+    x.review.start.assert_not_called()
+    x.final.start.assert_not_called()
+
+
 def test_final_return_retains_existing_route_without_auto_reexecution(connected):
     x = connected
     x.adapter.start(x.c.f.generation)

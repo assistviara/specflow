@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from uuid import uuid4
 
 from flask import current_app, render_template, request, session
 
@@ -110,11 +110,12 @@ class WorkflowPreparation:
         if stamp != self.stamp(service, p):
             raise BoundaryError('表示中に正式入力が変更されました。')
         spec_hash = self.settings.facts()['specification'][1]
-        identity = str(uuid5(NAMESPACE_URL, f'{p}:{spec}:{spec_hash}'))
-        slot = self.settings.root / identity
+        workflow_id = uuid4()
+        identity = str(uuid4())
+        slot = self.settings.root / str(workflow_id)
         if slot.exists():
             raise BoundaryError('このProject・Specificationの準備記録が既にあります。再実行せず正式記録を確認してください。')
-        value = dict(fields, stamp=stamp, identity=identity, slot=slot, approved=False,
+        value = dict(fields, stamp=stamp, identity=identity, workflow_id=workflow_id, slot=slot, approved=False,
                      specification_hash=spec_hash, project_name=service.repository.get_project(p).name)
         self.selections[self.key(p)] = value
         token = runtime.forms.issue('preparation:approve', p, revision=stamp)
@@ -165,21 +166,28 @@ class WorkflowPreparation:
             raise BoundaryError('予約済み保存領域が変更されています。')
         # Consumed permanently even if subsequent registration/persistence fails.
         with (slot / 'start-attempt').open('x', encoding='utf-8') as stream:
-            stream.write(value['identity'])
+            stream.write(str(value['workflow_id']))
         paths = dict(self.settings.files, state=slot / 'state.json', history=slot / 'history',
                      plan=slot / 'plan.md')
         with paths['state'].open('x', encoding='utf-8') as stream:
             json.dump({'status': 'specification_ready'}, stream)
         paths['history'].mkdir()
         values = {key: value[key] for key in ('name', 'project_name', 'project_description', 'project_version')}
-        values.update(approval_id=value['identity'], target_path=str(self.settings.repository))
+        values.update(workflow_id=value['workflow_id'], approval_id=value['identity'], target_path=str(self.settings.repository))
         return values, paths
 
     def binding(self, work, paths):
         slot = paths['state'].parent
-        expected = self.settings.root / work.approval_id
+        expected = self.settings.root / str(work.workflow_id)
+        legacy = self.settings.root / work.approval_id
+        # Existing slots remain readable in place; never migrate formal artifacts.
+        if slot == legacy:
+            expected = legacy
         if slot != expected or slot.resolve() != slot or not (slot / 'start-attempt').is_file():
             raise BoundaryError('このWorkflowの限定準備記録を確認できません。')
+        expected_identity = work.approval_id if slot == legacy else str(work.workflow_id)
+        if (slot / 'start-attempt').read_text(encoding='utf-8') != expected_identity:
+            raise BoundaryError('Workflow preparation identity mismatch.')
         self.settings.facts()
         for role, path in self.settings.files.items():
             if role not in paths or paths[role] != path:
