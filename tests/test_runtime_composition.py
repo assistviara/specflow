@@ -83,6 +83,12 @@ def test_production_ports_share_formal_stores_without_ai_git_or_writes(env, monk
     assert ports.final._retry_repositories is composition.JsonMergeRetryRepository
     assert ports.review._reviewer._retry._ai_service._runner._model == env['SPECFLOW_OPENAI_MODEL']
     assert isinstance(ports.plans._generation._ai_service._runner, composition.PlanCodexRunner)
+    plan_executor = ports.plans._generation._ai_service._runner._command_executor
+    implementation_runner = ports.implementation._execution._implementation_adapter._runner
+    assert isinstance(implementation_runner, composition.CodexRunner)
+    assert isinstance(plan_executor, composition.CodexCommandExecutor)
+    assert implementation_runner._command_executor is plan_executor
+    assert isinstance(plan_executor._transport, composition.SubprocessCommandExecutor)
     assert ports.plans._generation._ai_service._runner._repository == factory.settings.repository
     assert ports.plans._generation._repository_validator is not None
     assert ports.plans._revision._ai_service is ports.plans._prompt._ai_service

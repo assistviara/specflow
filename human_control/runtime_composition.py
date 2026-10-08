@@ -22,6 +22,7 @@ from core.ai.codex_runner import CodexRunner
 from core.plan_prompt_generator import PlanPromptGenerator
 from core.codex_prompt_generator import CodexPromptGenerator
 from infrastructure.subprocess_command_executor import SubprocessCommandExecutor
+from infrastructure.codex_command_executor import CodexCommandExecutor
 from infrastructure.codex_jsonl_parser import parse_codex_jsonl
 from infrastructure.plan_codex_runner import PlanCodexRunner
 from infrastructure.git_implementation_preparation import GitImplementationPreparation
@@ -89,7 +90,8 @@ class ProductionFactory:
         except Exception:
             raise ValueError('OpenAI client構成に失敗しました。認証設定を確認してください。') from None
         generator = PlanPromptGenerator()
-        plan_ai = AIService(PlanCodexRunner(SubprocessCommandExecutor(), s.repository,
+        codex_executor = CodexCommandExecutor(SubprocessCommandExecutor())
+        plan_ai = AIService(PlanCodexRunner(codex_executor, s.repository,
                                            s.check_repository))
         plans = PlanWorkflowUseCase(approvals,
             GenerateImplementationPlanUseCase(generator, plan_ai, s.check_repository), RequestPlanApprovalUseCase(approvals),
@@ -100,7 +102,7 @@ class ProductionFactory:
             record_repository=JsonTestExecutionRecordRepository(s.records))
         implementation = ImplementationWorkflowUseCase(approvals, GitImplementationPreparation(),
             ExecuteImplementationUseCase(approvals,
-                CodexImplementationAdapter(CodexRunner(SubprocessCommandExecutor()),
+                CodexImplementationAdapter(CodexRunner(codex_executor),
                                            trace_parser=parse_codex_jsonl), recorder), JsonTestStateProvider)
         return ApplicationPorts(WorkflowEntryUseCase(approvals), plans, implementation,
             EvidenceWorkflowUseCase(approvals, evidence, GitRepositoryStateProvider, JsonTestStateProvider),
