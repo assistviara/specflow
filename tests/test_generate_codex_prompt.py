@@ -868,7 +868,40 @@ Request Human Approval before changes beyond approved scope.
     )
 
     assert output.success is True
-    assert output.codex_prompt == codex_prompt
+    from application.codex_prompt_output_parser import parse_codex_prompt_output
+    from application.implementation_result_parser import ImplementationResultParser
+
+    original = parse_codex_prompt_output(codex_prompt)
+    generated = parse_codex_prompt_output(output.codex_prompt)
+    for field in original.__dataclass_fields__:
+        if field != 'required_execution_result_reporting':
+            assert getattr(generated, field) == getattr(original, field)
+    reporting = generated.required_execution_result_reporting
+    assert original.required_execution_result_reporting in reporting
+    # Exercise the actual report template shipped to Codex, not a parallel fixture.
+    template = reporting.split('```text\n', 1)[1].split('```', 1)[0]
+    for status, result, retry, operation, incomplete, approval in (
+        ('COMPLETED', 'PASS', 'NO', 'NONE', 'NONE', 'NONE'),
+        ('COMPLETED', 'FAIL', 'NO', 'NONE', 'Tests failed', 'NONE'),
+        ('NOT_RUN', 'NONE', 'UNKNOWN', 'NONE', 'Stopped before edits', 'Scope decision needed'),
+        ('ERROR', 'NONE', 'YES', 'test execution', 'Tests unavailable', 'NONE'),
+    ):
+        for required in ('YES', 'NO'):
+            report = template
+            for key, value in dict(summary='Observed facts only', test_required=required,
+                    changed_files='NONE', executed_commands='NONE', test_status=status,
+                    test_result=result, test_error='Observed test status', retry_safe=retry,
+                    retry_operation=operation, errors='NONE', warnings='NONE',
+                    incomplete_items=incomplete, human_approval=approval).items():
+                report = report.replace('<' + key + '>', value)
+            parsed = ImplementationResultParser.parse(report)
+            assert parsed.test_execution_status == status
+            assert parsed.test_result == result
+            assert parsed.test_required is (required == 'YES')
+            assert parsed.incomplete_items == incomplete
+            assert parsed.human_approval_required == approval
+    assert 'Do not fabricate' in reporting
+    assert 'not authorization to retry' in reporting
     assert output.prompt_usable is True
     assert output.current_state == "implementation_ready"
     assert output.stop_reason is None
