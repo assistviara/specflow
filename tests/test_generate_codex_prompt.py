@@ -902,6 +902,14 @@ Request Human Approval before changes beyond approved scope.
             assert parsed.human_approval_required == approval
     assert 'Do not fabricate' in reporting
     assert 'not authorization to retry' in reporting
+    assert 'output exactly NONE as the entire\nsection body' in reporting
+    assert 'no explanation, translation, bullet, or trailing commentary' in reporting
+    assert 'do not append a general closing note after NONE' in reporting
+    assert ('Put routine handoff explanations for Evidence, Review, and Final Approval in\n'
+            'Implementation Summary, not in Human Approval Required') in reporting
+    assert 'This does not waive any\ndownstream Human Approval' in reporting
+    assert ('If additional approval really is required, describe\n'
+            'the specific issue and decision needed in Human Approval Required; do not use NONE') in reporting
     assert output.prompt_usable is True
     assert output.current_state == "implementation_ready"
     assert output.stop_reason is None

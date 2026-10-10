@@ -41,6 +41,15 @@ For free-text sections, use NONE only when genuinely absent; otherwise describe
 the facts, uncertainty, remaining work, or required Human decision. Never use NONE
 to conceal unfinished work. A parsed report is not proof of successful implementation.
 
+Human Approval Required is only for additional Human decisions needed for the
+current implementation. If none are needed, output exactly NONE as the entire
+section body, with no explanation, translation, bullet, or trailing commentary.
+This is the last section: do not append a general closing note after NONE.
+Put routine handoff explanations for Evidence, Review, and Final Approval in
+Implementation Summary, not in Human Approval Required. This does not waive any
+downstream Human Approval. If additional approval really is required, describe
+the specific issue and decision needed in Human Approval Required; do not use NONE.
+
 ```text
 ## Implementation Summary
 TEST_REQUIRED: <test_required>
