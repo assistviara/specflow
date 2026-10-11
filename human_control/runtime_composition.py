@@ -1,6 +1,7 @@
 """Explicit, fixed production composition. Constructors perform no workflow work."""
 from dataclasses import dataclass
 from pathlib import Path
+import sys
 
 from application.workflow_entry import WorkflowEntryUseCase
 from application.plan_workflow import PlanWorkflowUseCase
@@ -103,7 +104,9 @@ class ProductionFactory:
         implementation = ImplementationWorkflowUseCase(approvals, GitImplementationPreparation(),
             ExecuteImplementationUseCase(approvals,
                 CodexImplementationAdapter(CodexRunner(codex_executor),
-                                           trace_parser=parse_codex_jsonl), recorder), JsonTestStateProvider)
+                                           trace_parser=parse_codex_jsonl,
+                                           test_environment=(Path(sys.executable).resolve(),
+                                                             Path(__file__).resolve().parents[1])), recorder), JsonTestStateProvider)
         return ApplicationPorts(WorkflowEntryUseCase(approvals), plans, implementation,
             EvidenceWorkflowUseCase(approvals, evidence, GitRepositoryStateProvider, JsonTestStateProvider),
             ReviewWorkflowUseCase(approvals, evidence, GitRepositoryStateProvider, JsonTestStateProvider,

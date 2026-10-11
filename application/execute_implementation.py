@@ -1,4 +1,6 @@
 from datetime import datetime
+from dataclasses import replace
+import hashlib
 from pathlib import Path
 import json
 import subprocess
@@ -139,6 +141,33 @@ class ExecuteImplementationUseCase:
             str(input_dto.implementation_plan_path),
             "implementation_plan",
         )
+
+        if specification_validation.is_valid and implementation_plan_validation.is_valid:
+            try:
+                documents = []
+                for path, record, label in (
+                    (input_dto.specification_path, specification_record, 'Specification'),
+                    (input_dto.implementation_plan_path, implementation_plan_record, 'Implementation Plan'),
+                ):
+                    raw = path.read_bytes()
+                    digest = hashlib.sha256(raw).hexdigest()
+                    if digest != record['artifact_hash']:
+                        raise ValueError('Approved document changed before handoff.')
+                    body = raw.decode('utf-8')
+                    documents.append(
+                        f'\n\n### Approved {label}\nSource: {path}\n'
+                        f'Approval ID: {record["approval_id"]}\nSHA-256: {digest}\n'
+                        f'BEGIN APPROVED DOCUMENT ({len(raw)} bytes)\n{body}\nEND APPROVED DOCUMENT\n')
+                execution_prompt += (
+                    '\n\n## Verified authoritative documents\n'
+                    'The following documents are supplied in full, not AI summaries. '
+                    'Preserve approved scope and Human Approval boundaries. '
+                    'If these documents conflict with the generated instructions, STOP; '
+                    'do not resolve the conflict autonomously.\n' + ''.join(documents))
+            except (OSError, UnicodeError, ValueError):
+                specification_validation = replace(
+                    specification_validation, is_valid=False,
+                    validation_errors=['Approved document handoff validation failed.'])
 
         current_state = load_current_state(
             input_dto.state_file

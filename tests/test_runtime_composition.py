@@ -85,6 +85,9 @@ def test_production_ports_share_formal_stores_without_ai_git_or_writes(env, monk
     assert isinstance(ports.plans._generation._ai_service._runner, composition.PlanCodexRunner)
     plan_executor = ports.plans._generation._ai_service._runner._command_executor
     implementation_runner = ports.implementation._execution._implementation_adapter._runner
+    assert ports.implementation._execution._implementation_adapter._test_environment == (
+        composition.Path(composition.sys.executable).resolve(),
+        composition.Path(composition.__file__).resolve().parents[1])
     assert isinstance(implementation_runner, composition.CodexRunner)
     assert isinstance(plan_executor, composition.CodexCommandExecutor)
     assert implementation_runner._command_executor is plan_executor
