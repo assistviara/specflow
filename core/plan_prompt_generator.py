@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
 
 from core.document_loader import load_text_file
 from core.prompt_builder import PromptBuilder, PromptResult
+from core.tdd_policy import require_tdd_policy
 
 
 class DocumentLoaderProtocol(Protocol):
@@ -58,6 +60,7 @@ class PlanPromptGenerator:
         implementation_plan_template_path: Path,
         project_metadata: dict[str, Any],
         template_path: Path,
+        tdd_policy=None,
     ) -> PromptResult:
         constitution = self._document_loader.load(
             constitution_path
@@ -94,10 +97,9 @@ class PlanPromptGenerator:
             ),
         }
 
-        return self._prompt_builder.build(
-            template=template,
-            context=context,
-        )
+        policy = require_tdd_policy(tdd_policy)
+        result = self._prompt_builder.build(template=template, context=context)
+        return replace(result, content=result.content + policy.instruction())
 
     def generate_revision(
         self,
@@ -107,6 +109,7 @@ class PlanPromptGenerator:
         specification_path: Path,
         related_information: str | None,
         template_path: Path,
+        tdd_policy=None,
     ) -> PromptResult:
         current_implementation_plan = self._document_loader.load(
             current_implementation_plan_path
@@ -127,7 +130,6 @@ class PlanPromptGenerator:
             "RELATED_INFORMATION": related_information,
         }
 
-        return self._prompt_builder.build(
-            template=template,
-            context=context,
-        )
+        policy = require_tdd_policy(tdd_policy)
+        result = self._prompt_builder.build(template=template, context=context)
+        return replace(result, content=result.content + policy.instruction())

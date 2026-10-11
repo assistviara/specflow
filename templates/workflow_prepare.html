@@ -23,6 +23,7 @@
 <h2>{{ selection.name }}：Specification承認済み</h2>
 <p>開始すると計画を生成し、HumanのPlan判断で停止します。外部AI呼び出し・費用・正式記録の保存が発生します。</p>
 <form method="post" action="{{ url_for('human_execution.start', project_id=p) }}">
+{% include "tdd_policy_fields.html" %}
 <input type="hidden" name="token" value="{{ token }}">
 <label><input type="checkbox" name="human_confirmed" value="yes" required>このSpecificationからWorkflowを開始する</label>
 <button>作業を開始する</button></form>

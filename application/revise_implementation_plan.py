@@ -1,3 +1,4 @@
+from core.tdd_policy import require_tdd_policy
 from datetime import datetime
 from uuid import uuid4
 
@@ -27,6 +28,7 @@ class ReviseImplementationPlanUseCase:
         self,
         input_dto: ReviseImplementationPlanInput,
     ):
+        require_tdd_policy(input_dto.tdd_policy)
         current_state = load_current_state(
             input_dto.state_file
         )
@@ -52,6 +54,7 @@ class ReviseImplementationPlanUseCase:
                 specification_path=input_dto.specification_path,
                 related_information=input_dto.related_information,
                 template_path=input_dto.revision_template_path,
+            tdd_policy=input_dto.tdd_policy,
             )
         )
 

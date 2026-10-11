@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy
 import json
 from pathlib import Path
 from unittest.mock import Mock
@@ -54,7 +55,7 @@ def test_execute_transitions_to_plan_generating(
         ),
         state_file=state_file,
         state_history_dir=state_history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     use_case.execute(input_dto)
 
@@ -112,7 +113,7 @@ def test_execute_generates_revision_prompt(
         ),
         state_file=state_file,
         state_history_dir=state_history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     use_case.execute(input_dto)
 
@@ -124,6 +125,7 @@ def test_execute_generates_revision_prompt(
         specification_path=input_dto.specification_path,
         related_information=input_dto.related_information,
         template_path=input_dto.revision_template_path,
+        tdd_policy=input_dto.tdd_policy,
     )
 
 
@@ -173,7 +175,7 @@ def test_execute_sends_revision_prompt_to_ai_service(
         ),
         state_file=state_file,
         state_history_dir=state_history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     use_case.execute(input_dto)
 
@@ -230,7 +232,7 @@ def test_execute_returns_failure_when_ai_fails(
         ),
         state_file=state_file,
         state_history_dir=state_history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     output = use_case.execute(input_dto)
 
@@ -311,7 +313,7 @@ Section 2 corresponds to revised Section 2.
         ),
         state_file=state_file,
         state_history_dir=state_history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     output = use_case.execute(input_dto)
 
@@ -388,7 +390,7 @@ Section 2 corresponds to revised Section 2.
         ),
         state_file=state_file,
         state_history_dir=state_history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     output = use_case.execute(input_dto)
 
@@ -448,7 +450,7 @@ def test_execute_returns_failure_when_ai_output_cannot_be_parsed(
         ),
         state_file=state_file,
         state_history_dir=state_history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     output = use_case.execute(input_dto)
 

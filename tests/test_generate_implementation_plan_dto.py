@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -23,7 +24,7 @@ def test_generate_implementation_plan_input_is_frozen():
         template_path=Path("plan_prompt.md"),
         state_file=Path("state.json"),
         state_history_dir=Path("state_history"),
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     with pytest.raises(FrozenInstanceError):
         dto.specification_path = Path("changed.md")

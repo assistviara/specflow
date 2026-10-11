@@ -1,0 +1,10 @@
+<fieldset><legend>Plan生成に使用するTDD方針</legend>
+<label>TDD適用<select name="tdd_required" required>
+<option value="">選択してください</option>
+<option value="yes" {% if tdd_policy and tdd_policy.required %}selected{% endif %}>必要</option>
+<option value="no" {% if tdd_policy and not tdd_policy.required %}selected{% endif %}>不要（理由必須）</option>
+</select></label>
+<label>TDD規則<textarea name="tdd_rules" required>{{ tdd_policy.rules if tdd_policy else '' }}</textarea></label>
+<label>TDD不要の正式理由<textarea name="no_tdd_reason">{{ tdd_policy.no_tdd_reason or '' if tdd_policy else '' }}</textarea></label>
+<p>この方針をPlan生成・承認・実装まで使用します。変更はPlan修正・再確認が必要です。</p>
+</fieldset>

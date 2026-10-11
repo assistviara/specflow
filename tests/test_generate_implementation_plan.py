@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy
 import hashlib
 import json
 from pathlib import Path
@@ -100,7 +101,7 @@ def test_invalid_specification_approval_does_not_start_plan_generation(
         template_path=tmp_path / "plan_prompt.md",
         state_file=state_file,
         state_history_dir=history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     result = use_case.execute(input_dto)
 
@@ -170,7 +171,7 @@ def test_valid_specification_approval_transitions_to_plan_generating(
         template_path=tmp_path / "plan_prompt.md",
         state_file=state_file,
         state_history_dir=history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     use_case.execute(input_dto)
 
@@ -255,7 +256,7 @@ def test_valid_specification_approval_calls_plan_prompt_generator(
         template_path=tmp_path / "plan_prompt.md",
         state_file=state_file,
         state_history_dir=history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     use_case.execute(input_dto)
 
@@ -269,6 +270,7 @@ def test_valid_specification_approval_calls_plan_prompt_generator(
         ),
         project_metadata=input_dto.project_metadata,
         template_path=input_dto.template_path,
+        tdd_policy=input_dto.tdd_policy,
     )
 
 
@@ -332,7 +334,7 @@ def test_plan_prompt_result_is_converted_to_ai_request(
         template_path=tmp_path / "plan_prompt.md",
         state_file=state_file,
         state_history_dir=history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     use_case.execute(input_dto)
 
@@ -407,7 +409,7 @@ def test_failed_ai_response_does_not_transition_to_plan_approval_pending(
         template_path=tmp_path / "plan_prompt.md",
         state_file=state_file,
         state_history_dir=history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     output = use_case.execute(input_dto)
 
@@ -488,7 +490,7 @@ def test_successful_ai_response_returns_implementation_plan_draft(
         template_path=tmp_path / "plan_prompt.md",
         state_file=state_file,
         state_history_dir=history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     result = use_case.execute(input_dto)
 
@@ -565,7 +567,7 @@ def test_successful_plan_generation_transitions_to_plan_approval_pending(
         template_path=tmp_path / "plan_prompt.md",
         state_file=state_file,
         state_history_dir=history_dir,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     use_case.execute(input_dto)
 

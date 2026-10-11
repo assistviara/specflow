@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy
 """Phase 7 Target 8: existing workflows, explicit Human inputs, offline AI ports.
 
 All Git changes below belong to pytest's disposable repositories. These tests
@@ -141,7 +142,7 @@ def test_mvp_entry_failure_stops_plan_and_preserves_saved_approval(workflow, fai
     plans = PlanWorkflowUseCase(approvals, generator, Mock(), Mock(), Mock())
     root = request.state_file.parent
     plan_input = GenerateImplementationPlanInput(root, root, request.specification_path, record,
-        root, root, {}, root, request.state_file, request.history_dir)
+        root, root, {}, root, request.state_file, request.history_dir, tdd_policy=TddPolicy(True, 'TDD'))
     rejected = plans.generate(stopped, plan_input, root / 'plan.md')
     assert not rejected.success
     generator.execute.assert_not_called()

@@ -1,4 +1,5 @@
 import hashlib
+from core.tdd_policy import TddPolicy
 import json
 from dataclasses import replace
 from uuid import uuid4
@@ -159,6 +160,8 @@ def test_final_runner_success_does_not_prove_test_or_tdd_success(implementation,
 def test_non_tdd_reason_is_explicit_and_does_not_disable_tests(implementation):
     _, request, runner, use_case, _ = implementation
     request = replace(request, tdd=replace(request.tdd, tdd_required=False, no_tdd_reason='Human: comments only'))
+    request = replace(request, upstream=replace(request.upstream,
+        tdd_policy=TddPolicy(False, 'TDD', 'Human: comments only')))
     mutate_trace(runner, lambda events: alter_phase(events, 'initial', 0))
     result = use_case.execute(request)
     assert result.success, result.stop_reason
@@ -172,6 +175,8 @@ def test_non_tdd_reason_is_explicit_and_does_not_disable_tests(implementation):
 def test_non_tdd_still_stops_on_required_test_failure(implementation):
     _, request, runner, use_case, _ = implementation
     request = replace(request, tdd=replace(request.tdd, tdd_required=False, no_tdd_reason='Human: formatting only'))
+    request = replace(request, upstream=replace(request.upstream,
+        tdd_policy=TddPolicy(False, 'TDD', 'Human: formatting only')))
     mutate_trace(runner, lambda events: alter_phase(events, 'target', 1))
     assert not use_case.execute(request).success
 

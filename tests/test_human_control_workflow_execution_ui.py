@@ -26,8 +26,12 @@ from test_classify_review_result import evaluation
 def hidden(response, action):
     body = response.get_data(as_text=True)
     chosen = next(f for f in re.findall(r'<form.*?</form>', body, re.S) if f'action="{action}"' in f)
-    return {k: html.unescape(v) for k, v in re.findall(
+    values = {k: html.unescape(v) for k, v in re.findall(
         r'<input type="hidden" name="([^"]+)" value="([^"]*)"', chosen)}
+    if action.endswith('/start'):
+        values.update(tdd_required='yes', tdd_rules='TDD', no_tdd_reason='')
+    return values
+
 
 
 @pytest.fixture
@@ -312,7 +316,7 @@ def test_invalid_delegated_input_stops_before_human_approval(delegated, fault):
     elif fault == 'sources': d.inputs['source_paths'] = 'not a JSON array'
     elif fault == 'outside': d.inputs['source_paths'] = json.dumps([str(x.f.spec)])
     elif fault == 'mode': d.inputs['review_mode'] = 'AUTO'
-    elif fault == 'tdd': d.inputs.pop('tdd_required')
+    elif fault == 'tdd': d.inputs['tdd_required'] = 'invalid'
     elif fault == 'no_tdd_reason': d.inputs['tdd_required'] = 'no'
     elif fault == 'prompt_template': d.inputs['prompt_template'] = str(x.f.tmp_path / 'missing.md')
     elif fault == 'branch': d.inputs['implementation_branch'] = ''

@@ -94,7 +94,8 @@ def test_explicit_start_generates_state_and_reaches_existing_plan_wait(prepared)
     body = x.client.get(url).get_data(as_text=True)
     for name in ('approval_id', 'approved_at', 'repository', 'implementation_branch', 'codex_prompt', 'review_dir'):
         assert f'name="{name}"' not in body
-    assert 'name="tdd_required"' in body
+    assert 'name="tdd_required"' not in body
+    assert 'Plan TDD policy' in body
     assert x.client.post(x.base + '/start', data=data).status_code == 409
     assert len(x.repo.list_workflows(x.project.project_id)) == 1
     x.factory.assert_called_once()
@@ -261,7 +262,7 @@ def test_plan_approval_connects_existing_prompt_and_implementation_dto(prepared)
     data.update(human_confirmed='yes', human_decision='approved', comment='Approved scope',
         target_paths='source.py', allowed_changes='*.py', forbidden_changes_none='yes',
         source_paths='source.py', test_paths='test_source.py', tdd_required='yes',
-        tdd_rules='Initial FAIL then target/full PASS', completion_conditions='All checks',
+        tdd_rules='TDD', completion_conditions='All checks',
         stop_conditions='Ambiguity', execution_result_reporting_requirements='Existing report', review_mode='BATCH')
     assert x.client.post(url + '/decide', data=data).status_code == 303
     x.ports.implementation.execute.assert_called_once()

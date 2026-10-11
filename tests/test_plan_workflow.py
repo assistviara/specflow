@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy
 import json
 from dataclasses import replace
 from types import SimpleNamespace
@@ -60,13 +61,13 @@ def flow(tmp_path):
     generation = GenerateImplementationPlanInput(
         tmp_path / 'constitution', tmp_path / 'principles', spec, entry.approval_record,
         tmp_path / 'decisions', tmp_path / 'plan-template', {}, tmp_path / 'template', state, history,
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
     decision = RequestPlanApprovalInput(plan_path, 'approved', 'Human decision', 'plan-1', '2026-09-26', state, history)
     prompt = GenerateCodexPromptInput(
         spec, 'spec-1', plan_path, 'plan-1', tmp_path, 'TDD', 'Complete', 'Stop', 'Report',
         tmp_path / 'prompt-template', state, history,
     )
-    revision = ReviseImplementationPlanInput(plan_path, 'Fix scope', spec, None, tmp_path / 'revision-template', state, history)
+    revision = ReviseImplementationPlanInput(plan_path, 'Fix scope', spec, None, tmp_path / 'revision-template', state, history, tdd_policy=TddPolicy(True, 'TDD'))
     return SimpleNamespace(**locals())
 
 

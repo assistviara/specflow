@@ -1,3 +1,4 @@
+from core.tdd_policy import require_tdd_policy
 from datetime import datetime
 from uuid import uuid4
 from pathlib import Path
@@ -27,6 +28,7 @@ class GenerateImplementationPlanUseCase:
         self,
         input_dto: GenerateImplementationPlanInput,
     ):
+        require_tdd_policy(input_dto.tdd_policy)
         is_valid = validate_approval(
             input_dto.specification_approval,
             str(input_dto.specification_path),
@@ -80,6 +82,7 @@ class GenerateImplementationPlanUseCase:
             ),
             project_metadata=input_dto.project_metadata,
             template_path=input_dto.template_path,
+            tdd_policy=input_dto.tdd_policy,
         )
 
         ai_request = PromptAdapter.to_ai_request(prompt_result)

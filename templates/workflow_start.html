@@ -10,6 +10,7 @@
 <p>Specification SHA-256: {{ spec_hash }}</p>
 <p>新しいWorkflowを登録し、正式Approvalと入力を検証して計画を生成します。計画は人の判断を待ちます。途中で失敗した場合も登録と正式記録を保持します。</p>
 <form method="post" action="{{ url_for('human_execution.start', project_id=p) }}">
+{% include "tdd_policy_fields.html" %}
 <input type="hidden" name="token" value="{{ token }}">
 {% for key, value in values.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
 <label><input type="checkbox" name="human_confirmed" value="yes" required>上の正式入力で、新しい作業を開始します</label>

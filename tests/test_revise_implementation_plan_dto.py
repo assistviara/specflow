@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy
 from pathlib import Path
 
 from application.dto import (
@@ -15,7 +16,7 @@ def test_revise_implementation_plan_input_keeps_data():
         revision_template_path=Path("plan_revision_prompt_template.md"),
         state_file=Path("state.json"),
         state_history_dir=Path("state_history"),
-    )
+     tdd_policy=TddPolicy(True, 'TDD'))
 
     assert (
         input_dto.current_implementation_plan_path

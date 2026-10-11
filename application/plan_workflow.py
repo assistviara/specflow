@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy, require_tdd_policy
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -23,6 +24,7 @@ class PlanWorkflowOutput:
     state_before: dict | None = None
     current_state: dict | None = None
     stop_reason: str | None = None
+    tdd_policy: TddPolicy | None = None
 
 
 class PlanWorkflowUseCase:
@@ -86,7 +88,7 @@ class PlanWorkflowUseCase:
 
     def generate(self, entry: WorkflowEntryOutput, request: GenerateImplementationPlanInput,
                  plan_path: Path) -> PlanWorkflowOutput:
-        output = PlanWorkflowOutput(entry, plan_path)
+        output = PlanWorkflowOutput(entry, plan_path, tdd_policy=request.tdd_policy)
         try:
             output = self._guard(output, request, 'plan_generating')
             record = self._specification(output, request)
@@ -137,6 +139,9 @@ class PlanWorkflowUseCase:
                 raise ValueError('Revision input differs from the Human Revision Request.')
             if revised_plan_path.exists():
                 raise ValueError('Revised Plan requires a new artifact path.')
+            policy = require_tdd_policy(request.tdd_policy or decision.tdd_policy)
+            request = replace(request, tdd_policy=policy)
+            output = replace(output, tdd_policy=policy)
             result = self._revision.execute(request)
             output = replace(output, draft_result=result)
             if not result.success:
@@ -164,7 +169,10 @@ class PlanWorkflowUseCase:
             saved = self._validate(request.implementation_plan_approval_id, approved.plan_path, 'implementation_plan')
             if saved != approved.approval_result.approval_record:
                 raise ValueError('Saved Approval differs from the Human Decision record.')
-            result = self._prompt.execute(request)
+            policy = require_tdd_policy(approved.tdd_policy)
+            if request.tdd_rules != policy.rules:
+                raise ValueError('Implementation TDD rules differ from Plan policy.')
+            result = self._prompt.execute(replace(request, tdd_rules=policy.rules + policy.instruction()))
             output = replace(output, prompt_result=result)
             if not result.success or not result.prompt_usable:
                 raise ValueError(result.stop_reason or result.error_message or 'Prompt is unusable.')

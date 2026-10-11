@@ -1,3 +1,4 @@
+from core.tdd_policy import require_tdd_policy
 from dataclasses import dataclass, replace
 import hashlib
 import json
@@ -87,6 +88,9 @@ class ImplementationWorkflowUseCase:
                 raise ValueError('TDD applicability is not bound to the approved Plan / Prompt.')
             if type(tdd.tdd_required) is not bool:
                 raise ValueError('Explicit tdd_required is required; Runner TEST_REQUIRED is not its authority.')
+            policy = require_tdd_policy(upstream.tdd_policy)
+            if (tdd.tdd_required, tdd.no_tdd_reason) != (policy.required, policy.no_tdd_reason):
+                raise ValueError('Implementation TDD policy differs from approved Plan.')
             if tdd.tdd_required and tdd.no_tdd_reason is not None:
                 raise ValueError('TDD required conflicts with a non-applicability reason.')
             if not tdd.tdd_required and (not isinstance(tdd.no_tdd_reason, str) or not tdd.no_tdd_reason.strip()):

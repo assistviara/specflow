@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy
 from pathlib import Path
 import pytest
 
@@ -58,7 +59,7 @@ def test_generate_returns_prompt_result() -> None:
     )
 
     result = generator.generate(
-        constitution_path=Path("constitution.md"),
+        tdd_policy=TddPolicy(True, 'TDD'),        constitution_path=Path("constitution.md"),
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
@@ -75,7 +76,7 @@ def test_generate_returns_prompt_result() -> None:
     )
 
     assert isinstance(result, PromptResult)
-    assert result.content == "PROMPT"
+    assert result.content == "PROMPT" + TddPolicy(True, "TDD").instruction()
     assert result.is_ready is True
 
 def test_generate_loads_all_required_documents() -> None:
@@ -87,7 +88,7 @@ def test_generate_loads_all_required_documents() -> None:
     )
 
     generator.generate(
-        constitution_path=Path("constitution.md"),
+        tdd_policy=TddPolicy(True, 'TDD'),        constitution_path=Path("constitution.md"),
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
@@ -121,7 +122,7 @@ def test_generate_builds_expected_context() -> None:
     )
 
     generator.generate(
-        constitution_path=Path("constitution.md"),
+        tdd_policy=TddPolicy(True, 'TDD'),        constitution_path=Path("constitution.md"),
         principles_path=Path("principles.md"),
         specification_path=Path("specification.md"),
         decisions_path=Path("decisions.md"),
@@ -182,7 +183,7 @@ def test_generate_propagates_document_loader_error() -> None:
 
     with pytest.raises(DocumentLoadError) as exc_info:
         generator.generate(
-            constitution_path=Path("constitution.md"),
+        tdd_policy=TddPolicy(True, 'TDD'),            constitution_path=Path("constitution.md"),
             principles_path=Path("principles.md"),
             specification_path=Path("specification.md"),
             decisions_path=Path("decisions.md"),
@@ -206,7 +207,7 @@ def test_generate_propagates_document_loader_error() -> None:
 
     with pytest.raises(DocumentLoadError) as exc_info:
         generator.generate(
-            constitution_path=Path("constitution.md"),
+        tdd_policy=TddPolicy(True, 'TDD'),            constitution_path=Path("constitution.md"),
             principles_path=Path("principles.md"),
             specification_path=Path("specification.md"),
             decisions_path=Path("decisions.md"),
@@ -236,7 +237,7 @@ def test_generate_propagates_prompt_builder_error() -> None:
         match="PromptBuilder failed",
     ):
         generator.generate(
-            constitution_path=Path("constitution.md"),
+        tdd_policy=TddPolicy(True, 'TDD'),            constitution_path=Path("constitution.md"),
             principles_path=Path("principles.md"),
             specification_path=Path("specification.md"),
             decisions_path=Path("decisions.md"),
@@ -261,7 +262,7 @@ def test_generate_revision_builds_expected_context() -> None:
     )
 
     result = generator.generate_revision(
-        current_implementation_plan_path=Path("current_plan.md"),
+        tdd_policy=TddPolicy(True, 'TDD'),        current_implementation_plan_path=Path("current_plan.md"),
         revision_request="Please revise the implementation scope.",
         specification_path=Path("specification.md"),
         related_information="Related implementation information.",
@@ -269,7 +270,7 @@ def test_generate_revision_builds_expected_context() -> None:
     )
 
     assert isinstance(result, PromptResult)
-    assert result.content == "PROMPT"
+    assert result.content == "PROMPT" + TddPolicy(True, "TDD").instruction()
 
     assert prompt_builder.template == (
         "CONTENT:plan_revision_prompt_template.md"
@@ -301,7 +302,7 @@ def test_generate_revision_loads_required_documents() -> None:
     )
 
     generator.generate_revision(
-        current_implementation_plan_path=Path("current_plan.md"),
+        tdd_policy=TddPolicy(True, 'TDD'),        current_implementation_plan_path=Path("current_plan.md"),
         revision_request="Please revise the implementation scope.",
         specification_path=Path("specification.md"),
         related_information="Related implementation information.",

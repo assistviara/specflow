@@ -11,6 +11,7 @@ import json
 from threading import RLock
 from uuid import uuid4
 
+from core.tdd_policy import TddPolicy, require_tdd_policy
 from flask import Blueprint, current_app, redirect, render_template, request, url_for
 
 from application.dto import (GenerateImplementationPlanInput, RequestPlanApprovalInput,
@@ -115,6 +116,24 @@ def required(form, key):
     return value
 
 
+def policy_input(form):
+    choice = form.get('tdd_required')
+    if choice not in ('yes', 'no'):
+        raise ValueError('Explicit TDD selection is required before Plan generation.')
+    return TddPolicy(choice == 'yes', required(form, 'tdd_rules'),
+                     form.get('no_tdd_reason', '').strip() or None).validate()
+
+
+def bound_policy_form(form, policy):
+    policy = require_tdd_policy(policy)
+    expected = dict(tdd_required='yes' if policy.required else 'no',
+                    tdd_rules=policy.rules, no_tdd_reason=policy.no_tdd_reason or '')
+    for key, value in expected.items():
+        if key in form and form[key] != value:
+            raise ValueError('TDD policy differs from the generated Plan; request Plan revision.')
+    return {**form, **expected}
+
+
 def selected_start(service, p, execution):
     if not callable(execution.factory):
         raise ValueError('実行用Application Layer依存が未設定です。STOP / Human Handoff。')
@@ -201,6 +220,7 @@ def start(project_id):
     try:
         runtime, execution, service, p, _ = dependencies(project_id)
         with execution.lock:
+            policy = policy_input(request.form)
             preparation = configured()
             if preparation is not None:
                 if not callable(execution.factory):
@@ -229,7 +249,7 @@ def start(project_id):
                 run.adapter = ApplicationAdapter(service, p, work.workflow_id, ports)
                 generation = GenerateImplementationPlanInput(paths['constitution'], paths['principles'],
                     paths['specification'], {}, paths['decisions'], paths['plan_template'],
-                    {k: values[k] for k in METADATA}, paths['plan_prompt_template'], paths['state'], paths['history'])
+                    {k: values[k] for k in METADATA}, paths['plan_prompt_template'], paths['state'], paths['history'], tdd_policy=policy)
                 run.result = run.adapter.start(generation)
             except Exception:
                 run.failure = '実行用依存の取得または実行に失敗しました。STOP。自動再実行はしません。'
@@ -269,6 +289,7 @@ def detail(project_id, workflow_id):
         work = service.repository.get_workflow(w)
         run = execution.runs.get(w)
         content, token, action, message = None, None, None, ''
+        policy = None
         try:
             if (run is not None and run.adapter is not None and run.result is not None
                     and run.result.success and not run.failure
@@ -279,6 +300,7 @@ def detail(project_id, workflow_id):
                     message='人の確認・判断を待っています。保持された結果と正式記録を確認してください。',
                     delegated=DELEGATED_LABELS)
             plan, content = active_plan(service, p, w, run)
+            policy = plan.tdd_policy
             choice = plan.approval_result.decision if plan.approval_result else None
             if choice is None:
                 action, message = 'decide', '計画の判断を待っています'
@@ -291,7 +313,7 @@ def detail(project_id, workflow_id):
         except (BoundaryError, ValueError, OSError) as exc:
             message = str(exc)
         return render_template('workflow_execution.html', p=p, w=w, work=work, run=run,
-            content=content, token=token, action=action, message=message, delegated=DELEGATED_LABELS)
+            content=content, token=token, action=action, message=message, delegated=DELEGATED_LABELS, tdd_policy=policy)
     except BoundaryError:
         return problem('Project / Workflow UUIDまたはownershipが一致しません。', 404)
     except Exception:
@@ -305,9 +327,10 @@ def array_input(key, form=None):
     return tuple(value)
 
 
-def delegated_inputs(work, paths, approval_id):
+def delegated_inputs(work, paths, approval_id, policy):
     preparation = configured()
-    form = preparation.delegated_form(work, paths, request.form) if preparation is not None else request.form
+    selected = bound_policy_form(request.form, policy)
+    form = preparation.delegated_form(work, paths, selected) if preparation is not None else selected
     refs = {key: explicit_path(required(form, key)) for key in
             ('repository', 'implementation_target', 'prompt_template', 'codex_prompt', 'review_dir', 'final_dir')}
     if not refs['repository'].is_dir() or not refs['prompt_template'].is_file():
@@ -361,6 +384,7 @@ def act(project_id, workflow_id, action):
                 if plan.approval_result is not None:
                     raise BoundaryError('既に判断済みです。')
                 choice = required(request.form, 'human_decision')
+                bound_policy_form(request.form, plan.tdd_policy)
                 if choice not in ('approved', 'revision_requested', 'cancelled'):
                     raise ValueError('対応する判断を明示してください。')
                 identity, date = (new_decision_identity() if configured() is not None else
@@ -370,7 +394,7 @@ def act(project_id, workflow_id, action):
                 comment = request.form.get('comment', '')
                 if choice == 'revision_requested' and not comment.strip():
                     raise ValueError('修正要求を入力してください。')
-                refs, delegated = delegated_inputs(work, paths, identity) if choice == 'approved' else ({}, None)
+                refs, delegated = delegated_inputs(work, paths, identity, plan.tdd_policy) if choice == 'approved' else ({}, None)
                 command = RequestPlanApprovalInput(paths['plan'], choice, comment, identity, date, paths['state'], paths['history'])
             else:
                 if plan.approval_result is None or plan.approval_result.decision != 'revision_requested':
@@ -390,7 +414,8 @@ def act(project_id, workflow_id, action):
                 refs = {'revision_template': template}
                 command = ReviseImplementationPlanInput(paths['plan'], plan.approval_result.revision_request,
                     paths['specification'], request.form.get('related_information') or None,
-                    template, paths['state'], paths['history'])
+                    template, paths['state'], paths['history'],
+                    tdd_policy=policy_input(request.form) if 'tdd_required' in request.form else plan.tdd_policy)
         except BoundaryError as exc:
             return problem(str(exc), 409)
         except (ValueError, OSError) as exc:

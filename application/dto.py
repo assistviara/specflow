@@ -1,3 +1,4 @@
+from core.tdd_policy import TddPolicy
 from dataclasses import dataclass
 from pathlib import Path
 from application.implementation_evidence import ImplementationEvidence
@@ -31,6 +32,7 @@ class GenerateImplementationPlanInput:
     template_path: Path
     state_file: Path
     state_history_dir: Path
+    tdd_policy: TddPolicy | None = None
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,8 @@ class ReviseImplementationPlanInput:
     revision_template_path: Path
     state_file: Path
     state_history_dir: Path
+    tdd_policy: TddPolicy | None = None
+
 
 @dataclass(frozen=True)
 class ReviseImplementationPlanOutput:
