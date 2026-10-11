@@ -1225,8 +1225,12 @@ Database schema change is required outside the approved scope.
     assert '"status": "critical_approval_pending"' in current_state
 
 
+@pytest.mark.parametrize("incomplete_text", [
+    "One approved implementation item remains incomplete.",
+    "依頼された実装・実行確認に未完了項目はありません。最終Evidenceの構築・検証および後続承認は本報告の対象外です。",
+])
 def test_incomplete_items_prevent_implementation_completion(
-    tmp_path,
+    tmp_path, incomplete_text,
 ) -> None:
     specification_path = tmp_path / "specification.md"
     specification_path.write_text(
@@ -1302,7 +1306,7 @@ One approved implementation item remains incomplete.
 
 ## Human Approval Required
 NONE
-"""
+""".replace("One approved implementation item remains incomplete.", incomplete_text)
 
     use_case = ExecuteImplementationUseCase(
         approval_repository=FakeApprovalRecordRepository(
@@ -1334,6 +1338,7 @@ NONE
     )
 
     assert output.base_branch == "release/baseline"
+    assert output.test_execution_record_path is None
     assert output.success is False
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
@@ -1341,9 +1346,9 @@ NONE
     assert output.implementation_result is not None
     assert (
         output.implementation_result.incomplete_items
-        == "One approved implementation item remains incomplete."
+        == incomplete_text
     )
-    assert output.stop_reason == "Implementation incomplete."
+    assert output.stop_reason == "Incomplete items reported or report format mismatch; Human review required."
 
     current_state = state_file.read_text(encoding="utf-8")
     assert '"status": "implementation_failed"' in current_state
@@ -2680,7 +2685,7 @@ NONE
     assert output.current_state == "implementation_failed"
     assert output.technical_retry_required is False
     assert output.critical_change_required is False
-    assert output.stop_reason == "Implementation incomplete."
+    assert output.stop_reason == "Incomplete items reported or report format mismatch; Human review required."
 
     current_state = state_file.read_text(encoding="utf-8")
     assert '"status": "implementation_failed"' in current_state

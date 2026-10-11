@@ -411,7 +411,7 @@ class ExecuteImplementationUseCase:
                     "occurred_at": (
                         datetime.now().astimezone().isoformat()
                     ),
-                    "reason": "Implementation incomplete",
+                    "reason": "Incomplete items reported or report format mismatch; Human review required.",
                 },
             )
 
@@ -434,7 +434,7 @@ class ExecuteImplementationUseCase:
                 current_state="implementation_failed",
                 technical_retry_required=False,
                 critical_change_required=False,
-                stop_reason="Implementation incomplete.",
+                stop_reason="Incomplete items reported or report format mismatch; Human review required.",
             )
 
         if implementation_result.test_execution_status == "ERROR":
@@ -599,7 +599,7 @@ class ExecuteImplementationUseCase:
                             "occurred_at": (
                                 datetime.now().astimezone().isoformat()
                             ),
-                            "reason": "Implementation incomplete",
+                            "reason": "Incomplete items reported or report format mismatch; Human review required.",
                         },
                     )
 
@@ -622,7 +622,7 @@ class ExecuteImplementationUseCase:
                         current_state="implementation_failed",
                         technical_retry_required=False,
                         critical_change_required=False,
-                        stop_reason="Implementation incomplete.",
+                        stop_reason="Incomplete items reported or report format mismatch; Human review required.",
                     )
 
             if implementation_result.test_execution_status == "ERROR":

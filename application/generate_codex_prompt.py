@@ -41,6 +41,13 @@ For free-text sections, use NONE only when genuinely absent; otherwise describe
 the facts, uncertainty, remaining work, or required Human decision. Never use NONE
 to conceal unfinished work. A parsed report is not proof of successful implementation.
 
+Incomplete Items must contain exactly NONE as its entire section body when no
+implementation work remains incomplete. Do not add explanations, translations,
+bullets, or commentary to NONE. Put routine Evidence, Review, and Final Approval
+handoff explanations in Implementation Summary, not in Incomplete Items.
+If work actually remains incomplete, describe it truthfully; never conceal it
+with NONE. Uncertainty must not be reported as completion.
+
 Human Approval Required is only for additional Human decisions needed for the
 current implementation. If none are needed, output exactly NONE as the entire
 section body, with no explanation, translation, bullet, or trailing commentary.

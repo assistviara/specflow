@@ -900,6 +900,9 @@ Request Human Approval before changes beyond approved scope.
             assert parsed.test_required is (required == 'YES')
             assert parsed.incomplete_items == incomplete
             assert parsed.human_approval_required == approval
+    assert 'Incomplete Items must contain exactly NONE as its entire section body' in reporting
+    assert 'handoff explanations in Implementation Summary, not in Incomplete Items.' in reporting
+    assert 'If work actually remains incomplete, describe it truthfully' in reporting
     assert 'Do not fabricate' in reporting
     assert 'not authorization to retry' in reporting
     assert 'output exactly NONE as the entire\nsection body' in reporting
