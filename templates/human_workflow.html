@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 {% block title %}{{ '今日はここまで' if ending else work.name }} - SpecFlow{% endblock %}
 {% block content %}
+{% if approval_requests or approval_request_error %}
+<section class="card"><h2>追加Human Approval要求</h2>
+<p>判断資料です。承認成立・実装成功・再開許可を意味しません。</p>
+{% if approval_request_error %}<p role="alert">{{ approval_request_error }}</p>{% endif %}
+{% for item in approval_requests %}
+<p>Implementation ID: {{ item.implementation_id }}{% if item.in_memory %}（プロセス内保持）{% endif %}</p>
+<pre>{{ item.body }}</pre>
+{% endfor %}
+</section>
+{% endif %}
 <p><a href="{{ url_for('human_projects.detail', project_id=project.project_id) }}">Projectへ戻る</a></p>
 <h1>{{ '作業終了（End Work）' if ending else '作業（Workflow）' }}</h1>
 <h2>{{ project.name }} / {{ work.name }}</h2>

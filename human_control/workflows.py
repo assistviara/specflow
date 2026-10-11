@@ -53,7 +53,7 @@ class WorkflowService:
                 for shared in _SHARED - {'repository', 'implementation_target'}:
                     if shared in paths and _overlap(path, paths[shared]):
                         raise WorkflowBoundaryError('Writable storage overlaps a formal input.')
-        roots = ('state', 'history', 'plan', 'codex_prompt', 'review_dir', 'final_dir')
+        roots = ('state', 'history', 'plan', 'codex_prompt', 'review_dir', 'final_dir', 'human_approval_requests')
         for index, role in enumerate(roots):
             for other_role in roots[index + 1:]:
                 if role in paths and other_role in paths and _overlap(paths[role], paths[other_role]):

@@ -58,12 +58,15 @@ def context(project_id, workflow_id):
     project, work = repo.get_project(p), repo.get_workflow(w)
     active = ProjectService(repo).active_project()
     intent = repo.human_intent(p, w)
+    from human_control.approval_requests import presentation
+    approval_requests, approval_request_error = presentation(WorkflowService(repo), p, w, observation)
     # Fresh T5 result + actual index / Intent / Focus, never posted hidden state.
     stamp = hashlib.sha256(json.dumps([asdict(project), asdict(work),
         repo.artifact_references(w), intent, asdict(active) if active else None,
         asdict(result)], default=str, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return dict(runtime=runtime, service=service, project=project, work=work,
         result=result, observation=observation, intent=intent, stamp=stamp,
+        approval_requests=approval_requests, approval_request_error=approval_request_error,
         active=active is not None and active.project_id == p)
 
 

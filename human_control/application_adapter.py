@@ -230,6 +230,13 @@ class ApplicationAdapter:
         # Recheck index identity after caller input acquisition, before execution.
         self._binding()
         implemented = self._keep(self.ports.implementation.execute(request))
+        from human_control.approval_requests import save_request
+        try:
+            save_request(self.workflows, self.project_id, self.workflow_id, implemented)
+        except Exception:
+            return self._stop((implemented.stop_reason or 'Human Approval required.')
+                              + ' Additional Human Approval request persistence failed; '
+                              'the actual Output is retained in this process. Human review required.')
         if not implemented.success:
             return self._stop(implemented.stop_reason)
         self._references(test_execution_record=implemented.execution.test_execution_record_path)
