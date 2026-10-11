@@ -4,6 +4,7 @@ from core.ai.dummy_runner import DummyAIRunner
 from core.ai.prompt_adapter import PromptAdapter
 from core.plan_prompt_generator import PlanPromptGenerator
 from core.ai.ai_service import AIService
+from core.tdd_policy import TddPolicy
 
 def write_text_file(
     directory: Path,
@@ -96,6 +97,7 @@ def test_plan_prompt_can_be_executed_by_dummy_ai(
             "project_version": "0.2.0",
         },
         template_path=template_path,
+        tdd_policy=TddPolicy(required=True, rules="テストを先に作成し、初回失敗を確認してから実装する。"),
     )
 
     request = PromptAdapter.to_ai_request(prompt_result)
